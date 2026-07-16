@@ -1,0 +1,553 @@
+@prefix aps: <https://aps.engine/ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+# ── APS Engine ontology ───────────────────────────────────────────────────────
+# Core domain (master & transactional tables):
+#   ITEM, BOM (+ BOM line), DEMAND, ROUTING, OPERATION, WORKCENTER, CALENDAR
+# Planning scope: capacity, time, and material constraints.
+# ─────────────────────────────────────────────────────────────────────────────
+
+<https://aps.engine/ontology> a owl:Ontology ;
+    rdfs:label "APS Engine manufacturing ontology"@en ;
+    rdfs:label "Ontology san xuat APS Engine"@vi ;
+    rdfs:comment "Advanced Planning & Scheduling: capacity, time, and material constraints. Single file: OWL TBox + SHACL validation shapes."@en ;
+    dcterms:title "APS Engine Ontology"@en ;
+    owl:versionInfo "1.3.0" ;
+    owl:versionIRI <https://aps.engine/ontology/1.3.0> .
+
+# ── Classes (core seven + supporting) ─────────────────────────────────────────
+
+aps:Item a owl:Class ;
+    rdfs:label "Item"@en ;
+    rdfs:label "Ma hang / vat tu"@vi ;
+    rdfs:comment "Master: materials and products (ITEM table). Not every item has an in-plant routing (e.g. purchased raw material)."@en .
+
+aps:BOM a owl:Class ;
+    rdfs:label "Bill of Materials"@en ;
+    rdfs:label "Dinh muc (BOM)"@vi ;
+    rdfs:comment "One BOM structure for one output item; components are BOM lines (BOMComponent)."@en ;
+    rdfs:subClassOf
+        [ a owl:Restriction ;
+            owl:onProperty aps:hasBOMComponent ;
+            owl:someValuesFrom aps:BOMComponent
+        ],
+        [ a owl:Restriction ;
+            owl:onProperty aps:producesItem ;
+            owl:cardinality "1"^^xsd:nonNegativeInteger
+        ] ;
+    owl:disjointWith aps:BOMComponent, aps:Calendar, aps:CalendarShift, aps:DayOfWeek,
+        aps:Demand, aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType,
+        aps:Routing, aps:RoutingType, aps:WorkCenter .
+
+aps:BOMComponent a owl:Class ;
+    rdfs:label "BOM line"@en ;
+    rdfs:label "Dong dinh muc"@vi ;
+    rdfs:comment "Single component row: quantity, component item, effectivity, sequence."@en ;
+    rdfs:subClassOf
+        [ a owl:Restriction ; owl:onProperty aps:quantity ; owl:cardinality "1"^^xsd:nonNegativeInteger ],
+        [ a owl:Restriction ; owl:onProperty aps:componentItem ; owl:cardinality "1"^^xsd:nonNegativeInteger ],
+        [ a owl:Restriction ; owl:onProperty aps:belongsToBOM ; owl:cardinality "1"^^xsd:nonNegativeInteger ] ;
+    owl:disjointWith aps:Calendar, aps:CalendarShift, aps:DayOfWeek, aps:Demand,
+        aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType, aps:Routing,
+        aps:RoutingType, aps:WorkCenter .
+
+aps:Demand a owl:Class ;
+    rdfs:label "Demand / plan order"@en ;
+    rdfs:label "Nhu cau / lenh ke hoach"@vi ;
+    rdfs:comment "Production demand: item, quantity, dates; feeds scheduling (DEMAND table). Optional aps:plannedRouting must name a routing owned by the same item as aps:demandsItem (see OWL property chain + SHACL)."@en ;
+    rdfs:subClassOf
+        [ a owl:Restriction ;
+            owl:onProperty aps:demandsItem ;
+            owl:someValuesFrom aps:Item
+        ] ;
+    owl:disjointWith aps:BOM, aps:BOMComponent, aps:Calendar, aps:CalendarShift,
+        aps:DayOfWeek, aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType,
+        aps:Routing, aps:RoutingType, aps:WorkCenter .
+
+aps:Routing a owl:Class ;
+    rdfs:label "Routing"@en ;
+    rdfs:label "Quy trinh (routing)"@vi ;
+    rdfs:comment "Process route for a manufactured item: ordered operations (ROUTING table)."@en ;
+    rdfs:subClassOf
+        [ a owl:Restriction ;
+            owl:onProperty aps:hasOperation ;
+            owl:someValuesFrom aps:Operation
+        ] ;
+    owl:disjointWith aps:Calendar, aps:CalendarShift, aps:DayOfWeek, aps:Demand,
+        aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType, aps:RoutingType .
+
+aps:Operation a owl:Class ;
+    rdfs:label "Operation"@en ;
+    rdfs:label "Cong doan"@vi ;
+    rdfs:comment "Single routing step: sequence (aps:procSeq), work center, process type. Sequencing is unique per routing (SHACL); optional aps:immediatelyPrecedes links consecutive ops."@en ;
+    rdfs:subClassOf
+        [ a owl:Restriction ; owl:onProperty aps:belongsToRouting ; owl:someValuesFrom aps:Routing ],
+        [ a owl:Restriction ; owl:onProperty aps:usesWorkCenter ; owl:someValuesFrom aps:WorkCenter ],
+        [ a owl:Restriction ; owl:onProperty aps:procSeq ; owl:cardinality "1"^^xsd:nonNegativeInteger ] ;
+    owl:disjointWith aps:Calendar, aps:CalendarShift, aps:DayOfWeek, aps:Demand,
+        aps:DemandStatus, aps:Item, aps:ProcessType, aps:RoutingType .
+
+aps:WorkCenter a owl:Class ;
+    rdfs:label "Work center"@en ;
+    rdfs:label "Trung tam san xuat"@vi ;
+    rdfs:comment "Capacity unit: machines/lines; tied to calendar for available time (WORKCENTER table)."@en ;
+    rdfs:subClassOf
+        [ a owl:Restriction ;
+            owl:onProperty aps:hasCalendar ;
+            owl:someValuesFrom aps:Calendar
+        ] ;
+    owl:disjointWith aps:Calendar, aps:CalendarShift, aps:DayOfWeek, aps:Demand,
+        aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType, aps:Routing,
+        aps:RoutingType .
+
+aps:Calendar a owl:Class ;
+    rdfs:label "Calendar"@en ;
+    rdfs:label "Lich lam viec"@vi ;
+    rdfs:comment "Working-time definition for a work center: shifts and rules (CALENDAR table)."@en ;
+    owl:disjointWith aps:BOM, aps:BOMComponent, aps:CalendarShift, aps:DayOfWeek,
+        aps:Demand, aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType,
+        aps:Routing, aps:RoutingType, aps:WorkCenter .
+
+aps:CalendarShift a owl:Class ;
+    rdfs:label "Calendar shift"@en ;
+    rdfs:label "Ca lam viec"@vi ;
+    owl:disjointWith aps:BOM, aps:BOMComponent, aps:DayOfWeek, aps:Demand,
+        aps:DemandStatus, aps:Item, aps:Operation, aps:ProcessType, aps:Routing,
+        aps:RoutingType, aps:WorkCenter .
+
+aps:DayOfWeek a owl:Class ;
+    rdfs:label "Day of week"@en ;
+    rdfs:label "Thu trong tuan"@vi ;
+    owl:disjointWith aps:Item .
+
+aps:DemandStatus a owl:Class ;
+    rdfs:label "Demand status"@en ;
+    rdfs:label "Trang thai nhu cau"@vi ;
+    owl:disjointWith aps:DayOfWeek, aps:Item .
+
+aps:ProcessType a owl:Class ;
+    rdfs:label "Process type"@en ;
+    rdfs:label "Loai cong doan"@vi ;
+    owl:disjointWith aps:DayOfWeek, aps:DemandStatus, aps:Item, aps:RoutingType .
+
+aps:RoutingType a owl:Class ;
+    rdfs:label "Routing type"@en ;
+    rdfs:label "Loai routing"@vi ;
+    owl:disjointWith aps:DayOfWeek, aps:DemandStatus, aps:Item .
+
+# Item subtypes: scheduling needs routing for manufactured goods, not for purchased raw material.
+
+aps:Product a owl:Class ;
+    rdfs:label "Finished product"@en ;
+    rdfs:label "Thanh pham"@vi ;
+    rdfs:subClassOf aps:Item,
+        [ a owl:Restriction ; owl:onProperty aps:hasRouting ; owl:someValuesFrom aps:Routing ] ;
+    owl:disjointWith aps:RawMaterial, aps:SemiProduct .
+
+aps:SemiProduct a owl:Class ;
+    rdfs:label "Semi-finished product"@en ;
+    rdfs:label "Ban thanh pham"@vi ;
+    rdfs:subClassOf aps:Item,
+        [ a owl:Restriction ; owl:onProperty aps:hasRouting ; owl:someValuesFrom aps:Routing ] ;
+    owl:disjointWith aps:RawMaterial .
+
+aps:RawMaterial a owl:Class ;
+    rdfs:label "Raw / purchased material"@en ;
+    rdfs:label "Nguyen vat lieu"@vi ;
+    rdfs:comment "May have no in-plant routing; still appears on BOMs and demands."@en ;
+    rdfs:subClassOf aps:Item .
+
+# ── Object properties ─────────────────────────────────────────────────────────
+
+aps:belongsToBOM a owl:ObjectProperty ;
+    rdfs:label "Belongs to BOM"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range aps:BOM ;
+    owl:inverseOf aps:hasBOMComponent .
+
+aps:belongsToRouting a owl:ObjectProperty ;
+    rdfs:label "Belongs to routing"@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range aps:Routing ;
+    owl:inverseOf aps:hasOperation .
+
+aps:componentItem a owl:AsymmetricProperty, owl:IrreflexiveProperty, owl:ObjectProperty ;
+    rdfs:label "Component item"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range aps:Item .
+
+aps:demandsItem a owl:ObjectProperty ;
+    rdfs:label "Demands item"@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range aps:Item .
+
+aps:hasBOM a owl:ObjectProperty ;
+    rdfs:label "Has BOM"@en ;
+    rdfs:domain aps:Item ;
+    rdfs:range aps:BOM ;
+    owl:inverseOf aps:producesItem .
+
+aps:hasBOMComponent a owl:ObjectProperty ;
+    rdfs:label "Has BOM component"@en ;
+    rdfs:domain aps:BOM ;
+    rdfs:range aps:BOMComponent .
+
+aps:hasCalendar a owl:ObjectProperty ;
+    rdfs:label "Has calendar"@en ;
+    rdfs:domain aps:WorkCenter ;
+    rdfs:range aps:Calendar .
+
+aps:hasDemandStatus a owl:ObjectProperty ;
+    rdfs:label "Has demand status"@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range aps:DemandStatus .
+
+aps:hasOperation a owl:ObjectProperty ;
+    rdfs:label "Has operation"@en ;
+    rdfs:domain aps:Routing ;
+    rdfs:range aps:Operation .
+
+aps:hasProcessType a owl:ObjectProperty ;
+    rdfs:label "Has process type"@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range aps:ProcessType .
+
+aps:hasRouting a owl:ObjectProperty, owl:InverseFunctionalProperty ;
+    rdfs:label "Has routing"@en ;
+    rdfs:comment "InverseFunctional: a routing IRI cannot attach to two different items (single ownership)."@en ;
+    rdfs:domain aps:Item ;
+    rdfs:range aps:Routing .
+
+aps:routingOfItem a owl:ObjectProperty ;
+    rdfs:label "Routing of item (ownership)"@en ;
+    rdfs:comment "Inverse of aps:hasRouting; with hasRouting InverseFunctional, each routing belongs to at most one item."@en ;
+    rdfs:domain aps:Routing ;
+    rdfs:range aps:Item ;
+    owl:inverseOf aps:hasRouting .
+
+aps:plannedRouting a owl:ObjectProperty ;
+    rdfs:label "Planned routing for demand"@en ;
+    rdfs:comment "When present, must be a routing of the demanded item: chain (plannedRouting o routingOfItem) implies demandsItem."@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range aps:Routing .
+
+# Logical bridge: plannedRouting o routingOfItem => demandsItem (same demand line item as routing owner).
+_:DemandRoutingChain a owl:SubObjectPropertyOf ;
+    owl:propertyChainAxiom ( aps:plannedRouting aps:routingOfItem ) ;
+    owl:superObjectProperty aps:demandsItem .
+
+aps:immediatelyPrecedes a owl:ObjectProperty, owl:IrreflexiveProperty, owl:AsymmetricProperty ;
+    rdfs:label "Next operation in same routing"@en ;
+    rdfs:comment "Optional explicit sequence edge; must agree with aps:procSeq ordering within the same aps:belongsToRouting (validated in SHACL)."@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range aps:Operation .
+
+aps:hasRoutingType a owl:ObjectProperty ;
+    rdfs:label "Has routing type"@en ;
+    rdfs:domain aps:Routing ;
+    rdfs:range aps:RoutingType .
+
+aps:hasShift a owl:ObjectProperty ;
+    rdfs:label "Has shift"@en ;
+    rdfs:domain aps:Calendar ;
+    rdfs:range aps:CalendarShift .
+
+aps:hasShiftDay a owl:ObjectProperty ;
+    rdfs:label "Has shift day"@en ;
+    rdfs:domain aps:CalendarShift ;
+    rdfs:range aps:DayOfWeek .
+
+aps:producesItem a owl:ObjectProperty ;
+    rdfs:label "Output item of BOM"@en ;
+    rdfs:domain aps:BOM ;
+    rdfs:range aps:Item ;
+    owl:inverseOf aps:hasBOM .
+
+aps:usesWorkCenter a owl:ObjectProperty ;
+    rdfs:label "Uses work center"@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range aps:WorkCenter .
+
+# ── Datatype properties (attributes aligned to typical APS columns) ─────────────
+
+aps:bomSeq a owl:DatatypeProperty ;
+    rdfs:label "Line sequence in BOM"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range xsd:integer .
+
+aps:calendarId a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Calendar ID"@en ;
+    rdfs:domain aps:Calendar ;
+    rdfs:range xsd:string .
+
+aps:calendarName a owl:DatatypeProperty ;
+    rdfs:label "Calendar name"@en ;
+    rdfs:domain aps:Calendar ;
+    rdfs:range xsd:string .
+
+aps:deliveryDate a owl:DatatypeProperty ;
+    rdfs:label "Delivery date"@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range xsd:date .
+
+aps:effectiveEnd a owl:DatatypeProperty ;
+    rdfs:label "Effective end"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range xsd:date .
+
+aps:effectiveStart a owl:DatatypeProperty ;
+    rdfs:label "Effective start"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range xsd:date .
+
+aps:hourlyCapacity a owl:DatatypeProperty ;
+    rdfs:label "Standard hourly capacity"@en ;
+    rdfs:comment "Units per hour at this work center (capacity constraint)."@en ;
+    rdfs:domain aps:WorkCenter ;
+    rdfs:range xsd:decimal .
+
+aps:itemName a owl:DatatypeProperty ;
+    rdfs:label "Item name"@en ;
+    rdfs:domain aps:Item ;
+    rdfs:range xsd:string .
+
+aps:itemNo a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Item number"@en ;
+    rdfs:domain aps:Item ;
+    rdfs:range xsd:string .
+
+aps:line a owl:DatatypeProperty ;
+    rdfs:label "Line identifier"@en ;
+    rdfs:domain aps:WorkCenter ;
+    rdfs:range xsd:integer .
+
+aps:planDate a owl:DatatypeProperty ;
+    rdfs:label "Plan date"@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range xsd:date .
+
+aps:planNo a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Plan / demand number"@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range xsd:string .
+
+aps:planQty a owl:DatatypeProperty ;
+    rdfs:label "Planned quantity"@en ;
+    rdfs:domain aps:Demand ;
+    rdfs:range xsd:decimal .
+
+aps:procName a owl:DatatypeProperty ;
+    rdfs:label "Operation name"@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range xsd:string .
+
+aps:procNo a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Operation code"@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range xsd:string .
+
+aps:procSeq a owl:DatatypeProperty ;
+    rdfs:label "Operation sequence"@en ;
+    rdfs:domain aps:Operation ;
+    rdfs:range xsd:integer .
+
+aps:quantity a owl:DatatypeProperty ;
+    rdfs:label "Component quantity"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range xsd:decimal .
+
+aps:revisionNo a owl:DatatypeProperty ;
+    rdfs:label "Revision"@en ;
+    rdfs:domain aps:BOMComponent ;
+    rdfs:range xsd:integer .
+
+aps:routingName a owl:DatatypeProperty ;
+    rdfs:label "Routing name"@en ;
+    rdfs:domain aps:Routing ;
+    rdfs:range xsd:string .
+
+aps:routingNo a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Routing number"@en ;
+    rdfs:domain aps:Routing ;
+    rdfs:range xsd:string .
+
+aps:shiftEnd a owl:DatatypeProperty ;
+    rdfs:label "Shift end"@en ;
+    rdfs:domain aps:CalendarShift ;
+    rdfs:range xsd:time .
+
+aps:shiftStart a owl:DatatypeProperty ;
+    rdfs:label "Shift start"@en ;
+    rdfs:domain aps:CalendarShift ;
+    rdfs:range xsd:time .
+
+aps:spec a owl:DatatypeProperty ;
+    rdfs:label "Specification"@en ;
+    rdfs:domain aps:Item ;
+    rdfs:range xsd:string .
+
+aps:stdCapacity a owl:DatatypeProperty ;
+    rdfs:label "Standard throughput (routing)"@en ;
+    rdfs:comment "Optional nominal output rate for this routing (engine-specific unit)."@en ;
+    rdfs:domain aps:Routing ;
+    rdfs:range xsd:integer .
+
+aps:workshopCd a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:label "Workshop code"@en ;
+    rdfs:domain aps:WorkCenter ;
+    rdfs:range xsd:string .
+
+aps:workshopGroup a owl:DatatypeProperty ;
+    rdfs:label "Workshop group"@en ;
+    rdfs:domain aps:WorkCenter ;
+    rdfs:range xsd:string .
+
+aps:workshopName a owl:DatatypeProperty ;
+    rdfs:label "Workshop name"@en ;
+    rdfs:domain aps:WorkCenter ;
+    rdfs:range xsd:string .
+
+# ── Enumerations (individuals) ───────────────────────────────────────────────
+
+aps:Friday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Friday"@en ;
+    rdfs:label "Thu Sau"@vi .
+
+aps:InternalProcess a aps:ProcessType, owl:NamedIndividual ;
+    rdfs:label "Internal process"@en ;
+    rdfs:label "Noi bo"@vi .
+
+aps:Monday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Monday"@en ;
+    rdfs:label "Thu Hai"@vi .
+
+aps:OutsourceProcess a aps:ProcessType, owl:NamedIndividual ;
+    rdfs:label "Outsource process"@en ;
+    rdfs:label "Gia cong ngoai"@vi .
+
+aps:Saturday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Saturday"@en ;
+    rdfs:label "Thu Bay"@vi .
+
+aps:Sunday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Sunday"@en ;
+    rdfs:label "Chu Nhat"@vi .
+
+aps:Thursday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Thursday"@en ;
+    rdfs:label "Thu Nam"@vi .
+
+aps:Tuesday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Tuesday"@en ;
+    rdfs:label "Thu Ba"@vi .
+
+aps:VirtualProcess a aps:ProcessType, owl:NamedIndividual ;
+    rdfs:label "Virtual process"@en ;
+    rdfs:label "Ao / placeholder"@vi .
+
+aps:Wednesday a aps:DayOfWeek, owl:NamedIndividual ;
+    rdfs:label "Wednesday"@en ;
+    rdfs:label "Thu Tu"@vi .
+
+# ── SHACL (same file; validate e.g. pyshacl) ───────────────────────────────────
+
+aps:DemandWithRoutingShape a sh:NodeShape ;
+    rdfs:comment "If plannedRouting is set, it must be one of the item's hasRouting values."@en ;
+    sh:targetClass aps:Demand ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "plannedRouting must be linked from the demanded item via hasRouting."@en ;
+        sh:select """
+            PREFIX aps: <https://aps.engine/ns#>
+            SELECT $this WHERE {
+                $this aps:plannedRouting ?r .
+                $this aps:demandsItem ?i .
+                FILTER NOT EXISTS { ?i aps:hasRouting ?r . }
+            }
+        """
+    ] .
+
+aps:OperationSequenceShape a sh:NodeShape ;
+    rdfs:comment "procSeq required, integer, unique per routing."@en ;
+    sh:targetClass aps:Operation ;
+    sh:property [
+        sh:path aps:procSeq ;
+        sh:datatype xsd:integer ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:name "procSeq"@en
+    ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Duplicate procSeq within the same routing."@en ;
+        sh:select """
+            PREFIX aps: <https://aps.engine/ns#>
+            SELECT $this WHERE {
+                $this aps:belongsToRouting ?route .
+                $this aps:procSeq ?seq .
+                ?other aps:belongsToRouting ?route .
+                ?other aps:procSeq ?seq .
+                FILTER ( ?other != $this )
+            }
+        """
+    ] .
+
+aps:ImmediatePrecedenceShape a sh:NodeShape ;
+    rdfs:comment "Optional immediatelyPrecedes: same routing; procSeq step +1."@en ;
+    sh:targetClass aps:Operation ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "immediatelyPrecedes: operations must belong to the same routing."@en ;
+        sh:select """
+            PREFIX aps: <https://aps.engine/ns#>
+            SELECT $this WHERE {
+                $this aps:immediatelyPrecedes ?next .
+                $this aps:belongsToRouting ?r1 .
+                ?next aps:belongsToRouting ?r2 .
+                FILTER ( ?r1 != ?r2 )
+            }
+        """
+    ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "immediatelyPrecedes: successor procSeq must be predecessor + 1."@en ;
+        sh:select """
+            PREFIX aps: <https://aps.engine/ns#>
+            SELECT $this WHERE {
+                $this aps:immediatelyPrecedes ?next .
+                $this aps:procSeq ?s1 .
+                ?next aps:procSeq ?s2 .
+                FILTER ( ( ?s2 - ?s1 ) != 1 )
+            }
+        """
+    ] .
+
+aps:BOMQuantityShape a sh:NodeShape ;
+    rdfs:comment "Material constraint: BOM component quantity must be strictly positive when stated."@en ;
+    sh:targetClass aps:BOMComponent ;
+    sh:property [
+        sh:path aps:quantity ;
+        sh:minExclusive 0 ;
+        sh:name "quantity"@en
+    ] .
+
+aps:DemandPlanQtyShape a sh:NodeShape ;
+    rdfs:comment "Demand: planned quantity must be positive when stated (scheduling meaningless otherwise)."@en ;
+    sh:targetClass aps:Demand ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "planQty must be greater than zero when present."@en ;
+        sh:select """
+            PREFIX aps: <https://aps.engine/ns#>
+            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+            SELECT $this WHERE {
+                $this aps:planQty ?q .
+                FILTER ( ?q <= 0 )
+            }
+        """
+    ] .

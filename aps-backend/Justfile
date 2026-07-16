@@ -1,0 +1,74 @@
+set windows-shell := ["powershell", "-c"]
+
+# Common variables
+python := "uv run python"
+migrate := "uv run alembic"
+uvicorn := "uv run uvicorn"
+black := "uv run black"
+flake8 := "uv run flake8"
+mypy := "uv run mypy"
+
+# Import platform-specific recipes
+import '.just/unix.just'
+import '.just/windows.just'
+
+# List recipes
+default:
+    @echo 'OS: {{os()}}'
+    @just --list
+
+# Setup project
+setup: venv install env
+
+# Check code style (formatting, linting, type checking)
+check-format: fmt lint typecheck
+
+# ─── Docker compose shortcuts (platform-agnostic) ──────────────────────
+
+# Start all services in background
+up:
+    docker compose up -d
+
+# Rebuild images then start all services
+up-build:
+    docker compose up -d --build
+
+# Stop all services (keep volumes / data)
+down:
+    docker compose down
+
+# Stop all services AND wipe volumes (DESTROYS DB DATA)
+[confirm("Wipe all volumes? This DELETES Postgres + Neo4j data! [y/N]")]
+down-v:
+    docker compose down -v
+
+# Show service status
+ps:
+    docker compose ps
+
+# Tail logs of a service (default: api). Usage: just logs api | just logs db
+logs service="api":
+    docker compose logs -f {{service}}
+
+# Restart a service (default: api)
+restart service="api":
+    docker compose restart {{service}}
+
+# Open shell inside a service (default: api). Usage: just sh api | just sh db
+sh service="api":
+    docker compose exec {{service}} bash
+
+# ─── DB workflows ──────────────────────────────────────────────────────
+
+# Soft reset DB: run migrations + seed (data preserved if already exists)
+db-reset: migrate seed
+
+# Full reset DB: wipe volumes → up → migrate → seed (DESTROYS DATA)
+[confirm("Full reset will DROP all DB data and reseed from G-System. Continue? [y/N]")]
+db-wipe:
+    docker compose down -v
+    docker compose up -d
+    @echo "Waiting for db + neo4j to be healthy..."
+    @until [ "$(docker inspect -f '{{{{.State.Health.Status}}}}' aps_core_db 2>/dev/null)" = "healthy" ] && [ "$(docker inspect -f '{{{{.State.Health.Status}}}}' aps_neo4j 2>/dev/null)" = "healthy" ]; do sleep 2; done
+    just migrate
+    just seed
