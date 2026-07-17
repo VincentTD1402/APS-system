@@ -1,0 +1,171 @@
+{
+  "app": {
+    "title": "APS 시스템",
+    "language": "언어"
+  },
+  "nav": {
+    "aps": "APS 작업계획",
+    "masters": "마스터 데이터",
+    "workCenters": "작업장 / 설비",
+    "items": "품목 / 라우팅",
+    "bom": "BOM",
+    "inventory": "재고",
+    "mps": "생산계획 (MPS)"
+  },
+  "common": {
+    "run": "RUN APS",
+    "apply": "적용 (Apply)",
+    "showAll": "전체보기",
+    "save": "저장",
+    "cancel": "취소",
+    "confirm": "확인",
+    "close": "닫기",
+    "detail": "상세",
+    "all": "전체",
+    "search": "검색",
+    "loading": "로딩중...",
+    "noData": "데이터 없음"
+  },
+  "filter": {
+    "dateRange": "기간",
+    "workCenter": "워크센터",
+    "item": "품목",
+    "risk": "리스크"
+  },
+  "kpi": {
+    "onTime": "계획납기 준수율",
+    "materialShort": "공정 투입 자재 부족",
+    "overloadWc": "공정부하율 초과",
+    "planRisk": "계획 수립 예상 리스크",
+    "unitPct": "%",
+    "unitCase": "건",
+    "unitWc": "%WC"
+  },
+  "loadMatrix": {
+    "title": "부하내역",
+    "subtitle": "워크센터 × 날짜",
+    "legend": {
+      "normal": "정상",
+      "materialShort": "자재부족",
+      "overload": "부하초과",
+      "both": "자재부족+부하초과",
+      "empty": "미배정"
+    }
+  },
+  "matrix": {
+    "aggregate": "WC 집계",
+    "detail": "계획 상세"
+  },
+  "planMatrix": {
+    "title": "계획별 부하 상세",
+    "subtitle": "각 행 = 1 계획 · 셀 값 = 일별 생산 수량",
+    "col": {
+      "wc": "작업장",
+      "item": "품목",
+      "qty": "계획수량"
+    }
+  },
+  "workPlanList": {
+    "title": "작업계획 리스트",
+    "subtitle": "총 {total}건 · 위험 {risk}건 · 지연 {delay}건",
+    "col": {
+      "workOrderNo": "작업지시번호",
+      "tmpPlanNo": "(임시)작업계획번호",
+      "orderNo": "오더",
+      "item": "품목",
+      "wc": "워크센터",
+      "process": "공정",
+      "planQty": "계획수량",
+      "planStart": "계획시작",
+      "planEnd": "계획완료",
+      "deliveryDate": "납기일자",
+      "sourceType": "리스트유형",
+      "riskType": "리스크유형",
+      "action": "액션"
+    }
+  },
+  "risk": {
+    "normal": "정상",
+    "materialShort": "자재부족",
+    "overload": "부하초과",
+    "both": "자재부족+부하초과"
+  },
+  "detail": {
+    "title": "유형별 상세",
+    "selectPlan": "왼쪽 리스트에서 계획을 선택하세요",
+    "purchaseRequest": "구매요청",
+    "scheduleAdjust": "일정조정",
+    "createWorkOrder": "작업지시 생성",
+    "adjustedBadge": "조정 적용됨",
+    "info": {
+      "item": "품목",
+      "wc": "워크센터",
+      "planQty": "계획수량",
+      "delivery": "납기일자",
+      "start": "시작",
+      "end": "종료",
+      "source": "출처"
+    },
+    "source": {
+      "workOrder": "작업지시",
+      "mps": "MPS"
+    }
+  },
+  "dialog": {
+    "purchase": {
+      "title": "구매요청",
+      "shortageQty": "부족 수량",
+      "requestQty": "요청 수량",
+      "note": "메모"
+    },
+    "adjust": {
+      "title": "일정조정",
+      "newStart": "새 시작일",
+      "newEnd": "새 종료일",
+      "note": "저장 후 Apply 버튼을 클릭하여 매트릭스에 반영하세요."
+    }
+  },
+  "master": {
+    "wc": {
+      "code": "코드",
+      "name": "이름",
+      "defaultRuntime": "기본 가동시간(분)",
+      "totalRuntime": "총 가동시간(분)",
+      "equipmentCount": "설비 수"
+    },
+    "equipment": {
+      "code": "설비코드",
+      "stRate": "ST환산율",
+      "runtime": "가동시간(분)"
+    },
+    "item": {
+      "code": "품목코드",
+      "name": "이름",
+      "uom": "단위"
+    },
+    "routing": {
+      "step": "단계",
+      "wc": "워크센터",
+      "process": "공정",
+      "standardSt": "표준S/T(분)"
+    },
+    "bom": {
+      "parent": "상위품목",
+      "child": "하위품목",
+      "qtyPer": "소요량"
+    },
+    "inventory": {
+      "warehouse": "창고",
+      "onHand": "재고량",
+      "asOf": "기준일"
+    }
+  },
+  "mps": {
+    "list": "MPS 목록",
+    "add": "추가",
+    "orderNo": "오더 번호",
+    "endDate": "종료일자",
+    "status": "상태",
+    "statusDraft": "작성"
+  }
+}

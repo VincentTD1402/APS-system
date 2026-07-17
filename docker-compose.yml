@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: aps-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aps}
+      POSTGRES_USER: ${POSTGRES_USER:-aps}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aps_dev_pw}
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - aps-db-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aps} -d ${POSTGRES_DB:-aps}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./aps-backend
+      dockerfile: Dockerfile
+    container_name: aps-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aps}:${POSTGRES_PASSWORD:-aps_dev_pw}@db:5432/${POSTGRES_DB:-aps}
+      APS_TIMEZONE: Asia/Seoul
+      GSYSTEM_MODE: mock
+      ERP_MODE: outbox
+      PYTHONPATH: /app
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./aps-frontend
+      dockerfile: Dockerfile
+    container_name: aps-frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:${BACKEND_PORT:-8000}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./aps-frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  aps-db-data:

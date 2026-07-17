@@ -1,0 +1,38 @@
+,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,APS
+,,,,,,,,,,,,,,,,,,,,,[Tỉ lệ đạt(Yeild) tiêu chuẩn giao hàng kế hoạch]
+,,,,,,,,,,,,,,,,,,,,,. Tỉ lệ Over giao hàng
+,,,,,,,,,,,,,,,,,,,,,. Tỉ lệ của những cái có Ngày giao hàng < hoàn thành kế hoạch
+,,,,,,,,,,,,,,,,,,,,,[Thiếu vật liệu input]
+,,,,,,,,,,,,,,,,,,,,,. Số vụ thiếu vật liệu input
+,,,,,,,,,,,,,,,,,,,,,. Chỉ thị sản xuất của vật liệu thiết bố trí lên trên
+,,,,,,,,,,,,,,,,,,,,,. Chức năng yêu cầu mua hàng
+,,,,,,,,,,,,,,,,,,,,,[ Tỉ lệ tải công đoạn]
+,,,,,,,,,,,,,,,,,,,,,. Tỉ lệ tải công đoạn (Over Capa)
+,,,,,,,,,,,,,,,,,,,,,. Chỉ thị sản xuất của quá tải công đoạn bố trí lên trên
+,,,,,,,,,,,,,,,,,,,,,. Chức năng điều chỉnh lịch trình
+,,,,,,,,,,,,,,,,,,,,,[ List dự kiến lập kế hoạch]
+,,,,,,,,,,,,,,,,,,,,,". Số vụ chỉ thị sản xuất thiếu vật liệu, quá tải công đoạn"
+,,,,,,,,,,,,,,,,,,,,,> Tạo chỉ thị sản xuất theo Work Plan đã được điều chỉnh
+,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,[Chi tiết tải],,,,,,,,,,
+,,,,,,,,,,,"1. Khi thực hiện RUN lần đầu, tạo và hiển thị 부하내역",,,,,,,,,,
+,,,,,,,,,,,"1. Hiển thị trạng thái theo ngày : Xanh lá (Bình thường), Cam (Quá tải)",,,,,,,,,,
+,,,,,,,,,,,,,,"Xanh dương (Thiếu vật liệu), Đỏ (Quá tải + Thiếu vật liệu)",,,,,,,
+,,,,,,,,,,,2. Nhấn 전체보기(Xem tất cả) → Hiển thị danh sách kế hoạch sản xuất toàn bộ ở phía dưới.,,,,,,,,,,
+,,,,,,,,,,,3. Nhấn vào 상태(Trạng thái) → Hiển thị Danh sách kế hoạch sản xuất theo Work Center/theo ngày ở phía dưới.,,,,,,,,,,
+,,,,,,,,,,,[Danh sách kế hoạch sản xuất],,,,,,,,,,
+,,,,,,,,,,,"1. Khi thực hiện RUN lần đầu, tạo và hiển thị 작업계획리스트 (List kế hoạch sản xuất)",,,,,,,,,,
+,,,,,,,,,,,"2. Cấu tạo các cột như : 작업번호(mã sản xuất), 오더 No(Order No), 품목(Item), 공정(Công đoạn), 리스트유형(loại hình List)",,,,,,,,,,
+,,,,,,,,,,,3. Hiển thị loại Risk (Thiếu vật liệu/Quá tải).,,,,,,,,,,
+,,,,,,,,,,,4. Hiển thị Thiếu vật liệu/Quá tải ở vị trí đầu của 작업계획(kế hoạch sản xuất).,,,,,,,,,,
+,,,,,,,,,,,"5. Khi nhấn ""상세 Chi tiết"", hiển thị 유형별상세(Chi tiết theo loại hình) của 작업생산계획번호(mã kế hoạch sản xuất) ở phía bên phải.",,,,,,,,,,
+,,,,,,,,,,,[Chi tiết theo loại hình],,,,,,,,,,
+,,,,,,,,,,,"1. Khi thực hiện RUN lần đầu, hiển thị toàn bộ 유형별상세",,,,,,,,,,
+,,,,,,,,,,,2. Nhấn button 리스크유형 (loại Risk)→ Mở màn hình 조정(Điều chỉnh),,,,,,,,,,
+,,,,,,,,,,,3. Yêu cầu mua hàng: Tạo Yêu cầu mua hàng ERP.,,,,,,,,,,
+,,,,,,,,,,,4. Điều chỉnh lịch: Điều chỉnh lại APS,,,,,,,,,,
+,,,,,,,,,,,[Button],,,,,,,,,,
+,,,,,,,,,,,1. Restore: Phản ánh điều chỉnh lịch.,,,,,,,,,,
+,,,,,,,,,,,2. 작업지시번호 (Tạo chỉ thị sản xuất): Tạo chỉ thị sản xuất trên ERP.,,,,,,,,,,

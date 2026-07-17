@@ -1,0 +1,171 @@
+{
+  "app": {
+    "title": "Hệ thống APS",
+    "language": "Ngôn ngữ"
+  },
+  "nav": {
+    "aps": "Kế hoạch APS",
+    "masters": "Master data",
+    "workCenters": "Work Center / Thiết bị",
+    "items": "Item / Routing",
+    "bom": "BOM",
+    "inventory": "Tồn kho",
+    "mps": "MPS"
+  },
+  "common": {
+    "run": "Chạy APS",
+    "apply": "Áp dụng (Apply)",
+    "showAll": "Xem tất cả",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "confirm": "Xác nhận",
+    "close": "Đóng",
+    "detail": "Chi tiết",
+    "all": "Tất cả",
+    "search": "Tìm kiếm",
+    "loading": "Đang tải...",
+    "noData": "Không có dữ liệu"
+  },
+  "filter": {
+    "dateRange": "Khoảng ngày",
+    "workCenter": "Work Center",
+    "item": "Item",
+    "risk": "Rủi ro"
+  },
+  "kpi": {
+    "onTime": "Tỉ lệ giao hàng đúng hạn",
+    "materialShort": "Thiếu vật liệu",
+    "overloadWc": "WC quá tải",
+    "planRisk": "Rủi ro dự kiến",
+    "unitPct": "%",
+    "unitCase": "vụ",
+    "unitWc": "%WC"
+  },
+  "loadMatrix": {
+    "title": "Chi tiết tải",
+    "subtitle": "Work Center × Ngày",
+    "legend": {
+      "normal": "Bình thường",
+      "materialShort": "Thiếu vật liệu",
+      "overload": "Quá tải",
+      "both": "Thiếu VL + Quá tải",
+      "empty": "Chưa phân bổ"
+    }
+  },
+  "matrix": {
+    "aggregate": "Tổng hợp WC",
+    "detail": "Chi tiết Plan"
+  },
+  "planMatrix": {
+    "title": "Chi tiết tải theo Plan",
+    "subtitle": "Mỗi hàng = 1 plan · số trong ô = SL sản xuất trong ngày",
+    "col": {
+      "wc": "WC",
+      "item": "Item",
+      "qty": "SL kế hoạch"
+    }
+  },
+  "workPlanList": {
+    "title": "Danh sách kế hoạch sản xuất",
+    "subtitle": "Tổng {total} · Rủi ro {risk} · Trễ {delay}",
+    "col": {
+      "workOrderNo": "Mã chỉ thị SX",
+      "tmpPlanNo": "Mã KHSX tạm",
+      "orderNo": "Order",
+      "item": "Item",
+      "wc": "Work Center",
+      "process": "Công đoạn",
+      "planQty": "SL kế hoạch",
+      "planStart": "Bắt đầu KH",
+      "planEnd": "Hoàn thành KH",
+      "deliveryDate": "Ngày giao",
+      "sourceType": "Nguồn",
+      "riskType": "Loại rủi ro",
+      "action": "Thao tác"
+    }
+  },
+  "risk": {
+    "normal": "Bình thường",
+    "materialShort": "Thiếu vật liệu",
+    "overload": "Quá tải",
+    "both": "Thiếu VL + Quá tải"
+  },
+  "detail": {
+    "title": "Chi tiết theo loại",
+    "selectPlan": "Chọn 1 kế hoạch từ danh sách bên trái",
+    "purchaseRequest": "Yêu cầu mua hàng",
+    "scheduleAdjust": "Điều chỉnh lịch",
+    "createWorkOrder": "Tạo chỉ thị SX",
+    "adjustedBadge": "Đã áp dụng chỉnh",
+    "info": {
+      "item": "Item",
+      "wc": "Work Center",
+      "planQty": "SL kế hoạch",
+      "delivery": "Ngày giao",
+      "start": "Bắt đầu",
+      "end": "Kết thúc",
+      "source": "Nguồn"
+    },
+    "source": {
+      "workOrder": "Chỉ thị SX",
+      "mps": "MPS"
+    }
+  },
+  "dialog": {
+    "purchase": {
+      "title": "Yêu cầu mua hàng",
+      "shortageQty": "SL thiếu",
+      "requestQty": "SL yêu cầu mua",
+      "note": "Ghi chú"
+    },
+    "adjust": {
+      "title": "Điều chỉnh lịch trình",
+      "newStart": "Ngày bắt đầu mới",
+      "newEnd": "Ngày kết thúc mới",
+      "note": "Sau khi lưu, bấm nút Apply để phản ánh chỉnh sửa vào matrix."
+    }
+  },
+  "master": {
+    "wc": {
+      "code": "Mã",
+      "name": "Tên",
+      "defaultRuntime": "Thời gian mặc định (phút)",
+      "totalRuntime": "Tổng thời gian (phút)",
+      "equipmentCount": "Số thiết bị"
+    },
+    "equipment": {
+      "code": "Mã thiết bị",
+      "stRate": "Tỉ lệ ST",
+      "runtime": "Thời gian (phút)"
+    },
+    "item": {
+      "code": "Mã Item",
+      "name": "Tên",
+      "uom": "Đơn vị"
+    },
+    "routing": {
+      "step": "Bước",
+      "wc": "Work Center",
+      "process": "Công đoạn",
+      "standardSt": "S/T tiêu chuẩn (phút)"
+    },
+    "bom": {
+      "parent": "Item cha",
+      "child": "Item con",
+      "qtyPer": "Định mức"
+    },
+    "inventory": {
+      "warehouse": "Kho",
+      "onHand": "Tồn",
+      "asOf": "Ngày chốt"
+    }
+  },
+  "mps": {
+    "list": "Danh sách MPS",
+    "add": "Thêm",
+    "orderNo": "Mã Order",
+    "endDate": "Ngày kết thúc",
+    "status": "Trạng thái",
+    "statusDraft": "Đã lập"
+  }
+}

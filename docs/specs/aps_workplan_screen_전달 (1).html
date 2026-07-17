@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI APS | 작업계획 조정</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-0:#0a0e14;
+  --bg-1:#111823;
+  --bg-2:#161f2c;
+  --bg-3:#1c2735;
+  --line:#25324450;
+  --line-strong:#2e3d52;
+  --text-0:#e8edf4;
+  --text-1:#aab8c9;
+  --text-2:#71818f;
+  --accent:#ff8a3d;
+  --accent-dim:#ff8a3d26;
+  --ok:#2fd188;
+  --ok-dim:#2fd18820;
+  --warn:#f5b93d;
+  --warn-dim:#f5b93d22;
+  --crit:#ff5468;
+  --crit-dim:#ff546822;
+  --mat:#4f8cff;
+  --mat-dim:#4f8cff2e;
+  --cap:#ff9f43;
+  --cap-dim:#ff9f4322;
+  --capacity:#ff9f43;
+  --capacity-dim:#ff9f432c;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans KR',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:radial-gradient(circle at 15% 0%, #131c2a 0%, var(--bg-0) 55%);
+  color:var(--text-0);
+  font-family:var(--sans);
+  font-size:13px;
+  min-height:100vh;
+  padding:20px;
+}
+.shell{max-width:1720px;margin:0 auto;}
+
+/* ===== Top bar ===== */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;background:var(--bg-1);
+  border:1px solid var(--line-strong);border-radius:10px;margin-bottom:14px;
+}
+.topbar-left{display:flex;align-items:center;gap:14px;}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;letter-spacing:.3px;}
+.brand .dot{width:9px;height:9px;border-radius:2px;background:var(--accent);box-shadow:0 0 10px var(--accent);}
+.brand small{color:var(--text-2);font-weight:500;font-size:11px;margin-left:2px;}
+.crumb{color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:6px;}
+.crumb b{color:var(--text-1);font-weight:600;}
+.topbar-right{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-1);}
+.badge-sim{background:var(--ok-dim);color:var(--ok);border:1px solid #2fd18855;padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:11px;font-weight:600;}
+.user-chip{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 6px;background:var(--bg-2);border:1px solid var(--line-strong);border-radius:20px;}
+.user-chip .av{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#ff8a3d,#f5b93d);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#1a1204;}
+
+/* ===== Filter bar ===== */
+.filterbar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 14px;background:var(--bg-1);border:1px solid var(--line-strong);border-radius:10px;margin-bottom:14px;
+}
+.f-group{display:flex;align-items:center;gap:6px;}
+.f-label{font-size:11px;color:var(--text-2);font-weight:600;}
+.f-input,.f-select{
+  background:var(--bg-2);border:1px solid var(--line-strong);color:var(--text-0);
+  padding:6px 10px;border-radius:6px;font-size:12px;font-family:var(--mono);
+}
+.date-input{color-scheme:dark;cursor:pointer;}
+.date-input::-webkit-calendar-picker-indicator{
+  filter:invert(0.75) brightness(1.3);cursor:pointer;
+}
+.date-input:hover{border-color:var(--accent);}
+.btn{
+  border:1px solid var(--line-strong);background:var(--bg-2);color:var(--text-1);
+  padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:6px;transition:.15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--text-0);}
+.btn-primary{background:var(--accent);color:#1a1204;border-color:var(--accent);}
+.btn-primary:hover{filter:brightness(1.08);}
+.spacer{flex:1;}
+
+/* ===== KPI row ===== */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+.kpi{
+  background:var(--bg-1);border:1px solid var(--line-strong);border-radius:10px;padding:16px 18px;
+  position:relative;overflow:hidden;
+}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--k-color,var(--accent));}
+.kpi-label{font-size:11.5px;color:var(--text-2);font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.kpi-value{font-family:var(--mono);font-size:28px;font-weight:600;color:var(--text-0);}
+.kpi-value span{font-size:14px;color:var(--text-2);font-weight:500;margin-left:2px;}
+.kpi.ok{--k-color:var(--ok);}
+.kpi.mat{--k-color:var(--mat);}
+.kpi.cap{--k-color:var(--capacity);}
+.kpi.crit{--k-color:var(--crit);}
+.kpi.crit .kpi-value{color:var(--crit);}
+.kpi.mat .kpi-value{color:var(--mat);}
+.kpi.cap .kpi-value{color:var(--capacity);}
+.kpi.ok .kpi-value{color:var(--ok);}
+
+/* ===== Main layout ===== */
+.main-grid{display:grid;grid-template-columns:1fr 420px;gap:14px;align-items:start;}
+.col-left{display:flex;flex-direction:column;gap:14px;min-width:0;}
+
+.panel{
+  background:var(--bg-1);border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;
+}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--line);
+}
+.panel-title{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;}
+.panel-title .tag{
+  font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text-2);
+  border:1px solid var(--line-strong);padding:1px 6px;border-radius:4px;
+}
+.panel-sub{font-size:11px;color:var(--text-2);}
+.panel-body{padding:14px 16px;}
+
+/* ---- 부하내역 캘린더 ---- */
+.cal-wrap{overflow-x:auto;}
+.cal{width:100%;border-collapse:collapse;min-width:1680px;}
+.cal th{
+  font-size:10.5px;color:var(--text-2);font-weight:600;text-align:center;
+  padding:6px 4px;border-bottom:1px solid var(--line);font-family:var(--mono);
+}
+.cal th.wc-col{text-align:left;padding-left:6px;width:110px;}
+.cal td{padding:4px;text-align:center;}
+.cal td.wc-name{
+  text-align:left;padding-left:6px;font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--text-1);
+  border-right:1px solid var(--line);
+}
+.cell{
+  height:26px;border-radius:4px;cursor:pointer;position:relative;transition:.12s;
+  border:1px solid transparent;
+}
+.cell:hover{transform:scale(1.08);border-color:#fff5;}
+.cell.g{background:var(--ok);opacity:.85;}
+.cell.b{background:var(--mat);opacity:.9;}
+.cell.p{background:var(--capacity);opacity:.9;}
+.cell.r{background:var(--crit);}
+.cell.n{background:var(--bg-3);border:1px dashed var(--line-strong);opacity:.65;}
+.cell.empty{background:var(--bg-2);opacity:.4;}
+.cell.selected{outline:2px solid var(--accent);outline-offset:1px;}
+.cal-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text-2);}
+.cal-legend span{display:flex;align-items:center;gap:5px;}
+.lg-dot{width:9px;height:9px;border-radius:2px;}
+
+/* ---- 작업계획 리스트 테이블 ---- */
+.tbl-scroll{max-height:360px;overflow-y:auto;}
+table.data{width:100%;border-collapse:collapse;font-size:12px;}
+table.data thead th{
+  position:sticky;top:0;background:var(--bg-2);z-index:1;
+  text-align:left;padding:9px 10px;font-size:10.5px;color:var(--text-2);font-weight:600;
+  border-bottom:1px solid var(--line-strong);white-space:nowrap;
+}
+table.data tbody td{
+  padding:9px 10px;border-bottom:1px solid var(--line);color:var(--text-1);white-space:nowrap;
+}
+table.data tbody tr{cursor:pointer;transition:.12s;}
+table.data tbody tr:hover{background:var(--bg-2);}
+table.data tbody tr.active{background:var(--accent-dim);}
+table.data tbody tr.active td{color:var(--text-0);}
+.mono{font-family:var(--mono);}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+  font-size:10.5px;font-weight:700;font-family:var(--mono);white-space:nowrap;
+  border:1px solid transparent;
+}
+.chip-dot{width:6px;height:6px;border-radius:50%;flex:none;}
+.chip.mat{background:var(--mat-dim);color:var(--mat);border-color:#4f8cff70;}
+.chip.mat .chip-dot{background:var(--mat);box-shadow:0 0 4px var(--mat);}
+.chip.cap{background:var(--capacity-dim);color:var(--capacity);border-color:#ff9f4370;}
+.chip.cap .chip-dot{background:var(--capacity);box-shadow:0 0 4px var(--capacity);}
+.chip.ok{background:var(--ok-dim);color:var(--ok);border-color:#2fd18870;}
+.chip.ok .chip-dot{background:var(--ok);box-shadow:0 0 4px var(--ok);}
+.status-pill{padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700;}
+.status-pill.risk{background:var(--crit-dim);color:var(--crit);}
+.status-pill.delay{background:var(--cap-dim);color:var(--cap);}
+.status-pill.norm{background:var(--ok-dim);color:var(--ok);}
+.link-btn{
+  background:none;border:1px solid var(--line-strong);color:var(--text-1);
+  padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600;
+}
+.link-btn:hover{border-color:var(--accent);color:var(--accent);}
+.score{font-family:var(--mono);font-weight:700;}
+
+/* ---- 우측 유형별 상세 ---- */
+.detail-panel{position:sticky;top:20px;display:flex;flex-direction:column;max-height:calc(100vh - 40px);}
+.detail-list{overflow-y:auto;flex:1;}
+.d-item{
+  padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer;transition:.12s;
+  position:relative;
+}
+.d-item:hover{background:var(--bg-2);}
+.d-item.selected{background:var(--bg-3);}
+.d-item.selected::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+.d-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.d-target{font-family:var(--mono);font-weight:700;font-size:12.5px;color:var(--text-0);}
+.d-sev{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.3px;}
+.d-sev.CRITICAL{background:var(--crit-dim);color:var(--crit);}
+.d-sev.LOW{background:var(--text-2)22;color:var(--text-2);}
+.d-summary{font-size:11.5px;color:var(--text-1);line-height:1.5;margin-bottom:8px;}
+.d-summary b{color:var(--text-0);font-weight:600;}
+.d-meta{display:flex;align-items:center;justify-content:space-between;}
+.d-status{font-size:10px;color:var(--text-2);font-family:var(--mono);}
+.d-status.done{color:var(--ok);}
+.d-action{
+  padding:5px 11px;border-radius:5px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+  display:flex;align-items:center;gap:5px;
+}
+.d-action.mat-btn{background:var(--mat-dim);color:var(--mat);border:1px solid #4f8cff55;}
+.d-action.mat-btn:hover{background:var(--mat);color:#0a1230;}
+.d-action.cap-btn{background:var(--capacity-dim);color:var(--capacity);border:1px solid #ff9f4355;}
+.d-action.cap-btn:hover{background:var(--capacity);color:#1f1533;}
+.d-action.done-btn{background:var(--ok-dim);color:var(--ok);border:1px solid #2fd18855;cursor:default;}
+
+.detail-empty{padding:40px 20px;text-align:center;color:var(--text-2);font-size:12px;}
+.detail-empty .ico{font-size:26px;margin-bottom:10px;opacity:.5;}
+
+.footer-note{
+  padding:10px 16px;border-top:1px solid var(--line);background:var(--bg-2);
+  font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:8px;
+}
+
+/* ===== Drawer (구매요청/일정조정 모달) ===== */
+.overlay{
+  position:fixed;inset:0;background:#00000090;backdrop-filter:blur(2px);
+  display:none;align-items:stretch;justify-content:flex-end;z-index:50;
+}
+.overlay.show{display:flex;}
+.drawer{
+  width:440px;max-width:92vw;background:var(--bg-1);border-left:1px solid var(--line-strong);
+  height:100%;overflow-y:auto;animation:slidein .22s ease-out;
+  display:flex;flex-direction:column;
+}
+@keyframes slidein{from{transform:translateX(30px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+.drawer-head{
+  padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+}
+.drawer-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.drawer-close{background:none;border:none;color:var(--text-2);font-size:18px;cursor:pointer;line-height:1;}
+.drawer-close:hover{color:var(--text-0);}
+.drawer-body{padding:20px;flex:1;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:11px;color:var(--text-2);font-weight:600;margin-bottom:6px;}
+.field .val{
+  background:var(--bg-2);border:1px solid var(--line-strong);border-radius:6px;padding:9px 11px;
+  font-family:var(--mono);font-size:12.5px;color:var(--text-0);
+}
+.field input,.field select{
+  width:100%;background:var(--bg-2);border:1px solid var(--line-strong);border-radius:6px;
+  padding:9px 11px;font-family:var(--mono);font-size:12.5px;color:var(--text-0);
+}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sim-box{
+  background:var(--warn-dim);border:1px solid #f5b93d40;border-radius:8px;padding:12px 14px;margin-top:4px;
+}
+.sim-box .sim-title{font-size:11px;font-weight:700;color:var(--cap);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.sim-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text-1);}
+.sim-row b{color:var(--text-0);font-family:var(--mono);}
+.sim-row.improve b{color:var(--ok);}
+.drawer-foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px;}
+.drawer-foot .btn{flex:1;justify-content:center;padding:10px;}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="brand"><span class="dot"></span>AI APS<small>Advanced Planning &amp; Scheduling</small></div>
+      <div class="crumb">한일차단기㈜ <span style="color:var(--text-2)">/</span> <b>작업계획 조정</b></div>
+    </div>
+    <div class="topbar-right">
+      <span class="badge-sim">● SIMULATED</span>
+      <span id="genTimeLabel">생성 2026-07-01 09:15</span>
+      <div class="user-chip"><span class="av">종</span> 종성 책임</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filterbar">
+    <div class="f-group"><span class="f-label">사업부</span><input class="f-input" style="width:110px" placeholder="전체"></div>
+    <div class="f-group"><span class="f-label">구간</span><select class="f-select"><option>확정</option><option>계획</option></select></div>
+    <div class="f-group"><span class="f-label">시나리오</span><select class="f-select" style="width:160px"><option>what-if-what_if_:shift_schedule_1</option></select></div>
+    <div class="f-group"><span class="f-label">기간</span>
+      <input class="f-input date-input" type="date" id="periodFromInput" style="width:130px" value="2026-06-01">
+      <span style="color:var(--text-2)">→</span>
+      <input class="f-input date-input" type="date" id="periodToInput" style="width:130px" value="2026-10-31">
+    </div>
+    <div class="f-group"><span class="f-label">계획번호</span><input class="f-input mono" id="planNoInput" style="width:170px" value="v40 · SCH-R35_sim_1"></div>
+    <button class="btn btn-primary" onclick="createWorkOrder()">📋 작업지시 생성</button>
+    <div class="spacer"></div>
+    <button class="btn">↺ Restore</button>
+    <button class="btn btn-primary" id="runBtn" onclick="runSimulation()">▶ RUN</button>
+  </div>
+
+  <!-- KPI row -->
+  <div class="kpi-row">
+    <div class="kpi ok"><div class="kpi-label">계획납기 준수율</div><div class="kpi-value" id="kpiOnTime">100<span>%</span></div></div>
+    <div class="kpi mat"><div class="kpi-label">공정 투입 자재 부족</div><div class="kpi-value" id="kpiMat">6<span>건</span></div></div>
+    <div class="kpi cap"><div class="kpi-label">공정부하율 초과</div><div class="kpi-value" id="kpiCap">5<span>%WC</span></div></div>
+    <div class="kpi crit"><div class="kpi-label">계획 수립 예상 리스크</div><div class="kpi-value" id="kpiRisk">20<span>건</span></div></div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+
+    <!-- LEFT: 상단 부하내역 + 하단 작업계획 리스트 -->
+    <div class="col-left">
+
+      <!-- 상단: 부하내역 캘린더 -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">부하내역<span class="tag">WORK CENTER × DATE</span></div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="panel-sub">셀 클릭 시 하단 작업계획 · 우측 유형별 상세 필터링</div>
+            <button class="link-btn" id="resetBtn" onclick="resetFilters()">↺ 전체보기</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="cal-wrap">
+            <table class="cal" id="calTable">
+              <thead>
+                <tr id="calHeadRow">
+                  <th class="wc-col">Work Center</th>
+                  <!-- 날짜 헤더는 JS에서 동적 생성 (2026-06 전체) -->
+                </tr>
+              </thead>
+              <tbody id="calBody"><!-- JS 렌더 --></tbody>
+            </table>
+          </div>
+          <div class="cal-legend">
+            <span><span class="lg-dot" style="background:var(--ok)"></span>정상</span>
+            <span><span class="lg-dot" style="background:var(--mat)"></span>자재부족</span>
+            <span><span class="lg-dot" style="background:var(--capacity)"></span>부하초과</span>
+            <span><span class="lg-dot" style="background:var(--crit)"></span>자재부족+부하초과</span>
+            <span><span class="lg-dot" style="background:var(--bg-3);border:1px dashed var(--line-strong)"></span>미부하(계획없음/휴무)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단: 작업계획 리스트 -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">작업계획 리스트<span class="tag">WORK PLAN · 임시 산출물</span></div>
+          <div class="panel-sub" id="planListSub">전체 20건 · 위험 12 · 지연 3</div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+          <div class="tbl-scroll">
+            <table class="data" id="planTable">
+              <thead>
+                <tr>
+                  <th>#</th><th>작업지시번호</th><th>(임시)작업계획번호</th><th>오더</th><th>품목</th><th>워크센터</th>
+                  <th>공정</th><th>계획수량</th><th>계획시작</th><th>계획완료</th><th>납기일자</th>
+                  <th>리스크유형</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="planBody"><!-- JS 렌더 --></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: 유형별 상세 -->
+    <div class="panel detail-panel">
+      <div class="panel-head">
+        <div class="panel-title">유형별 상세<span class="tag" id="wcTag">WC002</span></div>
+        <div class="panel-sub" id="detailPanelSub">건 선택 후 처리</div>
+      </div>
+      <div class="detail-list" id="detailList"><!-- JS 렌더 --></div>
+      <div class="footer-note">⚡ 처리 완료 시 조정된 Work Plan으로 작업지시(Work Order)가 자동 생성됩니다.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 구매요청 Drawer ===== -->
+<div class="overlay" id="matOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div class="drawer-title" style="color:var(--mat)">📦 구매요청 처리</div>
+      <button class="drawer-close" onclick="closeDrawer('mat')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field-row">
+        <div class="field"><label>대상 오더</label><div class="val" id="matOrder">P35D79</div></div>
+        <div class="field"><label>영향 ID</label><div class="val" id="matImpactId" style="font-size:10.5px;">SIM-SCH-R35_sim_1-...</div></div>
+      </div>
+      <div class="field"><label>자재코드 / 자재명</label><div class="val">RM-TUBE-4IN · STEEL TUBE 4" RAW MATERIAL</div></div>
+      <div class="field-row">
+        <div class="field"><label>부족 수량</label><div class="val" style="color:var(--crit)" id="matQty">2.0</div></div>
+        <div class="field"><label>필요일자</label><div class="val" id="matNeedDate">2026-06-05</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>요청 수량</label><input value="2.0"></div>
+        <div class="field"><label>희망 입고일</label><input value="2026-06-03"></div>
+      </div>
+      <div class="field"><label>공급업체 (선택)</label>
+        <select><option>자동 추천 — 대체 공급망 A社</option><option>기존 지정 공급업체</option><option>긴급 스팟 구매</option></select>
+      </div>
+      <div class="sim-box">
+        <div class="sim-title">⚡ AI 제안</div>
+        <div class="sim-row">대체 자재 유사조치 이력 <b>111건 중 실행 1건</b></div>
+        <div class="sim-row improve">긴급 구매 시 리드타임 <b>-2일 단축 가능</b></div>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn" onclick="closeDrawer('mat')">취소</button>
+      <button class="btn btn-primary" onclick="submitAction('mat')">ERP 구매요청 전송</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 일정조정 Drawer ===== -->
+<div class="overlay" id="capOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div class="drawer-title" style="color:var(--capacity)">🗓 일정조정 처리</div>
+      <button class="drawer-close" onclick="closeDrawer('cap')">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field-row">
+        <div class="field"><label>대상 워크센터</label><div class="val" id="capWc">WC002</div></div>
+        <div class="field"><label>부하율</label><div class="val" style="color:var(--crit)" id="capLoad">204%</div></div>
+      </div>
+      <div class="field"><label>현재 계획일정</label><div class="val" id="capDate">2026-06-05 · 유사조치 111건 중 실행 1건</div></div>
+      <div class="field"><label>조정 방식</label>
+        <select id="capMethod" onchange="updateSim()">
+          <option>대체 워크센터로 이관 (WC-003)</option>
+          <option>야간 시프트 추가 투입</option>
+          <option>계획일정 +2일 순연</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>조정 시작일</label><input value="2026-06-05"></div>
+        <div class="field"><label>조정 완료일</label><input value="2026-06-06"></div>
+      </div>
+      <div class="sim-box">
+        <div class="sim-title">⚡ 조정 후 시뮬레이션</div>
+        <div class="sim-row">조정 전 부하율 <b style="color:var(--crit)">204%</b></div>
+        <div class="sim-row improve">조정 후 부하율 <b id="capSimResult">96%</b></div>
+        <div class="sim-row improve">영향 오더 지연 <b>0건 유지</b></div>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn" onclick="closeDrawer('cap')">취소</button>
+      <button class="btn btn-primary" onclick="submitAction('cap')">적용 → 작업지시 반영</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= Mock Data ================= */
+const wcList = ["WC-001","WC-002","WC-003"];
+// 2026-06 전체 (30일, 초기 데모 상태). 요일 계산은 아래 weekendDays로 구분 (토/일 = 미부하 기본값)
+// RUN 클릭 시 상단 "기간" 입력값을 읽어 이 두 값을 실제 선택 기간으로 재계산합니다.
+let calDates = Array.from({length:30}, (_,i)=>"06-"+String(i+1).padStart(2,'0'));
+let weekendDays = new Set(["06-06","06-07","06-13","06-14","06-20","06-21","06-27","06-28"]);
+
+// "YYYY-MM-DD" ~ "YYYY-MM-DD" 입력값을 받아 실제 달력 기준 날짜 배열("MM-DD")과 주말 Set을 생성
+function buildDateRange(fromStr, toStr){
+  const from = new Date(fromStr+"T00:00:00");
+  const to = new Date(toStr+"T00:00:00");
+  if(isNaN(from) || isNaN(to) || to < from) return null;
+  const maxDays = 120; // 과도하게 넓은 기간을 선택했을 때 테이블이 무한정 커지는 것을 방지
+  const dates = [];
+  const weekends = new Set();
+  const cur = new Date(from);
+  let count = 0;
+  while(cur <= to && count < maxDays){
+    const key = `${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+    dates.push(key);
+    const dow = cur.getDay();
+    if(dow===0 || dow===6) weekends.add(key);
+    cur.setDate(cur.getDate()+1);
+    count++;
+  }
+  return dates.length ? {dates, weekends} : null;
+}
+
+const plans = [
+  {no:"WP-2603079",order:"P35D79",item:"CB-52kV-3P",wc:"WC-002",qty:120,start:"06-05",end:"06-08",ship:"10-21",type:"mat",status:"risk",delay:0,score:64.98},
+  {no:"WP-2603077",order:"P35D77",item:"CB-24kV-3P",wc:"WC-002",qty:80,start:"06-08",end:"06-10",ship:"10-12",type:"mat",status:"risk",delay:0,score:64.98,virtual:true},
+  {no:"WP-2603078",order:"P35D78",item:"CB-24kV-1P",wc:"WC-002",qty:60,start:"06-04",end:"06-05",ship:"10-14",type:"mat",status:"risk",delay:0,score:64.98},
+  {no:"WP-2603074",order:"P35D74",item:"CB-72kV-3P",wc:"WC-002",qty:40,start:"06-02",end:"06-03",ship:"09-30",type:"mat",status:"risk",delay:0,score:61.20,virtual:true},
+  {no:"WP-2603075",order:"P35D75",item:"CB-52kV-1P",wc:"WC-002",qty:95,start:"06-02",end:"06-03",ship:"10-02",type:"mat",status:"risk",delay:0,score:61.20},
+  {no:"WP-2603081",order:"P35D81",item:"CB-24kV-3P",wc:"WC-001",qty:110,start:"06-03",end:"06-04",ship:"10-25",type:"cap",status:"delay",delay:1,score:58.40,virtual:true},
+  {no:"WP-2603082",order:"P35D82",item:"CB-36kV-1P",wc:"WC-001",qty:70,start:"06-03",end:"06-04",ship:"10-27",type:"cap",status:"delay",delay:1,score:58.40},
+  {no:"WP-2603083",order:"P35D83",item:"CB-36kV-3P",wc:"WC-001",qty:90,start:"06-08",end:"06-09",ship:"11-05",type:"cap",status:"delay",delay:0,score:41.30,virtual:true},
+  {no:"WP-2603090",order:"P35D90",item:"CB-52kV-3P",wc:"WC-003",qty:55,start:"06-06",end:"06-07",ship:"11-02",type:"ok",status:"norm",delay:0,score:12.10},
+  {no:"WP-2603095",order:"P35D95",item:"CB-24kV-3P",wc:"WC-003",qty:65,start:"06-17",end:"06-18",ship:"11-10",type:"ok",status:"norm",delay:0,score:15.40,virtual:true},
+  {no:"WP-2603098",order:"P35D98",item:"CB-52kV-1P",wc:"WC-002",qty:75,start:"06-22",end:"06-23",ship:"11-14",type:"mat",status:"risk",delay:1,score:59.70},
+  // 자재부족만 있고 부하초과는 없는 예시 (빨강 = 부하초과 없이도 나타날 수 있음을 보여줌)
+  {no:"WP-2603101",order:"P35D101",item:"CB-36kV-1P",wc:"WC-002",qty:50,start:"06-12",end:"06-13",ship:"11-08",type:"mat",status:"risk",delay:0,score:55.10,virtual:true},
+  {no:"WP-2603102",order:"P35D102",item:"CB-52kV-3P",wc:"WC-001",qty:65,start:"06-16",end:"06-16",ship:"11-09",type:"ok",status:"norm",delay:0,score:9.80},
+];
+
+// 부하내역 캘린더는 작업계획 리스트(plans)에서 자재부족(mat)/부하초과(cap) 리스크를
+// 워크센터×날짜 단위로 합산하여 색상을 결정합니다.
+// - 자재부족 + 부하초과 동시 발생 → 빨강(r)
+// - 자재부족만 → 파랑(b)
+// - 부하초과만 → 보라(p)
+// - 둘 다 없음 → 평일=정상(초록,g) / 주말=미부하(회색,n)
+// (getRiskTypesForPlan은 detailByWc를 참조하므로, 이 함수 호출은 detailByWc 정의 이후에 이뤄져야 합니다.)
+function computeCalData(){
+  const cal = {};
+  const matFlag = {}, capFlag = {};
+  wcList.forEach(wc=>{
+    cal[wc] = calDates.map(d => weekendDays.has(d) ? "n" : "g");
+    matFlag[wc] = calDates.map(()=>false);
+    capFlag[wc] = calDates.map(()=>false);
+  });
+  plans.forEach(p=>{
+    const wcKey = wcList.includes(p.wc) ? p.wc : wcList.find(w=>w.replace('-','')===p.wc);
+    if(!wcKey) return;
+    const types = getRiskTypesForPlan(p);
+    const hasMat = types.includes('mat');
+    const hasCap = types.includes('cap');
+    if(!hasMat && !hasCap) return;
+    calDates.forEach((d, i)=>{
+      if(p.start <= d && d <= p.end){
+        if(hasMat) matFlag[wcKey][i] = true;
+        if(hasCap) capFlag[wcKey][i] = true;
+      }
+    });
+  });
+  wcList.forEach(wc=>{
+    calDates.forEach((d, i)=>{
+      if(weekendDays.has(d)) return; // 주말은 미부하 유지
+      const m = matFlag[wc][i], c = capFlag[wc][i];
+      if(m && c) cal[wc][i] = "r";
+      else if(m) cal[wc][i] = "b";
+      else if(c) cal[wc][i] = "p";
+    });
+  });
+  return cal;
+}
+
+// 부하내역이 '정상(초록)'으로 표시되는 날짜라도, 실제로는 위험이 없을 뿐 작업계획 자체는
+// 진행되고 있어야 하므로 위험/주의 건이 없는 정상 날짜에 대해 기본 작업계획을 채워 넣습니다.
+// (셀 클릭 시 정상 날짜에도 반드시 작업계획 리스트가 조회되도록 보장)
+const normalItemPool = ["CB-24kV-1P","CB-24kV-3P","CB-36kV-1P","CB-36kV-3P","CB-52kV-1P","CB-52kV-3P","CB-72kV-3P"];
+function fillNormalPlans(virtual){
+  wcList.forEach(wc=>{
+    calData[wc].forEach((state, i)=>{
+      if(state !== "g") return; // 정상(초록) 셀에만 채움
+      const d = calDates[i];
+      const alreadyCovered = plans.some(p=>{
+        const wcKey = wcList.includes(p.wc) ? p.wc : wcList.find(w=>w.replace('-','')===p.wc);
+        return wcKey===wc && p.start<=d && d<=p.end;
+      });
+      if(alreadyCovered) return;
+      const wcNo = wc.replace('WC-','').replace('WC','');
+      plans.push({
+        no:`WP-26${String(rInt(0,99999)).padStart(5,'0')}`,
+        order:`P36${d.replace('-','')}${wcNo}`,
+        item:normalItemPool[i % normalItemPool.length],
+        wc:wc,
+        qty: 40 + ((i*7) % 90),
+        start:d, end:d,
+        ship:"—",
+        type:"ok", status:"norm", delay:0,
+        score: +(4 + ((i*3) % 18)).toFixed(2),
+        // virtual이 요청된 경우(RUN 이후)에도 전부 임시로 몰지 않고, 절반 정도는
+        // 이미 ERP에 존재하는 작업지시로, 절반은 이번 RUN의 임시 산출물로 섞어서 배정
+        virtual: virtual ? Math.random() < 0.5 : false
+      });
+    });
+  });
+}
+
+// 작업계획별 공정(랜덤) 배정 — 오더코드 해시 기반이라 재렌더링해도 값이 흔들리지 않음
+const processPool = ["소재가공","권선","조립","용접","도장","배선","검사","시험","포장","출하준비"];
+function pickProcess(seedStr){
+  let hash = 0;
+  for(let i=0;i<seedStr.length;i++) hash = (hash*31 + seedStr.charCodeAt(i)) >>> 0;
+  return processPool[hash % processPool.length];
+}
+plans.forEach(p=>{ p.process = pickProcess(p.order || p.no); });
+
+const detailByWc = {
+  "WC002":[
+    {target:"P35D79",date:"06-05",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 2.0, 필요일 2026-06-05',impact:"SIM-SCH-R35_sim_1-IO35-P35D79-R2-11-16",status:"미처리"},
+    {target:"P35D79",date:"06-05",type:"cap",sev:"LOW",summary:"P35D79 작업 구간 WC-002 Resource overload (workcenter_id=2)",impact:"SCH-R35_sim_1_f6b36abda71b4190d37b",status:"미처리"},
+    {target:"P35D77",date:"06-08",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 2.0, 필요일 2026-06-08',impact:"SIM-SCH-R35_sim_1-IO35-P35D77-R2-11-16",status:"처리중"},
+    {target:"P35D77",date:"06-08",type:"cap",sev:"LOW",summary:"P35D77 작업 구간 WC-002 Resource overload (workcenter_id=2)",impact:"SCH-R35_sim_1_3f5d0cfb7ad4ef6c2fc2",status:"미처리"},
+    {target:"P35D78",date:"06-04",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 2.0, 필요일 2026-06-04',impact:"SIM-SCH-R35_sim_1-IO35-P35D78-R2-11-14",status:"미처리"},
+    {target:"P35D78",date:"06-04",type:"cap",sev:"LOW",summary:"P35D78 작업 구간 WC-002 Resource overload (workcenter_id=2)",impact:"SCH-R35_sim_1_d77f3ed92d508b1afa1",status:"완료"},
+    {target:"P35D74",date:"06-02",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 1.0, 필요일 2026-06-03',impact:"SIM-SCH-R35_sim_1-IO35-P35D74-R2-11-12",status:"미처리"},
+    {target:"P35D74",date:"06-02",type:"cap",sev:"LOW",summary:"P35D74 작업 구간 WC-002 Resource overload (workcenter_id=2)",impact:"SCH-R35_sim_1_4c3cb260251249dff736",status:"미처리"},
+    {target:"P35D75",date:"06-03",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 1.0, 필요일 2026-06-03',impact:"SIM-SCH-R35_sim_1-IO35-P35D75-R2-11-13",status:"미처리"},
+    {target:"P35D75",date:"06-03",type:"cap",sev:"LOW",summary:"P35D75 작업 구간 WC-002 Resource overload (workcenter_id=2)",impact:"SCH-R35_sim_1_c697698cf03e742d5120",status:"미처리"},
+    {target:"P35D98",date:"06-22",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 1.5, 필요일 2026-06-22',impact:"SIM-SCH-R35_sim_1-IO35-P35D98-R2-14-02",status:"미처리"},
+    {target:"P35D101",date:"06-12",type:"mat",sev:"CRITICAL",summary:'RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 1.5, 필요일 2026-06-12',impact:"SIM-SCH-R35_sim_1-IO35-P35D101-R2-11-20",status:"미처리"},
+  ],
+  "WC-001":[
+    {target:"P35D81",date:"06-03",type:"cap",sev:"CRITICAL",summary:"WC-001 Capa Over 204% · 2026-06-03~04 구간 부하 집중",impact:"SIM-SCH-R35_sim_1-IO35-P35D81-R2-08-04",status:"미처리"},
+    {target:"P35D82",date:"06-04",type:"cap",sev:"LOW",summary:"WC-001 Capa Over 118% · 2026-06-03~04 구간",impact:"SCH-R35_sim_1_a91cd0b8ef2a4d19",status:"미처리"},
+    {target:"P35D83",date:"06-08",type:"cap",sev:"LOW",summary:"WC-001 Capa Over 105% · 2026-06-08~09 구간",impact:"SCH-R35_sim_1_b02de1f9a8c3",status:"미처리"},
+    {target:"P35D102",date:"06-16",type:"ok",sev:"LOW",summary:"이상 없음 · 정상 부하율 58%",impact:"SCH-R35_sim_1_ok_0002",status:"완료"},
+  ],
+  "WC-003":[
+    {target:"P35D90",date:"06-06",type:"ok",sev:"LOW",summary:"이상 없음 · 정상 부하율 62%",impact:"SCH-R35_sim_1_ok_0001",status:"완료"},
+    {target:"P35D95",date:"06-17",type:"ok",sev:"LOW",summary:"이상 없음 · 정상 부하율 71%",impact:"SCH-R35_sim_1_ok_0003",status:"완료"},
+  ]
+};
+
+// getRiskTypesForPlan(detailByWc 참조)이 정의된 이후 시점이므로, 캘린더 색상 계산과
+// 정상 날짜 채움은 detailByWc 정의 직후 이 위치에서 수행합니다.
+let calData = computeCalData();
+fillNormalPlans();
+
+/* ================= Render Calendar ================= */
+const calHeadRow = document.getElementById('calHeadRow');
+function renderCalHead(){
+  calHeadRow.innerHTML = '<th class="wc-col">Work Center</th>';
+  calDates.forEach(d=>{
+    const th = document.createElement('th');
+    th.textContent = d;
+    calHeadRow.appendChild(th);
+  });
+}
+renderCalHead();
+
+const calBody = document.getElementById('calBody');
+function renderCalendar(){
+  calBody.innerHTML = "";
+  wcList.forEach(wc=>{
+    const tr = document.createElement('tr');
+    let html = `<td class="wc-name">${wc}</td>`;
+    calData[wc].forEach((state, i)=>{
+      html += `<td><div class="cell ${state}" data-wc="${wc}" data-day="${i}" onclick="selectCell('${wc}',${i},this)"></div></td>`;
+    });
+    tr.innerHTML = html;
+    calBody.appendChild(tr);
+  });
+}
+renderCalendar();
+
+function selectCell(wc, day, el){
+  document.querySelectorAll('.cell.selected').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  filterByWcDate(wc, calDates[day]);
+}
+
+/* ================= Render Plan Table ================= */
+const typeMeta = {
+  mat:{label:"자재부족", cls:"mat", icon:"🔩"},
+  cap:{label:"부하초과", cls:"cap", icon:"⚡"},
+  ok:{label:"정상", cls:"ok", icon:"✓"}
+};
+const statusMeta = {
+  risk:{label:"위험",cls:"risk",color:"var(--crit)"},
+  delay:{label:"지연",cls:"delay",color:"var(--cap)"},
+  norm:{label:"정상",cls:"norm",color:"var(--ok)"}
+};
+
+// 하나의 작업계획(오더)이 자재부족·부하초과를 동시에 가질 수 있으므로,
+// 유형별 상세(detailByWc)에서 해당 오더에 연계된 모든 리스크 유형을 모아서 반환합니다.
+function getRiskTypesForPlan(p){
+  const key = detailByWc[p.wc] ? p.wc : p.wc.replace('WC-00','WC00');
+  const all = detailByWc[key] || [];
+  const types = [...new Set(all.filter(d=>d.target===p.order).map(d=>d.type))];
+  return types.length ? types : [p.type];
+}
+
+const planBody = document.getElementById('planBody');
+const planListSub = document.getElementById('planListSub');
+
+function renderPlans(filterWc, filterDate){
+  planBody.innerHTML = "";
+  const filtered = plans.filter(p=>{
+    if(filterWc && p.wc!==filterWc && p.wc.replace('-','')!==filterWc) return false;
+    // 계획시작~계획완료 구간에 filterDate가 포함되는 건만 (MM-DD zero-padded 문자열 비교)
+    if(filterDate && !(p.start <= filterDate && filterDate <= p.end)) return false;
+    return true;
+  });
+
+  // 자재부족(mat) 또는 부하초과(cap) 리스크가 있는 건을 상단에 우선 배치하고,
+  // 그 안에서는 점수(score) 높은 순 → 나머지 정상(ok) 건은 그 아래 배치
+  filtered.sort((a,b)=>{
+    const aRisk = getRiskTypesForPlan(a).some(t=>t==='mat'||t==='cap') ? 1 : 0;
+    const bRisk = getRiskTypesForPlan(b).some(t=>t==='mat'||t==='cap') ? 1 : 0;
+    if(aRisk !== bRisk) return bRisk - aRisk;
+    return b.score - a.score;
+  });
+
+  if(planListSub){
+    if(filterWc && filterDate){
+      planListSub.textContent = `${filterWc} · ${filterDate} 구간 포함 건 ${filtered.length}건`;
+    } else if(filterWc){
+      planListSub.textContent = `${filterWc} 전체 ${filtered.length}건`;
+    } else {
+      planListSub.textContent = `전체 ${plans.length}건 · 위험 ${plans.filter(p=>p.status==='risk').length} · 지연 ${plans.filter(p=>p.status==='delay').length}`;
+    }
+  }
+
+  filtered.forEach((p,idx)=>{
+    const sm = statusMeta[p.status];
+    const riskChips = getRiskTypesForPlan(p).map(t=>{
+      const tm = typeMeta[t] || typeMeta.ok;
+      return `<span class="chip ${tm.cls}">${tm.icon} ${tm.label}</span>`;
+    }).join(" ");
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${idx+1}</td>
+      <td class="mono">${p.virtual ? "–" : p.no}</td>
+      <td class="mono" style="color:var(--accent)">${p.virtual ? p.no : "–"}</td>
+      <td class="mono">${p.order}</td>
+      <td>${p.item}</td>
+      <td class="mono">${p.wc}</td>
+      <td>${p.process}</td>
+      <td class="mono">${p.qty}</td>
+      <td class="mono">${p.start}</td>
+      <td class="mono">${p.end}</td>
+      <td class="mono">${p.ship}</td>
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap;">${riskChips}</div></td>
+      <td><button class="link-btn" onclick="jumpToDetail('${p.wc}','${p.order}')">상세 →</button></td>
+    `;
+    planBody.appendChild(tr);
+  });
+}
+renderPlans(null);
+
+/* ================= Render Detail Panel ================= */
+const detailList = document.getElementById('detailList');
+const wcTag = document.getElementById('wcTag');
+const detailPanelSub = document.getElementById('detailPanelSub');
+let currentWc = "WC002";
+let currentDate = null;
+let currentDetailItems = [];
+
+// 특정 오더(target이 'P'로 시작)에 연결된 상세 항목은, 그 오더의 작업계획
+// 계획시작~계획완료 전체 구간(부하내역 셀이 칠해지는 구간)에 걸쳐 노출되어야 합니다.
+// (WC 레벨 일반 항목은 필요일 하루만 대응)
+function detailMatchesDate(item, date){
+  if(!date) return true;
+  if(/^P/.test(item.target)){
+    const p = plans.find(pl => pl.order === item.target);
+    if(p) return p.start <= date && date <= p.end;
+  }
+  return item.date === date;
+}
+
+// 상세 리스트 HTML 생성 (renderDetail / renderDetailForOrder 공통 사용)
+function buildDetailItemsHtml(items){
+  return items.map((d,i)=>{
+    const isDone = d.status==="완료";
+    let actionBtn = "";
+    if(!isDone){
+      if(d.type==="mat"){
+        actionBtn = `<button class="d-action mat-btn" onclick="openDrawer('mat', ${i})">📦 구매요청</button>`;
+      } else if(d.type==="cap"){
+        actionBtn = `<button class="d-action cap-btn" onclick="openDrawer('cap', ${i})">🗓 일정조정</button>`;
+      } else {
+        actionBtn = `<button class="d-action done-btn">- 조치불필요</button>`;
+      }
+    } else {
+      actionBtn = `<button class="d-action done-btn">✓ 처리완료</button>`;
+    }
+    return `
+    <div class="d-item" id="d-item-${i}" onclick="selectDetail(${i})">
+      <div class="d-row1">
+        <span class="d-target">${d.target}</span>
+        <span class="d-sev ${d.sev}">${d.sev}</span>
+      </div>
+      <div class="d-summary">${d.summary}</div>
+      <div class="d-meta">
+        <span class="d-status ${isDone?'done':''}">${d.status} · ${d.date} · ${d.impact.slice(0,18)}...</span>
+        ${actionBtn}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderDetail(wc, date){
+  currentWc = wc;
+  currentDate = date || null;
+  wcTag.textContent = date ? `${wc} · ${date}` : wc;
+
+  const all = detailByWc[wc] || [];
+  const items = date ? all.filter(d => detailMatchesDate(d, date)) : all;
+  currentDetailItems = items;
+
+  if(items.length===0){
+    detailPanelSub.textContent = date ? `${wc} · ${date} 해당 없음` : "건 선택 후 처리";
+    detailList.innerHTML = date
+      ? `<div class="detail-empty"><div class="ico">◎</div>${wc} · ${date}에 해당하는<br>리스크 항목이 없습니다.</div>`
+      : `<div class="detail-empty"><div class="ico">◎</div>선택한 워크센터에 대한<br>리스크 항목이 없습니다.</div>`;
+    return;
+  }
+
+  // 구성 breakdown: 오더 연계(자재부족 등) vs WC 레벨(공정부하율, 오더 미지정) 건수를 구분 표시
+  // → 작업계획 리스트(오더 단위) 건수와 유형별 상세 건수가 다를 때 이유를 바로 알 수 있도록 함
+  if(date){
+    const orderLinked = items.filter(d => /^P/.test(d.target)).length;
+    const wcLevel = items.length - orderLinked;
+    detailPanelSub.textContent = wcLevel > 0
+      ? `오더 연계 ${orderLinked}건 + 공정부하(WC) ${wcLevel}건 = 총 ${items.length}건`
+      : `오더 연계 ${orderLinked}건`;
+  } else {
+    detailPanelSub.textContent = `${wc} 전체 ${items.length}건`;
+  }
+
+  detailList.innerHTML = buildDetailItemsHtml(items);
+}
+renderDetail(currentWc, null);
+
+// 작업계획 리스트에서 '상세 →' 클릭 시: 워크센터 전체가 아니라
+// 해당 오더와 직접 연계된 상세 항목만 필터링해서 보여줍니다.
+function renderDetailForOrder(wc, order){
+  currentWc = wc;
+  currentDate = null;
+  const all = detailByWc[wc] || [];
+  const items = all.filter(d => d.target === order);
+  currentDetailItems = items;
+  wcTag.textContent = `${wc} · ${order}`;
+
+  if(items.length===0){
+    detailPanelSub.textContent = `${order} 관련 항목 없음`;
+    detailList.innerHTML = `<div class="detail-empty"><div class="ico">◎</div>${order}에 연계된<br>리스크 항목이 없습니다.</div>`;
+    return;
+  }
+  detailPanelSub.textContent = `${order} 관련 ${items.length}건`;
+  detailList.innerHTML = buildDetailItemsHtml(items);
+}
+
+function selectDetail(i){
+  document.querySelectorAll('.d-item').forEach(el=>el.classList.remove('selected'));
+  document.getElementById('d-item-'+i).classList.add('selected');
+}
+
+function filterByWcDate(wc, date){
+  renderPlans(wc, date);
+  const key = detailByWc[wc] ? wc : wc.replace('WC-00','WC00');
+  renderDetail(detailByWc[wc] ? wc : (detailByWc[key] ? key : wc), date);
+}
+
+function jumpToDetail(wc, order){
+  const key = detailByWc[wc] ? wc : wc.replace('WC-00','WC00');
+  // 해당 오더와 직접 연계된 항목만 필터링해서 표시 (워크센터 전체 미필터 리스트를 보여주지 않음)
+  renderDetailForOrder(key, order);
+  if(currentDetailItems.length>0){
+    selectDetail(0);
+  }
+}
+
+function resetFilters(){
+  // 캘린더 셀 선택 해제
+  document.querySelectorAll('.cell.selected').forEach(c=>c.classList.remove('selected'));
+  // 작업계획 리스트: 전체 조회 (초기화면과 동일)
+  renderPlans(null, null);
+  // 유형별 상세: 초기화면 기본값(WC002 전체)으로 복원
+  renderDetail("WC002", null);
+}
+
+/* ================= Drawers ================= */
+function openDrawer(type, idx){
+  const d = currentDetailItems[idx];
+  if(type==="mat"){
+    document.getElementById('matOrder').textContent = d.target;
+    document.getElementById('matImpactId').textContent = d.impact;
+    const qtyMatch = d.summary.match(/부족 수량 ([\d.]+)/);
+    document.getElementById('matQty').textContent = qtyMatch ? qtyMatch[1] : "-";
+    const dateMatch = d.summary.match(/필요일 ([\d-]+)/);
+    document.getElementById('matNeedDate').textContent = dateMatch ? dateMatch[1] : "-";
+    document.getElementById('matOverlay').classList.add('show');
+  } else {
+    document.getElementById('capWc').textContent = d.target.startsWith('WC') ? d.target : currentWc;
+    document.getElementById('capOverlay').classList.add('show');
+  }
+}
+function closeDrawer(type){
+  document.getElementById(type+'Overlay').classList.remove('show');
+}
+function updateSim(){
+  const sel = document.getElementById('capMethod').value;
+  const result = sel.includes('대체') ? '96%' : sel.includes('시프트') ? '142%' : '88%';
+  document.getElementById('capSimResult').textContent = result;
+}
+function submitAction(type){
+  closeDrawer(type);
+  alert(type==='mat' ? 'ERP 구매요청이 전송되었습니다. (구매모듈 연계)' : '일정조정이 적용되어 작업지시(Work Order)가 반영되었습니다.');
+}
+[document.getElementById('matOverlay'), document.getElementById('capOverlay')].forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('show'); });
+});
+
+/* ================= RUN: 가상데이터로 작업계획 갱신 ================= */
+// RUN 버튼 클릭 시 매번 새로운 시뮬레이션 회차를 가정하여
+// plans / detailByWc / calData를 랜덤하게 재생성하고 화면 전체를 다시 그립니다.
+
+const ORDER_DEFS = [
+  {order:"P35D79",  wc:"WC-002", item:"CB-52kV-3P"},
+  {order:"P35D77",  wc:"WC-002", item:"CB-24kV-3P"},
+  {order:"P35D78",  wc:"WC-002", item:"CB-24kV-1P"},
+  {order:"P35D74",  wc:"WC-002", item:"CB-72kV-3P"},
+  {order:"P35D75",  wc:"WC-002", item:"CB-52kV-1P"},
+  {order:"P35D98",  wc:"WC-002", item:"CB-52kV-1P"},
+  {order:"P35D101", wc:"WC-002", item:"CB-36kV-1P"},
+  {order:"P35D81",  wc:"WC-001", item:"CB-24kV-3P"},
+  {order:"P35D82",  wc:"WC-001", item:"CB-36kV-1P"},
+  {order:"P35D83",  wc:"WC-001", item:"CB-36kV-3P"},
+  {order:"P35D102", wc:"WC-001", item:"CB-52kV-3P"},
+  {order:"P35D90",  wc:"WC-003", item:"CB-52kV-3P"},
+  {order:"P35D95",  wc:"WC-003", item:"CB-24kV-3P"},
+];
+const detailWcKey = wc => wc === "WC-002" ? "WC002" : wc;
+
+function rInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function rPick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+let runSeq = 40; // v40 → RUN 클릭마다 +1 (계획번호/시나리오 회차 시뮬레이션)
+
+function generateMockRun(){
+  const newPlans = [];
+  const newDetail = {"WC002":[], "WC-001":[], "WC-003":[]};
+
+  ORDER_DEFS.forEach((def, idx)=>{
+    // 자재부족/부하초과 비중을 조금 더 높게 부여 (정상 대비 리스크 상황을 자주 보여주기 위함)
+    const profile = rPick(["mat","mat","cap","cap","ok"]);
+    const maxIdx = calDates.length - 1;
+    const startIdx = rInt(0, maxIdx);
+    const endIdx = Math.min(startIdx + rInt(0,2), maxIdx);
+    const start = calDates[startIdx];
+    const end = calDates[endIdx];
+    const qty = rInt(35, 130);
+    const ship = `${rPick(["09","10","11"])}-${pad2(rInt(1,28))}`;
+    // RUN을 누를 때마다 작업지시번호/(임시)작업계획번호가 매번 다르게 나오도록 랜덤 생성
+    const no = "WP-26" + String(rInt(0, 99999)).padStart(5,'0');
+
+    let status, type, delay, score;
+    if(profile==="mat"){
+      type="mat"; status="risk"; delay=0;
+      score = +(rInt(50,68) + Math.random()).toFixed(2);
+    } else if(profile==="cap"){
+      type="cap"; status="delay"; delay=rInt(0,2);
+      score = +(rInt(35,60) + Math.random()).toFixed(2);
+    } else {
+      type="ok"; status="norm"; delay=0;
+      score = +(rInt(5,20) + Math.random()).toFixed(2);
+    }
+
+    // 작업지시번호(기존 ERP) / (임시)작업계획번호(RUN 결과) 를 랜덤하게 섞어서 배정
+    const isVirtual = Math.random() < 0.5;
+    newPlans.push({ no, order:def.order, item:def.item, wc:def.wc, qty, start, end, ship, type, status, delay, score, virtual:isVirtual });
+
+    const dKey = detailWcKey(def.wc);
+    if(!newDetail[dKey]) newDetail[dKey] = [];
+
+    if(type==="mat"){
+      const shortage = +(rInt(5,20)/10).toFixed(1);
+      newDetail[dKey].push({
+        target:def.order, date:start, type:"mat",
+        sev: rPick(["CRITICAL","CRITICAL","LOW"]),
+        summary:`RM-TUBE-4IN (STEEL TUBE 4" RAW MATERIAL) 부족 수량 ${shortage}, 필요일 2026-${start}`,
+        impact:`SIM-SCH-R${runSeq}-IO35-${def.order}-R2-${rInt(10,16)}-${rInt(10,20)}`,
+        status: rPick(["미처리","미처리","처리중","완료"])
+      });
+      // 자재부족 오더는 대개 동일 구간에 경미한 부하 이슈도 동반되는 경우가 많음
+      if(Math.random() < 0.7){
+        newDetail[dKey].push({
+          target:def.order, date:start, type:"cap", sev:"LOW",
+          summary:`${def.order} 작업 구간 ${def.wc} Resource overload (workcenter_id=${def.wc.slice(-1)})`,
+          impact:`SCH-R${runSeq}_sim_${Math.random().toString(16).slice(2,10)}`,
+          status: rPick(["미처리","완료"])
+        });
+      }
+    } else if(type==="cap"){
+      const loadPct = rInt(95,210);
+      newDetail[dKey].push({
+        target:def.order, date:start, type:"cap",
+        sev: loadPct > 150 ? "CRITICAL" : "LOW",
+        summary:`${def.wc} Capa Over ${loadPct}% · 2026-${start}~${end} 구간 부하 집중`,
+        impact:`SIM-SCH-R${runSeq}-IO35-${def.order}-R2-${rInt(6,12)}-${rInt(1,10)}`,
+        status: rPick(["미처리","미처리","완료"])
+      });
+    } else {
+      newDetail[dKey].push({
+        target:def.order, date:start, type:"ok", sev:"LOW",
+        summary:`이상 없음 · 정상 부하율 ${rInt(45,75)}%`,
+        impact:`SCH-R${runSeq}_sim_ok_${pad2(idx+1)}`,
+        status:"완료"
+      });
+    }
+  });
+
+  return { plans:newPlans, detailByWc:newDetail };
+}
+
+function updateKPIs(){
+  const totalOrders = ORDER_DEFS.length;
+  const baseOrderNos = new Set(ORDER_DEFS.map(d=>d.order));
+  const basePlans = plans.filter(p=>baseOrderNos.has(p.order));
+  const delayCount = basePlans.filter(p=>p.status==='delay').length;
+  const onTime = Math.max(0, Math.round(((totalOrders - delayCount) / totalOrders) * 100));
+
+  let matOpenCount = 0, riskItemCount = 0;
+  const capWcSet = new Set();
+  Object.keys(detailByWc).forEach(k=>{
+    detailByWc[k].forEach(d=>{
+      riskItemCount++;
+      if(d.type==='mat' && d.status!=='완료') matOpenCount++;
+      if(d.type==='cap') capWcSet.add(k);
+    });
+  });
+  const capPercent = Math.round((capWcSet.size / wcList.length) * 100);
+
+  document.getElementById('kpiOnTime').firstChild.textContent = onTime;
+  document.getElementById('kpiMat').firstChild.textContent = matOpenCount;
+  document.getElementById('kpiCap').firstChild.textContent = capPercent;
+  document.getElementById('kpiRisk').firstChild.textContent = riskItemCount;
+}
+
+// 작업지시 생성 버튼: 현재는 ERP 연동 전이라 버튼 UI만 제공합니다.
+// 추후 ERP 연동 시, 이 함수에서 현재 작업계획 리스트(plans)를 API로 전송해
+// 실제 작업지시(Work Order)를 생성하도록 구현하면 됩니다.
+function createWorkOrder(){
+  alert('작업지시 생성 요청이 접수되었습니다. (ERP 연동 예정 · 현재는 버튼 UI만 제공)');
+}
+
+function runSimulation(){
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn.disabled) return;
+  const originalLabel = runBtn.innerHTML;
+  runBtn.disabled = true;
+  runBtn.innerHTML = "⏳ 실행중...";
+
+  setTimeout(()=>{
+    runSeq += 1;
+
+    // 상단 "기간" 입력값을 읽어 부하내역/작업계획을 그 기간 기준으로 재구성
+    const fromInput = document.getElementById('periodFromInput');
+    const toInput = document.getElementById('periodToInput');
+    const range = fromInput && toInput ? buildDateRange(fromInput.value, toInput.value) : null;
+    if(range){
+      calDates = range.dates;
+      weekendDays = range.weekends;
+      renderCalHead();
+    } else if(fromInput && toInput){
+      // 잘못된 기간(끝 날짜가 시작보다 빠른 경우 등)은 무시하고 기존 기간 유지
+      console.warn('유효하지 않은 기간입니다. 이전 기간을 유지합니다.');
+    }
+
+    const generated = generateMockRun();
+
+    // plans / detailByWc는 다른 함수들이 참조(reference)를 그대로 들고 있으므로
+    // 재할당하지 않고 내용만 비우고 채워 넣습니다.
+    plans.length = 0;
+    plans.push(...generated.plans);
+
+    Object.keys(detailByWc).forEach(k=>delete detailByWc[k]);
+    Object.assign(detailByWc, generated.detailByWc);
+
+    calData = computeCalData();
+    fillNormalPlans(true);
+    plans.forEach(p=>{ p.process = pickProcess(p.order || p.no); });
+
+    renderCalendar();
+    resetFilters();
+    updateKPIs();
+
+    const planNoInput = document.getElementById('planNoInput');
+    if(planNoInput) planNoInput.value = `v${runSeq} · SCH-R${runSeq}_sim_1`;
+
+    const genTimeLabel = document.getElementById('genTimeLabel');
+    if(genTimeLabel){
+      const now = new Date();
+      const stamp = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+      genTimeLabel.textContent = `생성 ${stamp}`;
+    }
+
+    runBtn.disabled = false;
+    runBtn.innerHTML = originalLabel;
+  }, 650);
+}
+</script>
+</body>
+</html>

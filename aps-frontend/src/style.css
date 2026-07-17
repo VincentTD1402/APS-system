@@ -1,0 +1,118 @@
+:root {
+  font-family: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --aps-mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  --aps-ok: #2fd188;
+  --aps-mat: #4f8cff;
+  --aps-cap: #ff9f43;
+  --aps-crit: #ff5468;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  min-height: 100vh;
+}
+
+body {
+  font-size: 13px;
+  color: var(--p-text-color);
+  background: var(--p-content-background);
+}
+
+.mono {
+  font-family: var(--aps-mono);
+}
+
+.risk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-family: var(--aps-mono);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.risk-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.risk-chip.normal {
+  background: rgba(47, 209, 136, 0.15);
+  color: var(--aps-ok);
+  border-color: rgba(47, 209, 136, 0.4);
+}
+.risk-chip.normal .dot {
+  background: var(--aps-ok);
+}
+.risk-chip.material-short {
+  background: rgba(79, 140, 255, 0.15);
+  color: var(--aps-mat);
+  border-color: rgba(79, 140, 255, 0.4);
+}
+.risk-chip.material-short .dot {
+  background: var(--aps-mat);
+}
+.risk-chip.overload {
+  background: rgba(255, 159, 67, 0.15);
+  color: var(--aps-cap);
+  border-color: rgba(255, 159, 67, 0.4);
+}
+.risk-chip.overload .dot {
+  background: var(--aps-cap);
+}
+.risk-chip.both {
+  background: rgba(255, 84, 104, 0.15);
+  color: var(--aps-crit);
+  border-color: rgba(255, 84, 104, 0.4);
+}
+.risk-chip.both .dot {
+  background: var(--aps-crit);
+}
+
+.load-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform 0.12s;
+  border: 1px solid transparent;
+  display: inline-block;
+}
+.load-cell:hover {
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.load-cell.selected {
+  outline: 2px solid #ff8a3d;
+  outline-offset: 1px;
+}
+.load-cell.normal {
+  background: var(--aps-ok);
+  opacity: 0.85;
+}
+.load-cell.material-short {
+  background: var(--aps-mat);
+  opacity: 0.9;
+}
+.load-cell.overload {
+  background: var(--aps-cap);
+  opacity: 0.9;
+}
+.load-cell.both {
+  background: var(--aps-crit);
+}
+.load-cell.empty {
+  background: transparent;
+  border: 1px dashed rgba(128, 128, 128, 0.4);
+  opacity: 0.55;
+}

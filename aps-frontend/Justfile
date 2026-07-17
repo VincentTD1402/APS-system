@@ -1,0 +1,39 @@
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+
+pm := "pnpm"
+
+# Default: list recipes
+default:
+    @just --list
+
+# Install deps
+install:
+    {{pm}} install
+
+# Run dev server (locally, outside Docker)
+dev:
+    {{pm}} dev
+
+# Build for production
+build:
+    {{pm}} build
+
+# Preview production build locally
+preview:
+    {{pm}} preview
+
+# Tests (Vitest)
+test *args:
+    {{pm}} test {{args}}
+
+# Lint
+lint:
+    {{pm}} lint
+
+# Type check
+typecheck:
+    {{pm}} typecheck
+
+# Format
+fmt:
+    {{pm}} exec prettier --write "src/**/*.{ts,vue,json,css}"
