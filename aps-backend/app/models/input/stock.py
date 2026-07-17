@@ -11,16 +11,24 @@ from app.db.database import Base
 class Stock(Base):
     """Inventory stock record from G-System lg_stock.
 
-    Synced directly from G-System DB (no API endpoint yet).
-    able_qty is the key field for APS scheduling (available quantity).
-    All qty/amt fields are nullable — not all stock types carry every figure.
+    Synced from GET .../lg/lgstock/aps/pending. able_qty is the key field for
+    APS scheduling (available quantity). All qty/amt fields are nullable —
+    not all stock types carry every figure.
+
+    G-System's response has TWO distinct ids per row: "id" (the interface
+    pending-queue row id — can change across sync cycles for the same stock
+    record) and "lgStockId" (the stable business stock-record id). Upserting
+    must key off lg_stock_id, not the local PK, to avoid duplicate rows.
     """
 
     __tablename__ = "aps_stock"
     __table_args__ = {"schema": "aps_input"}
 
-    # G-System primary key
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # G-System interface pending-queue row id (for traceability only)
+    gsystem_if_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    # G-System stable business stock-record id — the real upsert key
+    lg_stock_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, index=True)
 
     # Identifiers
     corp_id:     Mapped[str | None] = mapped_column(String(50))
@@ -73,4 +81,4 @@ class Stock(Base):
     mod_ip:      Mapped[str | None] = mapped_column(String(50))
 
     def __repr__(self) -> str:
-        return f"<Stock id={self.id} item={self.item_id} ym={self.stk_ym} able={self.able_qty}>"
+        return f"<Stock lg_stock_id={self.lg_stock_id} item={self.item_id} ym={self.stk_ym} able={self.able_qty}>"

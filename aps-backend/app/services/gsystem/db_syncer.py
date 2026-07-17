@@ -795,43 +795,87 @@ def sync_calendar(session: Session, records: list[dict[str, Any]]) -> int:
 def sync_stock(session: Session, records: list[dict[str, Any]]) -> int:
     """Upsert/delete stock rows from G-System API response.
 
-    Expected API fields match lg_stock column names (snake_case).
-    Key scheduling field: able_qty.
+    G-System returns camelCase JSON keys (verified live against
+    POST /lg/lgstock/aps/pending) — NOT snake_case matching the raw
+    lg_stock DB column names. Key scheduling field: able_qty (ableQty).
     """
-    _STOCK_FIELDS = (
-        "corp_id", "parea_id", "biz_id", "stk_ym", "stk_type",
-        "wh_cd", "location_id", "item_id", "unit_cd", "lotno",
-        "prev_qty", "prev_price", "prev_amt",
-        "in_qty", "out_qty", "able_qty",
-        "buy_qty", "buy_amt", "make_qty", "make_amt",
-        "etc_in_qty", "etc_in_amt", "mv_in_qty", "mv_in_amt",
-        "invoice_qty", "invoice_amt", "mat_qty", "mat_amt",
-        "mv_out_qty", "mv_out_amt", "etc_out_qty", "etc_out_amt",
-        "reg_user_id", "reg_dt", "reg_ip",
-        "mod_user_id", "mod_dt", "mod_ip",
+    # (model attr, API JSON key, value kind) — kind picks the caster below.
+    _STOCK_FIELD_MAP: tuple[tuple[str, str, str], ...] = (
+        ("corp_id", "corpId", "str"),
+        ("parea_id", "pareaId", "str"),
+        ("biz_id", "bizId", "str"),
+        ("stk_ym", "stkYm", "str"),
+        ("stk_type", "stkType", "str"),
+        ("wh_cd", "whCd", "str"),
+        ("location_id", "locationId", "str"),
+        ("item_id", "itemId", "str"),
+        ("unit_cd", "unitCd", "str"),
+        ("lotno", "lotNo", "str"),
+        ("prev_qty", "prevQty", "float"),
+        ("prev_price", "prevPrice", "float"),
+        ("prev_amt", "prevAmt", "float"),
+        ("in_qty", "inQty", "float"),
+        ("out_qty", "outQty", "float"),
+        ("able_qty", "ableQty", "float"),
+        ("buy_qty", "buyQty", "float"),
+        ("buy_amt", "buyAmt", "float"),
+        ("make_qty", "makeQty", "float"),
+        ("make_amt", "makeAmt", "float"),
+        ("etc_in_qty", "etcInQty", "float"),
+        ("etc_in_amt", "etcInAmt", "float"),
+        ("mv_in_qty", "mvInQty", "float"),
+        ("mv_in_amt", "mvInAmt", "float"),
+        ("invoice_qty", "invoiceQty", "float"),
+        ("invoice_amt", "invoiceAmt", "float"),
+        ("mat_qty", "matQty", "float"),
+        ("mat_amt", "matAmt", "float"),
+        ("mv_out_qty", "mvOutQty", "float"),
+        ("mv_out_amt", "mvOutAmt", "float"),
+        ("etc_out_qty", "etcOutQty", "float"),
+        ("etc_out_amt", "etcOutAmt", "float"),
+        ("reg_user_id", "regUserId", "str"),
+        ("reg_dt", "regDt", "datetime"),
+        ("reg_ip", "regIp", "str"),
+        ("mod_user_id", "modUserId", "str"),
+        ("mod_dt", "modDt", "datetime"),
+        ("mod_ip", "modIp", "str"),
     )
     count = 0
-    for rec in records:
-        stock_id = rec.get("id")
-        if stock_id is None:
-            logger.warning("sync_stock: missing id — skipped")
+    for rec in _sorted(records):
+        if_id = rec.get("id")
+        lg_stock_id = rec.get("lgStockId")
+        if lg_stock_id is None:
+            logger.warning("sync_stock: missing lgStockId — skipped id=%s", if_id)
             continue
+        lg_stock_id = int(lg_stock_id)
 
-        entry = session.get(Stock, int(stock_id))
+        # Flush before each lookup — a batch can carry 2+ pending records for
+        # the same lgStockId (insert-then-update, or insert-then-delete); the
+        # session's autoflush is off, so an unflushed prior insert in this
+        # same loop would otherwise be invisible to this select.
+        entry = session.execute(select(Stock).where(Stock.lg_stock_id == lg_stock_id)).scalar_one_or_none()
         if rec.get("ifStatus") == "D":
             if entry:
                 session.delete(entry)
+                session.flush()
             continue
         if entry is None:
-            entry = Stock(id=int(stock_id))
+            entry = Stock(lg_stock_id=lg_stock_id)
             session.add(entry)
+        entry.gsystem_if_id = int(if_id) if if_id is not None else None
 
-        for field in _STOCK_FIELDS:
-            val = rec.get(field)
-            setattr(entry, field, val)
+        for attr, api_key, kind in _STOCK_FIELD_MAP:
+            raw = rec.get(api_key)
+            if kind == "float":
+                val = _to_float(raw)
+            elif kind == "datetime":
+                val = _parse_datetime(raw)
+            else:
+                val = str(raw) if raw is not None else None
+            setattr(entry, attr, val)
+        session.flush()
         count += 1
 
-    session.flush()
     logger.info("sync_stock: %d rows upserted", count)
     return count
 
