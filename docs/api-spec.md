@@ -82,14 +82,16 @@ Sinh gợi ý hành động AI từ context KPI. Cache theo `scenario_id`.
 `KPI3LoadResponse`: `{ kpi_name, avg_load, max_load, min_load, risk_triggered, entries: WorkcenterLoadEntry[], overloaded_slots: WorkcenterLoadEntry[] }`
 
 ### `POST /daily-plan/rebuild`
-Tính lại `aps_result.aps_daily_plan` từ `aps_mps_plan` × `aps_item_routing_spec` (backward-fill). Gọi trước khi đọc các endpoint daily-plan bên dưới.
-→ `DailyPlanRebuildResponse`: `{ rows_inserted }`
+Tính lại `aps_result.aps_daily_plan` từ `aps_mps_plan` × `aps_item_routing_spec` (backward-fill), lưu `status` (`normal`/`overload`) cho từng dòng, rồi đọc lại các dòng vừa lưu để trả về rollup theo (workcenter, ngày) luôn — không cần gọi thêm `GET /daily-plan/workcenter-status` sau khi rebuild.
+→ `DailyPlanRebuildResponse`: `{ rows_inserted, daily_status: WorkcenterDailyStatus[] }` — `daily_status` cùng shape với `GET /daily-plan/workcenter-status`, phản ánh đúng các dòng vừa rebuild.
+
+`WorkcenterDailyStatus`: `{ work_date, workcenter_id, workcenter_no, workcenter_name, planned_qty_total, daily_out_qty, used_minutes, capacity_minutes, load_percent, status }`
 
 ### `GET /daily-plan`
-Query: `workcenter_id?`, `start_date?`, `end_date?` (YYYY-MM-DD) → `DailyPlanRow[]`
+Query: `workcenter_id?`, `start_date?`, `end_date?` (YYYY-MM-DD) → `DailyPlanRow[]`. `status` mỗi dòng đọc trực tiếp từ cột đã lưu `aps_daily_plan.status` (không tính lại).
 
 ### `GET /daily-plan/workcenter-status`
-Rollup theo (workcenter, ngày) — dùng để tô màu FE (`status`: `overload`/`normal`). Query như trên → `WorkcenterDailyStatus[]`
+Rollup theo (workcenter, ngày) — dùng để tô màu FE (`status`: `overload`/`normal`). Query như trên → `WorkcenterDailyStatus[]`. `status` đọc từ cột đã lưu `aps_daily_plan.status` (rollup: overload nếu bất kỳ dòng nào trong nhóm là overload), các trường số (`used_minutes`, `capacity_minutes`, `load_percent`, `daily_out_qty`, `planned_qty_total`) vẫn tính live như trước.
 
 ### `GET /{scenario_id}/workcenter-schedule`
 Dữ liệu cho Gantt chart. Query: `start_date?`, `end_date?`, `workcenter_id?` → `WorkcenterLoadEntry[]`
