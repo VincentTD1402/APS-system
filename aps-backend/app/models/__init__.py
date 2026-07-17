@@ -2,7 +2,7 @@
 # Input domain models (aps_input / aps_*)
 from .input.customer import Customer
 from .input.item import Item
-from .input.bom import BOM, BOMComponent
+from .input.bom import BOM
 from .input.workcenter import WorkCenter
 from .input.equipment import Equipment
 from .input.routing import RoutingStep, Routing, RoutingItem
@@ -31,7 +31,6 @@ __all__ = [
     "Customer",
     "Item",
     "BOM",
-    "BOMComponent",
     "WorkCenter",
     "Equipment",
     "Routing",

@@ -59,6 +59,85 @@ def _workcenter_capacity_index(db: Session):
     return build_workcenter_capacity_index(db)
 
 
+def _workcenter_daily_status_rollup(
+    db: Session,
+    workcenter_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> List[WorkcenterDailyStatus]:
+    """Workcenter-level rollup of aps_daily_plan for one (workcenter, work_date).
+
+    `status` is read from the persisted `DailyPlan.status` column (single source
+    of truth, written by `daily_plan_builder.rebuild_daily_plan`). Defensive
+    rollup rule: a slot rolls up to "overload" if ANY row in the group is
+    "overload" — do not assume the builder always sets it uniformly per slot.
+
+    Numeric fields (`used_minutes`, `capacity_minutes`, `load_percent`,
+    `daily_out_qty`, `planned_qty_total`) are NOT persisted and stay computed
+    live here, same as before.
+    """
+    stmt = (
+        select(DailyPlan, WorkCenter, ItemRoutingSpec)
+        .join(WorkCenter, DailyPlan.workcenter_id == WorkCenter.id)
+        .join(ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id)
+    )
+    if workcenter_id is not None:
+        stmt = stmt.where(DailyPlan.workcenter_id == workcenter_id)
+    if start_date:
+        stmt = stmt.where(DailyPlan.work_date >= date_cls.fromisoformat(start_date))
+    if end_date:
+        stmt = stmt.where(DailyPlan.work_date <= date_cls.fromisoformat(end_date))
+
+    results = db.execute(stmt).all()
+
+    required_minutes = _required_minutes_by_workcenter_day(
+        [(dp, wc, ir, None, None) for dp, wc, ir in results]
+    )
+    qty_by_slot: dict = defaultdict(float)
+    persisted_overload_by_slot: dict = defaultdict(bool)  # defensive OR rollup
+    for dp, _wc, _ir in results:
+        slot = (dp.workcenter_id, dp.work_date)
+        qty_by_slot[slot] += float(dp.planned_qty)
+        if dp.status == "overload":
+            persisted_overload_by_slot[slot] = True
+    capacity_index = _workcenter_capacity_index(db)
+    meta_by_wc = {wc.id: wc for _dp, wc, _ir in results}
+
+    out: List[WorkcenterDailyStatus] = []
+    # Iterate qty_by_slot keys (not required_minutes) so a slot with rows but
+    # zero required minutes (work_time is None) is still surfaced.
+    for (wc_id, work_date) in sorted(
+        qty_by_slot.keys(),
+        key=lambda k: (meta_by_wc[k[0]].workcenter_no or "", k[1]),
+    ):
+        wc = meta_by_wc[wc_id]
+        used_minutes = required_minutes.get((wc_id, work_date), 0.0)
+        capacity = capacity_index.minutes_on(wc_id, work_date)
+        qty_total = qty_by_slot[(wc_id, work_date)]
+        load_percent = (
+            round((used_minutes / capacity) * 100.0, 2) if capacity > 0
+            else (999.99 if used_minutes > 0 else 0.0)
+        )
+        if capacity > 0 and used_minutes > 0:
+            daily_out_qty = round(qty_total * capacity / used_minutes, 2)
+        else:
+            daily_out_qty = 0.0
+        status = "overload" if persisted_overload_by_slot[(wc_id, work_date)] else "normal"
+        out.append(WorkcenterDailyStatus(
+            work_date=work_date,
+            workcenter_id=wc_id,
+            workcenter_no=wc.workcenter_no,
+            workcenter_name=wc.workcenter_name,
+            planned_qty_total=round(qty_total, 2),
+            daily_out_qty=daily_out_qty,
+            used_minutes=round(used_minutes, 2),
+            capacity_minutes=round(capacity, 2),
+            load_percent=load_percent,
+            status=status,
+        ))
+    return out
+
+
 # ============================================================================
 # KPI 1 – Delivery Compliance Rate
 # ============================================================================
@@ -142,7 +221,8 @@ def rebuild_daily_plan_endpoint(db: Session = Depends(get_db)) -> DailyPlanRebui
 
     rows = rebuild_daily_plan(db)
     db.commit()
-    return DailyPlanRebuildResponse(rows_inserted=rows)
+    daily_status = _workcenter_daily_status_rollup(db)  # re-read persisted rows
+    return DailyPlanRebuildResponse(rows_inserted=rows, daily_status=daily_status)
 
 
 @router.get(
@@ -173,13 +253,6 @@ def list_daily_plan(
         stmt = stmt.where(DailyPlan.work_date <= date_cls.fromisoformat(end_date))
 
     results = db.execute(stmt).all()
-    required_minutes = _required_minutes_by_workcenter_day(results)
-    capacity_index = _workcenter_capacity_index(db)
-
-    def _status(wc_id: int, work_date: date_cls) -> str:
-        capacity = capacity_index.minutes_on(wc_id, work_date)
-        required = required_minutes.get((wc_id, work_date), 0.0)
-        return "overload" if capacity > 0 and required > capacity else "normal"
 
     return [
         DailyPlanRow(
@@ -192,7 +265,7 @@ def list_daily_plan(
             proc_name=ir.proc_name,
             plan_no=mp.plan_no,
             item_no=it.item_no if it else None,
-            status=_status(dp.workcenter_id, dp.work_date),
+            status=dp.status,
         )
         for dp, wc, ir, mp, it in results
     ]
@@ -214,62 +287,7 @@ def get_workcenter_daily_status(
     end_date: Optional[str] = Query(None, description="Filter work_date <= (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
 ) -> List[WorkcenterDailyStatus]:
-    stmt = (
-        select(DailyPlan, WorkCenter, ItemRoutingSpec)
-        .join(WorkCenter, DailyPlan.workcenter_id == WorkCenter.id)
-        .join(ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id)
-    )
-    if workcenter_id is not None:
-        stmt = stmt.where(DailyPlan.workcenter_id == workcenter_id)
-    if start_date:
-        stmt = stmt.where(DailyPlan.work_date >= date_cls.fromisoformat(start_date))
-    if end_date:
-        stmt = stmt.where(DailyPlan.work_date <= date_cls.fromisoformat(end_date))
-
-    results = db.execute(stmt).all()
-    required_minutes = _required_minutes_by_workcenter_day(
-        [(dp, wc, ir, None, None) for dp, wc, ir in results]
-    )
-    qty_by_slot: dict = defaultdict(float)
-    for dp, _wc, _ir in results:
-        qty_by_slot[(dp.workcenter_id, dp.work_date)] += float(dp.planned_qty)
-    capacity_index = _workcenter_capacity_index(db)
-    meta_by_wc = {wc.id: wc for _dp, wc, _ir in results}
-
-    out: List[WorkcenterDailyStatus] = []
-    for (wc_id, work_date), used_minutes in sorted(
-        required_minutes.items(), key=lambda kv: (meta_by_wc[kv[0][0]].workcenter_no or "", kv[0][1])
-    ):
-        wc = meta_by_wc[wc_id]
-        capacity = capacity_index.minutes_on(wc_id, work_date)
-        qty_total = qty_by_slot.get((wc_id, work_date), 0.0)
-        load_percent = round((used_minutes / capacity) * 100.0, 2) if capacity > 0 else (999.99 if used_minutes > 0 else 0.0)
-
-        # daily_out_qty = max producible qty/day for the actual product mix that day —
-        # derived so that qty_total > daily_out_qty is exactly equivalent to
-        # used_minutes > capacity_minutes (same check, expressed directly in quantity).
-        if capacity > 0 and used_minutes > 0:
-            daily_out_qty = round(qty_total * capacity / used_minutes, 2)
-            overloaded = qty_total > daily_out_qty
-        else:
-            daily_out_qty = 0.0
-            overloaded = False
-
-        out.append(
-            WorkcenterDailyStatus(
-                work_date=work_date,
-                workcenter_id=wc_id,
-                workcenter_no=wc.workcenter_no,
-                workcenter_name=wc.workcenter_name,
-                planned_qty_total=round(qty_total, 2),
-                daily_out_qty=daily_out_qty,
-                used_minutes=round(used_minutes, 2),
-                capacity_minutes=round(capacity, 2),
-                load_percent=load_percent,
-                status="overload" if overloaded else "normal",
-            )
-        )
-    return out
+    return _workcenter_daily_status_rollup(db, workcenter_id, start_date, end_date)
 
 
 

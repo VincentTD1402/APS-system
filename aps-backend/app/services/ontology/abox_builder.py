@@ -24,7 +24,7 @@ from rdflib.namespace import RDF, XSD
 from sqlalchemy.orm import Session
 
 from app.config import get_logger
-from app.models import BOMComponent, CalendarEntry, Demand, Item, RoutingStep, Routing, WorkCenter
+from app.models import CalendarEntry, Demand, Item, RoutingStep, Routing, WorkCenter
 from app.models import BOM
 
 from .namespace import (
@@ -63,33 +63,40 @@ def _build_items(session: Session, g: Graph) -> dict[int, URIRef]:
 
 
 def _build_bom(session: Session, g: Graph, item_by_id: dict[int, URIRef]) -> None:
-    """Add BOM headers and BOMComponent lines."""
-    bom_count = 0
-    for bom in session.query(BOM).all():
-        parent_uri = item_by_id.get(bom.parent_item_id)
+    """Add BOM headers and BOMComponent lines from the merged `aps_bom` table.
+
+    Storage is now one row per parent/component pair (no separate header
+    table); the RDF layer still synthesizes one "BOM header" node per
+    distinct parent_item_id — keyed on the parent's item_no, never on the
+    physical row id — so the emitted triples are unchanged.
+    """
+    seen_parents: set[int] = set()
+    for row in session.query(BOM).order_by(BOM.parent_item_id, BOM.bom_seq).all():
+        parent_uri = item_by_id.get(row.parent_item_id)
         if not parent_uri:
             continue
-        bom_u = bom_uri(session.get(Item, bom.parent_item_id).item_no)
-        g.add((bom_u, RDF.type, APS["BOM"]))
-        g.add((bom_u, APS["producesItem"], parent_uri))
-        g.add((parent_uri, APS["hasBOM"], bom_u))
-        for comp in session.query(BOMComponent).filter_by(bom_id=bom.id).all():
-            comp_item_uri = item_by_id.get(comp.component_item_id)
-            if not comp_item_uri:
-                continue
-            comp_u = bom_component_uri(
-                session.get(Item, bom.parent_item_id).item_no, comp.component_item_id
-            )
-            g.add((comp_u, RDF.type, APS["BOMComponent"]))
-            g.add((comp_u, APS["belongsToBOM"], bom_u))
-            g.add((bom_u, APS["hasBOMComponent"], comp_u))
-            g.add((comp_u, APS["componentItem"], comp_item_uri))
-            if comp.quantity is not None:
-                g.add((comp_u, APS["quantity"], Literal(float(comp.quantity), datatype=XSD.decimal)))
-            if comp.bom_seq is not None:
-                g.add((comp_u, APS["bomSeq"], Literal(comp.bom_seq, datatype=XSD.integer)))
-        bom_count += 1
-    logger.info("build_bom: %d BOM headers", bom_count)
+        parent_item = session.get(Item, row.parent_item_id)
+        parent_no = parent_item.item_no
+        bom_u = bom_uri(parent_no)
+        if row.parent_item_id not in seen_parents:
+            g.add((bom_u, RDF.type, APS["BOM"]))
+            g.add((bom_u, APS["producesItem"], parent_uri))
+            g.add((parent_uri, APS["hasBOM"], bom_u))
+            seen_parents.add(row.parent_item_id)
+
+        comp_item_uri = item_by_id.get(row.component_item_id)
+        if not comp_item_uri:
+            continue
+        comp_u = bom_component_uri(parent_no, row.component_item_id)
+        g.add((comp_u, RDF.type, APS["BOMComponent"]))
+        g.add((comp_u, APS["belongsToBOM"], bom_u))
+        g.add((bom_u, APS["hasBOMComponent"], comp_u))
+        g.add((comp_u, APS["componentItem"], comp_item_uri))
+        if row.qty1 is not None:
+            g.add((comp_u, APS["quantity"], Literal(float(row.qty1), datatype=XSD.decimal)))
+        if row.bom_seq is not None:
+            g.add((comp_u, APS["bomSeq"], Literal(row.bom_seq, datatype=XSD.integer)))
+    logger.info("build_bom: %d BOM headers", len(seen_parents))
 
 
 def _build_workcenters(session: Session, g: Graph) -> dict[int, URIRef]:

@@ -189,11 +189,6 @@ class KPIStatusResponse(BaseModel):
 # Daily Plan (backward-fill) — standalone, not KPI3
 # ============================================================================
 
-class DailyPlanRebuildResponse(BaseModel):
-    """Result of recomputing aps_result.aps_daily_plan."""
-    rows_inserted: int = Field(..., description="Rows written to aps_daily_plan")
-
-
 class DailyPlanRow(BaseModel):
     """One row from aps_result.aps_daily_plan."""
     work_date: date
@@ -225,3 +220,13 @@ class WorkcenterDailyStatus(BaseModel):
     capacity_minutes: float
     load_percent: float
     status: str = Field("normal", description="'overload' when planned_qty_total > daily_out_qty, else 'normal'")
+
+
+class DailyPlanRebuildResponse(BaseModel):
+    """Result of recomputing aps_result.aps_daily_plan."""
+    rows_inserted: int = Field(..., description="Rows written to aps_daily_plan")
+    daily_status: List[WorkcenterDailyStatus] = Field(
+        default_factory=list,
+        description="Per-(workcenter, work_date) load rollup of the rows just rebuilt "
+                    "(same shape as GET /daily-plan/workcenter-status).",
+    )

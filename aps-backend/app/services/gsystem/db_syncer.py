@@ -12,7 +12,7 @@ Usage:
         session.commit()
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_logger
 from app.models import (
-    BOM, BOMComponent, Demand, Equipment, Item, ItemProcessStep, ItemRoutingSpec,
+    BOM, Demand, Equipment, Item, ItemProcessStep, ItemRoutingSpec,
     MpsPlan, RoutingStep, Routing, RoutingItem, WorkCenter,
 )
 from app.models.input.calendar import CalendarEntry
@@ -59,6 +59,27 @@ def _parse_date(value: Any) -> date | None:
     except ValueError:
         logger.warning("Cannot parse date %r — stored as None", value)
         return None
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    """Parse a G-System datetime value → naive datetime, or None.
+
+    Handles both API formats seen in practice:
+      - "2025-03-21 10:41:48"          (naive, space separator — regDt/modDt)
+      - "2026-07-17T01:28:37.853+00:00" (ISO 8601 with tz offset — ifRecvDt)
+    Tz-aware values are normalized to naive UTC (target columns are
+    TIMESTAMP WITHOUT TIME ZONE, matching existing reg_dt/mod_dt convention).
+    """
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except ValueError:
+        logger.warning("Cannot parse datetime %r — stored as None", value)
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def _sorted(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -325,7 +346,7 @@ def sync_item_routing(
         if r.gsystem_id is not None
     } if routing_ids else {}
 
-    wc_ids = {int(r["workcenterId"]) for r in records if r.get("workcenterId") is not None}
+    wc_ids = {int(r["oscustId"]) for r in records if r.get("oscustId") is not None}
     wc_by_gsys: dict[int, WorkCenter] = {
         w.gsystem_id: w
         for w in session.execute(select(WorkCenter).where(WorkCenter.gsystem_id.in_(wc_ids))).scalars().all()
@@ -348,7 +369,9 @@ def sync_item_routing(
         gsys_routing_id = _to_int(rec.get("routingId"))
         ir.gsystem_routing_id = gsys_routing_id
         ir.routing_id = routing_by_gsys[gsys_routing_id].id if gsys_routing_id in routing_by_gsys else None
-        gsys_wc_id = _to_int(rec.get("workcenterId"))
+        # G-System names this field "oscustId" (not "workcenterId") in the
+        # itemRoutingMng response — verified against live API response.
+        gsys_wc_id = _to_int(rec.get("oscustId"))
         ir.gsystem_workcenter_id = gsys_wc_id
         ir.workcenter_id = wc_by_gsys[gsys_wc_id].id if gsys_wc_id in wc_by_gsys else None
         ir.routing_no = rec.get("routingNo")
@@ -489,9 +512,12 @@ def sync_bom(
     records: list[dict[str, Any]],
     item_index: dict[int, Item],
 ) -> None:
-    """Upsert/delete BOM headers + components.
+    """Upsert/delete merged BOM rows (one row per parent/component pair).
 
-    G-System fields: upitemId (lowercase i), downitemId, qty1, bomSort.
+    G-System fields: upitemId (lowercase i), downitemId, qty1, qty2, bomSort,
+    plus the full informational field set (id, bomId, upitemNo, downitemNo,
+    bomLevel, sdate, edate, delvType, delvTypeNm, revNo, ifRecvYn, ifRecvDt,
+    regDt, regUserId, modDt, modUserId, corpId, bizId, ifStatus).
     """
     count = 0
     for rec in _sorted(records):
@@ -504,26 +530,43 @@ def sync_bom(
         if parent is None or child is None:
             logger.debug("sync_bom: parent=%s child=%s not found", parent_id, child_id)
             continue
-        bom = session.execute(select(BOM).where(BOM.parent_item_id == parent.id)).scalar_one_or_none()
+        row = session.execute(
+            select(BOM).where(BOM.parent_item_id == parent.id, BOM.component_item_id == child.id)
+        ).scalar_one_or_none()
         if rec.get("ifStatus") == "D":
-            if bom:
-                comp = session.execute(select(BOMComponent).where(BOMComponent.bom_id == bom.id, BOMComponent.component_item_id == child.id)).scalar_one_or_none()
-                if comp:
-                    session.delete(comp)
+            if row:
+                session.delete(row)
+                session.flush()
             continue
-        if bom is None:
-            bom = BOM(parent_item=parent)
-            session.add(bom)
-            session.flush()
-        comp = session.execute(select(BOMComponent).where(BOMComponent.bom_id == bom.id, BOMComponent.component_item_id == child.id)).scalar_one_or_none()
-        if comp is None:
-            comp = BOMComponent(bom=bom, component_item=child)
-            session.add(comp)
-        comp.quantity = float(rec.get("qty1") or 1)
-        comp.bom_seq = rec.get("bomSort")
+        if row is None:
+            row = BOM(parent_item=parent, component_item=child)
+            session.add(row)
+        qty2 = rec.get("qty2")
+        row.qty1 = float(rec.get("qty1") or 1)
+        row.qty2 = float(qty2) if qty2 is not None else None
+        row.bom_seq = rec.get("bomSort")
+        row.gsystem_if_id = rec.get("id")
+        row.gsystem_bom_id = rec.get("bomId")
+        row.parent_item_no = rec.get("upitemNo")
+        row.component_item_no = rec.get("downitemNo")
+        row.bom_level = rec.get("bomLevel")
+        row.start_date = rec.get("sdate")
+        row.end_date = rec.get("edate")
+        row.delivery_type = rec.get("delvType")
+        row.delivery_type_name = rec.get("delvTypeNm")
+        row.rev_no = rec.get("revNo")
+        row.if_recv_yn = rec.get("ifRecvYn")
+        row.if_recv_dt = _parse_datetime(rec.get("ifRecvDt"))
+        row.reg_dt = _parse_datetime(rec.get("regDt"))
+        row.reg_user_id = rec.get("regUserId")
+        row.mod_dt = _parse_datetime(rec.get("modDt"))
+        row.mod_user_id = rec.get("modUserId")
+        row.corp_id = rec.get("corpId")
+        row.biz_id = rec.get("bizId")
+        row.if_status = rec.get("ifStatus")
         session.flush()
         count += 1
-    logger.info("sync_bom: %d components upserted", count)
+    logger.info("sync_bom: %d rows upserted", count)
 
 
 def sync_demands(

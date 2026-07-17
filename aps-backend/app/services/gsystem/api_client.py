@@ -289,8 +289,10 @@ class GSystemClient:
         """Fetch 품목별라우팅입력 for an item (GET /pd/itemRoutingMng?itemId=).
 
         item_id is the G-System business id (Item.gsystem_id). One row per proc
-        step (procSno). Passing revNo restricts/thins the result (observed missing
-        workTime/workcenterId on some items) — intentionally omitted.
+        step (procSno). Passing revNo restricts/thins the result — intentionally
+        omitted. Workcenter is returned as "oscustId"/"custNm" (NOT "workcenterId"/
+        "workcenterNm" like other endpoints) — verified against live API response;
+        `workTime` is present only on rows where it was actually entered upstream.
         """
         path = "/pd/itemRoutingMng"
         last_exc: Exception | None = None

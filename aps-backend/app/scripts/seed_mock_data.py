@@ -21,7 +21,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.db.database import SessionLocal, init_db
 from app.models import (
     BOM,
-    BOMComponent,
     CalendarEntry,
     Customer,
     Demand,
@@ -214,14 +213,9 @@ def _seed_bom(session, items: dict[str, Item]) -> int:
         child = items.get(child_no)
         if parent is None or child is None:
             continue
-        bom = session.query(BOM).filter_by(parent_item_id=parent.id).first()
-        if bom is None:
-            bom = BOM(parent_item=parent)
-            session.add(bom)
-            session.flush()
-        comp = session.query(BOMComponent).filter_by(bom_id=bom.id, component_item_id=child.id).first()
-        if comp is None:
-            session.add(BOMComponent(bom=bom, component_item=child, quantity=qty, bom_seq=1))
+        row = session.query(BOM).filter_by(parent_item_id=parent.id, component_item_id=child.id).first()
+        if row is None:
+            session.add(BOM(parent_item=parent, component_item=child, qty1=qty, qty2=qty, bom_seq=1))
             count += 1
     session.flush()
     return count
