@@ -1,74 +1,66 @@
-set windows-shell := ["powershell", "-c"]
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
-# Common variables
 python := "uv run python"
-migrate := "uv run alembic"
 uvicorn := "uv run uvicorn"
-black := "uv run black"
-flake8 := "uv run flake8"
+alembic := "uv run alembic"
+pytest := "uv run pytest"
+ruff := "uv run ruff"
 mypy := "uv run mypy"
 
-# Import platform-specific recipes
+# Import OS-specific recipes (auto-picked by [unix] / [windows] attributes)
 import '.just/unix.just'
 import '.just/windows.just'
 
-# List recipes
+# Default: list recipes with OS info
 default:
-    @echo 'OS: {{os()}}'
+    @echo "aps-backend · OS: {{os()}}"
     @just --list
 
-# Setup project
-setup: venv install env
+# Install deps (uv sync — cross-platform)
+install:
+    uv sync
 
-# Check code style (formatting, linting, type checking)
-check-format: fmt lint typecheck
+# Run dev server locally (outside Docker)
+dev port="8000":
+    {{uvicorn}} app.main:app --reload --host 0.0.0.0 --port {{port}}
 
-# ─── Docker compose shortcuts (platform-agnostic) ──────────────────────
+# Run prod server locally
+prod port="8000":
+    {{uvicorn}} app.main:app --host 0.0.0.0 --port {{port}} --workers 2
 
-# Start all services in background
-up:
-    docker compose up -d
+# Apply pending migrations (chạy inside backend container)
+migrate:
+    docker compose exec backend {{alembic}} upgrade head
 
-# Rebuild images then start all services
-up-build:
-    docker compose up -d --build
+# Create new migration. Usage: just migration "add_xxx_table"
+migration name:
+    docker compose exec backend {{alembic}} revision --autogenerate -m "{{name}}"
 
-# Stop all services (keep volumes / data)
-down:
-    docker compose down
+# Roll back one migration step
+downgrade:
+    docker compose exec backend {{alembic}} downgrade -1
 
-# Stop all services AND wipe volumes (DESTROYS DB DATA)
-[confirm("Wipe all volumes? This DELETES Postgres + Neo4j data! [y/N]")]
-down-v:
-    docker compose down -v
+# Seed reference data (mock G-System import)
+seed:
+    docker compose exec backend {{python}} -m app.cli import-gsystem --source=mock
 
-# Show service status
-ps:
-    docker compose ps
+# Run tests
+test *args:
+    {{pytest}} {{args}}
 
-# Tail logs of a service (default: api). Usage: just logs api | just logs db
-logs service="api":
-    docker compose logs -f {{service}}
+# Coverage report
+coverage:
+    {{pytest}} --cov=app --cov-report=term-missing --cov-report=html
 
-# Restart a service (default: api)
-restart service="api":
-    docker compose restart {{service}}
+# Lint (ruff)
+lint:
+    {{ruff}} check app tests
 
-# Open shell inside a service (default: api). Usage: just sh api | just sh db
-sh service="api":
-    docker compose exec {{service}} bash
+# Type check (mypy)
+typecheck:
+    {{mypy}} app
 
-# ─── DB workflows ──────────────────────────────────────────────────────
-
-# Soft reset DB: run migrations + seed (data preserved if already exists)
-db-reset: migrate seed
-
-# Full reset DB: wipe volumes → up → migrate → seed (DESTROYS DATA)
-[confirm("Full reset will DROP all DB data and reseed from G-System. Continue? [y/N]")]
-db-wipe:
-    docker compose down -v
-    docker compose up -d
-    @echo "Waiting for db + neo4j to be healthy..."
-    @until [ "$(docker inspect -f '{{{{.State.Health.Status}}}}' aps_core_db 2>/dev/null)" = "healthy" ] && [ "$(docker inspect -f '{{{{.State.Health.Status}}}}' aps_neo4j 2>/dev/null)" = "healthy" ]; do sleep 2; done
-    just migrate
-    just seed
+# Format (ruff format + auto-fix)
+fmt:
+    {{ruff}} format app tests
+    {{ruff}} check --fix app tests

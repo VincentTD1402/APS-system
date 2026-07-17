@@ -3,10 +3,20 @@ set dotenv-load
 
 compose := "docker compose"
 
-# Default: list recipes
+backend-justfile := "aps-backend/Justfile"
+frontend-justfile := "aps-frontend/Justfile"
+
+# Import OS-specific recipes (auto-picked by [unix] / [windows] attributes)
+import '.just/unix.just'
+import '.just/windows.just'
+
+# Default: list recipes with OS info
 default:
-    @echo 'OS: {{os()}}'
+    @just _banner
     @just --list
+
+_banner:
+    @echo "APS System · OS: {{os()}} · arch: {{arch()}}"
 
 # ─── Docker compose (cross-platform) ───────────────────────────────────
 
@@ -39,11 +49,12 @@ rebuild:
 restart service:
     {{compose}} restart {{service}}
 
-# Open shell in a service. Usage: just sh backend | just sh frontend | just sh db
+# Open shell in a service (uses sh — bash may not exist on alpine images).
+# Usage: just sh backend | just sh frontend | just sh db
 sh service:
-    {{compose}} exec {{service}} bash
+    {{compose}} exec {{service}} sh
 
-# Psql into db (override: `just psql aps aps`)
+# Psql into db. Usage: just psql | just psql postgres another_db
 psql user=env_var_or_default("POSTGRES_USER", "aps") db=env_var_or_default("POSTGRES_DB", "aps"):
     {{compose}} exec db psql -U {{user}} -d {{db}}
 
@@ -59,45 +70,45 @@ bootstrap:
 
 # Apply migrations (delegates to backend)
 migrate:
-    just --justfile backend/Justfile migrate
+    just --justfile {{backend-justfile}} migrate
 
 # Create new migration. Usage: just migration "add_xxx_table"
 migration name:
-    just --justfile backend/Justfile migration "{{name}}"
+    just --justfile {{backend-justfile}} migration "{{name}}"
 
 # Roll back one migration step
 downgrade:
-    just --justfile backend/Justfile downgrade
+    just --justfile {{backend-justfile}} downgrade
 
 # Seed reference data
 seed:
-    just --justfile backend/Justfile seed
+    just --justfile {{backend-justfile}} seed
 
 # Lint backend + frontend
 lint:
-    just --justfile backend/Justfile lint
-    just --justfile frontend/Justfile lint
+    just --justfile {{backend-justfile}} lint
+    just --justfile {{frontend-justfile}} lint
 
 # Type check backend + frontend
 typecheck:
-    just --justfile backend/Justfile typecheck
-    just --justfile frontend/Justfile typecheck
+    just --justfile {{backend-justfile}} typecheck
+    just --justfile {{frontend-justfile}} typecheck
 
 # Run tests backend + frontend
 test:
-    just --justfile backend/Justfile test
-    just --justfile frontend/Justfile test
+    just --justfile {{backend-justfile}} test
+    just --justfile {{frontend-justfile}} test
 
 # Format backend + frontend
 fmt:
-    just --justfile backend/Justfile fmt
-    just --justfile frontend/Justfile fmt
+    just --justfile {{backend-justfile}} fmt
+    just --justfile {{frontend-justfile}} fmt
 
 # Full local CI: lint + typecheck + test + FE build
 ci: lint typecheck test
-    just --justfile frontend/Justfile build
+    just --justfile {{frontend-justfile}} build
 
-# Dev (informational — run inside subproject for local hot-reload without Docker)
+# Dev — chạy local (không Docker) cho hot-reload nhanh
 dev:
-    @echo "Backend dev:  just --justfile backend/Justfile dev"
-    @echo "Frontend dev: just --justfile frontend/Justfile dev"
+    @echo "Backend dev:  just --justfile {{backend-justfile}} dev"
+    @echo "Frontend dev: just --justfile {{frontend-justfile}} dev"
