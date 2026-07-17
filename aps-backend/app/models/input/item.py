@@ -30,8 +30,12 @@ class Item(Base):
     spec: Mapped[str | None] = mapped_column(String(200))
 
     demands: Mapped[List["Demand"]] = relationship(back_populates="item")
-    boms: Mapped[List["BOM"]] = relationship(back_populates="parent_item")
-    bom_components: Mapped[List["BOMComponent"]] = relationship(back_populates="component_item")
+    bom_parent_links: Mapped[List["BOM"]] = relationship(
+        back_populates="parent_item", foreign_keys="BOM.parent_item_id"
+    )
+    bom_component_links: Mapped[List["BOM"]] = relationship(
+        back_populates="component_item", foreign_keys="BOM.component_item_id"
+    )
     plan_shortages: Mapped[List["PlanShortage"]] = relationship(back_populates="item")
     routing_items: Mapped[list["RoutingItem"]] = relationship(back_populates="item")
     item_process_steps: Mapped[list["ItemProcessStep"]] = relationship(back_populates="item")

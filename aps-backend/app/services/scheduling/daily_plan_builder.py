@@ -178,6 +178,8 @@ def rebuild_daily_plan(session: Session) -> int:
     session.query(DailyPlan).delete(synchronize_session=False)
 
     inserted = 0
+    required_minutes_by_slot: dict[tuple[int, date], float] = defaultdict(float)
+    rows_by_slot: dict[tuple[int, date], list[DailyPlan]] = defaultdict(list)
     for mps in mps_lines:
         anchor = _anchor_end_date(mps)
         if anchor is None or not mps.plan_qty or float(mps.plan_qty) <= 0:
@@ -210,18 +212,31 @@ def rebuild_daily_plan(session: Session) -> int:
             for work_date, qty in allocations.items():
                 if qty <= 0:
                     continue
-                session.add(
-                    DailyPlan(
-                        mps_plan_id=mps.id,
-                        item_routing_id=step.id,
-                        workcenter_id=step.workcenter_id,
-                        work_date=work_date,
-                        planned_qty=round(qty, 2),
-                    )
+                persisted_qty = round(qty, 2)
+                row = DailyPlan(
+                    mps_plan_id=mps.id,
+                    item_routing_id=step.id,
+                    workcenter_id=step.workcenter_id,
+                    work_date=work_date,
+                    planned_qty=persisted_qty,
+                    status="normal",
                 )
+                session.add(row)
+                slot = (step.workcenter_id, work_date)
+                required_minutes_by_slot[slot] += persisted_qty * work_time_minutes
+                rows_by_slot[slot].append(row)
                 inserted += 1
 
             window_end = max(today, earliest_day - timedelta(days=1))
+
+    # Second pass: a (workcenter, day) slot is overloaded when the total
+    # required minutes across ALL steps sharing it exceeds real daily
+    # capacity — only knowable after every MPS line has been processed.
+    for (wc_id, work_date), required in required_minutes_by_slot.items():
+        capacity = capacity_index.minutes_on(wc_id, work_date)
+        if capacity > 0 and required > capacity:
+            for row in rows_by_slot[(wc_id, work_date)]:
+                row.status = "overload"
 
     session.flush()
     logger.info("rebuild_daily_plan: %d rows across %d MPS lines", inserted, len(mps_lines))
