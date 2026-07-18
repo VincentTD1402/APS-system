@@ -59,6 +59,9 @@ def list_material_shortage(
     rows = db.execute(stmt).scalars().all()
     return [
         MaterialShortageRow(
+            parent_item_id=r.parent_item_id,
+            parent_item_no=r.parent_item_no,
+            parent_item_name=r.parent_item_name,
             item_id=r.item_id,
             item_no=r.item_no,
             item_name=r.item_name,

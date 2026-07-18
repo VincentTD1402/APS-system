@@ -10,9 +10,12 @@ class MaterialShortageRebuildResponse(BaseModel):
 
 
 class MaterialShortageRow(BaseModel):
-    """One component/material's required-vs-available rollup."""
+    """One (parent product/semiproduct → component) material requirement vs stock."""
 
-    item_id: int
+    parent_item_id: int | None = Field(None, description="Product/semiproduct (BOM parent) — FK aps_item.id, clickable")
+    parent_item_no: str | None = None
+    parent_item_name: str | None = None
+    item_id: int = Field(..., description="Component/material (BOM child) — FK aps_item.id, clickable")
     item_no: str | None = None
     item_name: str | None = None
     required_qty: float = Field(..., description="Σ plan_qty × qty1/qty2 across MPS lines (소요예정)")
