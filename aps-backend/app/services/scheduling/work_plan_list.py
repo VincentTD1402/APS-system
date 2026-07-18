@@ -1,14 +1,16 @@
 """Assemble the Work Plan List (작업계획 리스트) — read-only.
 
-Combines two disjoint sources per spec P6 (docs/specs/my_explain.md):
-  - Set A (source_type="WO"): incomplete work orders — aps_result.work_order.
-  - Set B (source_type="MPS"): uncreated MPS plan lines shown as temporary
-    ((임시)) work plans — aps_input.aps_mps_plan where status_cd='notCreated'.
+Base = every `aps_input.aps_mps_plan` line. The `aps_result.work_order` table is a
+lookup only: if the line's `plan_no` exists there → `work_order_no = plan_no`
+(source_type "WO", 미완료 작업지시); otherwise `tmp_plan_no = plan_no`
+(source_type "MPS", 미작성 생산계획). Exactly one of the two identifiers is set.
 
-Per-operation columns (공정/워크센터) and the overload risk are enriched from
-aps_result.aps_daily_plan (the backward-fill output of daily_plan_builder). A
-line with no daily_plan coverage (missing item/routing mapping) simply leaves
-those columns null — a known data gap, not an error.
+Column derivations follow the caller's spec (see docs/api-spec.md §6):
+  - 워크센터: aps_item_routing_spec (item_id, routing_id) → workcenter → aps_workcenter.
+  - 공정: aps_item_process_step (item_id, routing_id) → proc_sno → aps_item_routing_spec.
+  - dates: raw aps_mps_plan.plan_start_date / plan_end_date / delivery_date.
+  - overload: aps_result.aps_daily_plan.status for the line; material_short: BOM × stock.
+Columns whose source data is missing are returned as null (no fallback).
 """
 
 from __future__ import annotations
@@ -20,60 +22,75 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import BOM, DailyPlan, Item, ItemRoutingSpec, MpsPlan, Stock, WorkCenter, WorkOrder
+from app.models import (
+    BOM,
+    DailyPlan,
+    Item,
+    ItemProcessStep,
+    ItemRoutingSpec,
+    MpsPlan,
+    Stock,
+    WorkCenter,
+    WorkOrder,
+)
 from app.schemas.work_plan import WorkPlanRow
-from app.services.scheduling.daily_plan_builder import _anchor_end_date
-
-# MPS status_cd for lines that have NOT been turned into a work order yet.
-_UNCREATED_STATUS = "notCreated"
 
 
-def _tmp_plan_no(mps: MpsPlan) -> str:
-    """Provisional (임시)작업계획번호 for an uncreated MPS line."""
-    return f"WP-{mps.id:07d}"
+def _build_workcenter_index(db: Session) -> dict[tuple[int, int], tuple[Optional[str], Optional[str]]]:
+    """(item_id, routing_id) → (workcenter_no, workcenter_name).
 
-
-def _build_daily_plan_enrichment(db: Session) -> dict[int, dict]:
-    """Aggregate aps_daily_plan per mps_plan_id.
-
-    Returns {mps_plan_id: {start, end, overload, proc_name, workcenter_no,
-    workcenter_name}}. The representative operation (for 공정/워크센터 display)
-    is the earliest routing step (lowest proc_sno).
+    From aps_item_routing_spec rows that carry a workcenter_id, joined to
+    aps_workcenter. Representative operation = lowest proc_sno.
     """
-    stmt = (
-        select(DailyPlan, ItemRoutingSpec, WorkCenter)
-        .join(ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id)
-        .join(WorkCenter, DailyPlan.workcenter_id == WorkCenter.id)
+    stmt = select(ItemRoutingSpec, WorkCenter).join(
+        WorkCenter, ItemRoutingSpec.workcenter_id == WorkCenter.id
     )
-    grouped: dict[int, list] = defaultdict(list)
-    for dp, ir, wc in db.execute(stmt).all():
-        grouped[dp.mps_plan_id].append((dp, ir, wc))
+    grouped: dict[tuple[int, int], list] = defaultdict(list)
+    for ir, wc in db.execute(stmt).all():
+        if ir.item_id is not None and ir.routing_id is not None:
+            grouped[(ir.item_id, ir.routing_id)].append((ir, wc))
 
-    enrichment: dict[int, dict] = {}
-    for mps_id, group in grouped.items():
-        work_dates = [dp.work_date for dp, _, _ in group]
-        _, rep_ir, rep_wc = min(
-            group, key=lambda t: t[1].proc_sno if t[1].proc_sno is not None else 0
-        )
-        enrichment[mps_id] = {
-            "start": min(work_dates),
-            "end": max(work_dates),
-            "overload": any(dp.status == "overload" for dp, _, _ in group),
-            "proc_name": rep_ir.proc_name,
-            "workcenter_no": rep_wc.workcenter_no,
-            "workcenter_name": rep_wc.workcenter_name,
-        }
-    return enrichment
+    index: dict[tuple[int, int], tuple[Optional[str], Optional[str]]] = {}
+    for key, group in grouped.items():
+        _, wc = min(group, key=lambda t: t[0].proc_sno if t[0].proc_sno is not None else 0)
+        index[key] = (wc.workcenter_no, wc.workcenter_name)
+    return index
 
 
-def _risk_types(enrichment: Optional[dict], material_short: bool = False) -> list[str]:
-    """리스크유형 for a row: '부하초과'(overload) and/or '자재부족'(material_short)."""
-    risks: list[str] = []
-    if enrichment and enrichment["overload"]:
-        risks.append("overload")
-    if material_short:
-        risks.append("material_short")
-    return risks or ["normal"]
+def _build_proc_index(db: Session) -> dict[tuple[int, int], str]:
+    """(item_id, routing_id) → proc_name.
+
+    proc_sno comes from aps_item_process_step (item_id, routing_id); proc_name from
+    aps_item_routing_spec (item_id, routing_id, proc_sno). Representative = lowest
+    proc_sno that resolves to a proc_name.
+    """
+    proc_name_by_key: dict[tuple[int, int, int], str] = {}
+    for irs in db.execute(select(ItemRoutingSpec)).scalars().all():
+        if irs.item_id is not None and irs.routing_id is not None and irs.proc_sno is not None:
+            proc_name_by_key[(irs.item_id, irs.routing_id, irs.proc_sno)] = irs.proc_name
+
+    snos_by_key: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for ips in db.execute(select(ItemProcessStep)).scalars().all():
+        if ips.item_id is not None and ips.routing_id is not None and ips.proc_sno is not None:
+            snos_by_key[(ips.item_id, ips.routing_id)].append(ips.proc_sno)
+
+    index: dict[tuple[int, int], str] = {}
+    for key, snos in snos_by_key.items():
+        for sno in sorted(snos):
+            name = proc_name_by_key.get((key[0], key[1], sno))
+            if name is not None:
+                index[key] = name
+                break
+    return index
+
+
+def _build_overload_set(db: Session) -> set[int]:
+    """mps_plan_id set with at least one overloaded aps_daily_plan row."""
+    overloaded: set[int] = set()
+    for mps_plan_id, status in db.execute(select(DailyPlan.mps_plan_id, DailyPlan.status)).all():
+        if status == "overload":
+            overloaded.add(mps_plan_id)
+    return overloaded
 
 
 def _build_material_shortage(db: Session) -> set[int]:
@@ -125,6 +142,16 @@ def _build_material_shortage(db: Session) -> set[int]:
     return short
 
 
+def _risk_types(overload: bool, material_short: bool) -> list[str]:
+    """리스크유형: '부하초과'(overload) and/or '자재부족'(material_short); else ['normal']."""
+    risks: list[str] = []
+    if overload:
+        risks.append("overload")
+    if material_short:
+        risks.append("material_short")
+    return risks or ["normal"]
+
+
 def _row_matches_filters(
     row: WorkPlanRow,
     *,
@@ -162,71 +189,37 @@ def build_work_plan_list(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
 ) -> list[WorkPlanRow]:
-    """Build the combined Work Plan List (Set A work orders + Set B MPS lines)."""
-    enrichment = _build_daily_plan_enrichment(db)
-    short_mps_ids = _build_material_shortage(db)
+    """Build the Work Plan List — one row per aps_mps_plan line."""
+    wo_plan_nos = {wo.plan_no for wo in db.execute(select(WorkOrder)).scalars().all() if wo.plan_no}
     items_by_id = {it.id: it for it in db.execute(select(Item)).scalars().all()}
-    wc_by_id = {wc.id: wc for wc in db.execute(select(WorkCenter)).scalars().all()}
+    wc_index = _build_workcenter_index(db)
+    proc_index = _build_proc_index(db)
+    overload_ids = _build_overload_set(db)
+    short_mps_ids = _build_material_shortage(db)
 
     rows: list[WorkPlanRow] = []
-
-    # --- Set B: uncreated MPS plan lines (미작성 생산계획) ---
-    mps_lines = (
-        db.execute(select(MpsPlan).where(MpsPlan.status_cd == _UNCREATED_STATUS)).scalars().all()
-    )
-    for mps in mps_lines:
-        e = enrichment.get(mps.id)
+    for mps in db.execute(select(MpsPlan)).scalars().all():
         item = items_by_id.get(mps.item_id) if mps.item_id is not None else None
+        key = (mps.item_id, mps.routing_id)
+        wc = wc_index.get(key)  # (workcenter_no, workcenter_name) or None
+        has_wo = mps.plan_no in wo_plan_nos
         rows.append(
             WorkPlanRow(
-                source_type="MPS",
-                work_order_no=None,
-                tmp_plan_no=_tmp_plan_no(mps),
-                order_no=mps.po_no,
+                source_type="WO" if has_wo else "MPS",
+                # 작업지시번호 / (임시)작업계획번호 — both are plan_no; exactly one is set.
+                work_order_no=mps.plan_no if has_wo else None,
+                tmp_plan_no=None if has_wo else mps.plan_no,
+                order_no=mps.po_no,  # 오더 = PO NO
                 item_no=item.item_no if item else None,
                 item_name=item.item_name if item else None,
-                workcenter_no=e["workcenter_no"] if e else None,
-                workcenter_name=e["workcenter_name"] if e else None,
-                proc_name=e["proc_name"] if e else None,
+                workcenter_no=wc[0] if wc else None,
+                workcenter_name=wc[1] if wc else None,
+                proc_name=proc_index.get(key),
                 planned_qty=float(mps.plan_qty) if mps.plan_qty is not None else None,
-                # 계획시작 = Backward(종료일자) = earliest daily_plan day, else raw plan_start_date.
-                plan_start=(e["start"] if e else None) or mps.plan_start_date,
-                # 계획완료 = 종료일자 = plan_end_date.
-                plan_end=mps.plan_end_date,
+                plan_start=mps.plan_start_date,  # 계획시작 = plan_start_date (raw)
+                plan_end=mps.plan_end_date,  # 계획완료 = plan_end_date (raw)
                 delivery_date=mps.delivery_date,
-                risk_types=_risk_types(e, mps.id in short_mps_ids),
-            )
-        )
-
-    # --- Set A: incomplete work orders (미완료 작업지시) ---
-    # Per spec, WO dates are read from the linked MPS line (생산계획입력), joined by plan_no.
-    mps_by_plan_no: dict[str, MpsPlan] = {}
-    for mps in db.execute(select(MpsPlan)).scalars().all():
-        if mps.plan_no and mps.plan_no not in mps_by_plan_no:
-            mps_by_plan_no[mps.plan_no] = mps
-    for wo in db.execute(select(WorkOrder)).scalars().all():
-        mps = mps_by_plan_no.get(wo.plan_no) if wo.plan_no else None
-        e = enrichment.get(mps.id) if mps else None
-        item = items_by_id.get(wo.item_id) if wo.item_id is not None else None
-        wc = wc_by_id.get(wo.workcenter_id) if wo.workcenter_id is not None else None
-        rows.append(
-            WorkPlanRow(
-                source_type="WO",
-                work_order_no=wo.work_order_no,
-                tmp_plan_no=None,
-                order_no=mps.po_no if mps else None,
-                item_no=wo.item_no or (item.item_no if item else None),
-                item_name=item.item_name if item else None,
-                workcenter_no=(e["workcenter_no"] if e else None) or (wc.workcenter_no if wc else None),
-                workcenter_name=(e["workcenter_name"] if e else None) or (wc.workcenter_name if wc else None),
-                proc_name=e["proc_name"] if e else None,
-                planned_qty=float(mps.plan_qty) if (mps and mps.plan_qty is not None) else None,
-                # 계획시작 = 작업시작일자(plan_start_date), else Backward.
-                plan_start=(mps.plan_start_date if mps else None) or (e["start"] if e else None),
-                # 계획완료 = 작업종료일자(prod_end_date) else 종료일자(plan_end_date).
-                plan_end=_anchor_end_date(mps) if mps else None,
-                delivery_date=mps.delivery_date if mps else None,
-                risk_types=_risk_types(e, (mps.id in short_mps_ids) if mps else False),
+                risk_types=_risk_types(mps.id in overload_ids, mps.id in short_mps_ids),
             )
         )
 
