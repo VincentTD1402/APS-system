@@ -110,6 +110,12 @@ class GSystemClient:
 
         if self._cfg.all_data:
             body = {**body, "allDataYn": True}
+
+        # Stock feed returns only pending deltas by default; request the full
+        # snapshot so aps_stock has current on-hand qty for material shortage.
+        if key == "stock":
+            body = {**body, "allDataYn": "Y"}
+
         last_exc: Exception | None = None
         for attempt in range(1, self._cfg.retries + 1):
             try:
