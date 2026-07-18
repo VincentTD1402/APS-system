@@ -13,6 +13,7 @@ from app.api.v1.routes import (
     llm,
     purchase_requests,
     work_plan,
+    material_shortage,
     workorder,
 )
 
@@ -24,3 +25,4 @@ api_router.include_router(kpi_summary.router, prefix="/kpi-summary", tags=["kpi_
 api_router.include_router(workorder.router, prefix="/workorder", tags=["workorder"])
 api_router.include_router(purchase_requests.router, prefix="/purchase-requests", tags=["purchase_requests"])
 api_router.include_router(work_plan.router, prefix="/work-plan", tags=["work_plan"])
+api_router.include_router(material_shortage.router, prefix="/material-shortage", tags=["material_shortage"])

@@ -109,9 +109,13 @@ class GSystemClient:
             body = {}
 
         if self._cfg.all_data:
-            # G-System's stock endpoint only honors allDataYn as the string "Y";
-            # the other endpoints already work with the boolean True — leave them as-is.
-            body = {**body, "allDataYn": "Y" if key == "stock" else True}
+            body = {**body, "allDataYn": True}
+
+        # Stock feed returns only pending deltas by default; request the full
+        # snapshot so aps_stock has current on-hand qty for material shortage.
+        if key == "stock":
+            body = {**body, "allDataYn": "Y"}
+
         last_exc: Exception | None = None
         for attempt in range(1, self._cfg.retries + 1):
             try:

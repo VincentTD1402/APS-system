@@ -1,7 +1,7 @@
 from datetime import date as date_cls
 
 from fastapi import APIRouter, Depends, Path, Query
-from sqlalchemy import and_, select
+from sqlalchemy import and_, case, distinct, func, select
 from sqlalchemy.orm import Session
 from collections import defaultdict
 from typing import List, Optional
@@ -25,6 +25,7 @@ from app.schemas.kpi_summary import (
     KPI1DeliveryResponse,
     KPI2ShortageResponse,
     KPI3LoadResponse,
+    MaterialShortageSummary,
     PlanImpactedOrderRow,
     WorkcenterDailyStatus,
     WorkcenterLoadByWorkcenter,
@@ -95,11 +96,13 @@ def _workcenter_daily_status_rollup(
     )
     qty_by_slot: dict = defaultdict(float)
     persisted_overload_by_slot: dict = defaultdict(bool)  # defensive OR rollup
+    short_qty_by_slot: dict = defaultdict(float)          # Σ material_shortage_qty per slot
     for dp, _wc, _ir in results:
         slot = (dp.workcenter_id, dp.work_date)
         qty_by_slot[slot] += float(dp.planned_qty)
-        if dp.status == "overload":
+        if dp.status in ("overload", "urgent"):  # urgent = overload + material shortage
             persisted_overload_by_slot[slot] = True
+        short_qty_by_slot[slot] += float(dp.material_shortage_qty or 0)
     capacity_index = _workcenter_capacity_index(db)
     meta_by_wc = {wc.id: wc for _dp, wc, _ir in results}
 
@@ -122,7 +125,18 @@ def _workcenter_daily_status_rollup(
             daily_out_qty = round(qty_total * capacity / used_minutes, 2)
         else:
             daily_out_qty = 0.0
-        status = "overload" if persisted_overload_by_slot[(wc_id, work_date)] else "normal"
+        over = persisted_overload_by_slot[(wc_id, work_date)]
+        short_qty = short_qty_by_slot[(wc_id, work_date)]
+        short = short_qty > 0
+        # 부하내역 4-state: normal(green) | overload(orange) | material-shortage(blue) | urgent(red=both)
+        if over and short:
+            status, statuses = "urgent", ["overload", "material-shortage"]
+        elif over:
+            status, statuses = "overload", ["overload"]
+        elif short:
+            status, statuses = "material-shortage", ["material-shortage"]
+        else:
+            status, statuses = "normal", ["normal"]
         out.append(WorkcenterDailyStatus(
             work_date=work_date,
             workcenter_id=wc_id,
@@ -133,7 +147,9 @@ def _workcenter_daily_status_rollup(
             used_minutes=round(used_minutes, 2),
             capacity_minutes=round(capacity, 2),
             load_percent=load_percent,
+            material_shortage_qty=round(short_qty, 4),
             status=status,
+            statuses=statuses,
         ))
     return out
 
@@ -217,9 +233,13 @@ def get_load_kpi(
     description="Recompute aps_result.aps_daily_plan from aps_mps_plan x aps_item_routing_spec.",
 )
 def rebuild_daily_plan_endpoint(db: Session = Depends(get_db)) -> DailyPlanRebuildResponse:
+    from app.services.material_shortage import apply_daily_material_shortage
     from app.services.scheduling.daily_plan_builder import rebuild_daily_plan
 
     rows = rebuild_daily_plan(db)
+    # Backward material-shortage pass — flags aps_daily_plan.material_shortage_qty
+    # per (mps, day) from stock running balance. Must run after the daily plan is built.
+    apply_daily_material_shortage(db)
     db.commit()
     daily_status = _workcenter_daily_status_rollup(db)  # re-read persisted rows
     return DailyPlanRebuildResponse(rows_inserted=rows, daily_status=daily_status)
@@ -254,6 +274,14 @@ def list_daily_plan(
 
     results = db.execute(stmt).all()
 
+    def _statuses(dp) -> List[str]:
+        # status: normal | overload | material-shortage | urgent (both)
+        if dp.status == "urgent":
+            return ["overload", "material-shortage"]
+        if dp.status in ("overload", "material-shortage"):
+            return [dp.status]
+        return ["normal"]
+
     return [
         DailyPlanRow(
             work_date=dp.work_date,
@@ -266,9 +294,41 @@ def list_daily_plan(
             plan_no=mp.plan_no,
             item_no=it.item_no if it else None,
             status=dp.status,
+            material_shortage_qty=float(dp.material_shortage_qty or 0),
+            statuses=_statuses(dp),
         )
         for dp, wc, ir, mp, it in results
     ]
+
+
+@router.get(
+    "/daily-plan/material-shortage-summary",
+    response_model=MaterialShortageSummary,
+    summary="Total material shortage (daily plan)",
+    description="Sum of aps_daily_plan.material_shortage_qty (+ short row/order counts). Filterable by date.",
+)
+def material_shortage_summary(
+    start_date: Optional[str] = Query(None, description="Filter work_date >= (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="Filter work_date <= (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+) -> MaterialShortageSummary:
+    short_flag = case((DailyPlan.material_shortage_qty > 0, 1), else_=0)
+    stmt = select(
+        func.coalesce(func.sum(DailyPlan.material_shortage_qty), 0),
+        func.coalesce(func.sum(short_flag), 0),
+        func.count(distinct(case((DailyPlan.material_shortage_qty > 0, DailyPlan.mps_plan_id)))),
+    )
+    if start_date:
+        stmt = stmt.where(DailyPlan.work_date >= date_cls.fromisoformat(start_date))
+    if end_date:
+        stmt = stmt.where(DailyPlan.work_date <= date_cls.fromisoformat(end_date))
+
+    total, rows, orders = db.execute(stmt).one()
+    return MaterialShortageSummary(
+        total_shortage_qty=round(float(total or 0), 4),
+        short_rows=int(rows or 0),
+        short_orders=int(orders or 0),
+    )
 
 
 @router.get(

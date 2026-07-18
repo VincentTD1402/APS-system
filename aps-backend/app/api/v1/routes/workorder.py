@@ -135,7 +135,7 @@ def _payload_from_plan_operation(db: Session, op: PlanOperation, existing_nums: 
 
         stock = (
             db.query(Stock)
-            .filter(Stock.item_id.in_([str(item.gsystem_id), item.item_no] if item.gsystem_id is not None else [item.item_no]))
+            .filter(Stock.gsystem_item_id.in_([str(item.gsystem_id), item.item_no] if item.gsystem_id is not None else [item.item_no]))
             .order_by(Stock.mod_dt.desc().nullslast(), Stock.reg_dt.desc().nullslast())
             .first()
         )
@@ -263,7 +263,7 @@ def _workorder_row_from_operation(
     if item is not None:
         stock = (
             db.query(Stock)
-            .filter(Stock.item_id.in_([str(item.gsystem_id), item.item_no] if item.gsystem_id is not None else [item.item_no]))
+            .filter(Stock.gsystem_item_id.in_([str(item.gsystem_id), item.item_no] if item.gsystem_id is not None else [item.item_no]))
             .order_by(Stock.mod_dt.desc().nullslast(), Stock.reg_dt.desc().nullslast())
             .first()
         )

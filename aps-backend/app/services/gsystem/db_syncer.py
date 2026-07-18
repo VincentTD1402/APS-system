@@ -808,7 +808,7 @@ def sync_stock(session: Session, records: list[dict[str, Any]]) -> int:
         ("stk_type", "stkType", "str"),
         ("wh_cd", "whCd", "str"),
         ("location_id", "locationId", "str"),
-        ("item_id", "itemId", "str"),
+        ("gsystem_item_id", "itemId", "str"),
         ("unit_cd", "unitCd", "str"),
         ("lotno", "lotNo", "str"),
         ("prev_qty", "prevQty", "float"),
