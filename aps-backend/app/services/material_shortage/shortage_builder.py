@@ -27,8 +27,8 @@ logger = get_logger(__name__)
 def _available_by_item(session: Session) -> dict[int, float]:
     """Sum aps_stock.able_qty per local item id (기초 재고).
 
-    aps_stock.item_id is the G-System business item id (string) → resolved to the
-    local aps_item via aps_item.gsystem_id.
+    aps_stock.gsystem_item_id is the G-System business item id (string) →
+    resolved to the local aps_item via aps_item.gsystem_id.
     """
     item_by_gsys: dict[int, int] = {}
     for local_id, gsys_id in session.execute(select(Item.id, Item.gsystem_id)).all():
@@ -37,12 +37,12 @@ def _available_by_item(session: Session) -> dict[int, float]:
 
     available: dict[int, float] = defaultdict(float)
     for stk in session.execute(select(Stock)).scalars().all():
-        if stk.able_qty is None or not stk.item_id:
+        if stk.able_qty is None or not stk.gsystem_item_id:
             continue
         try:
-            gsys_id = int(stk.item_id)
+            gsys_id = int(stk.gsystem_item_id)
         except (TypeError, ValueError):
-            logger.info("material_shortage: stock item_id=%r not an int — skipped", stk.item_id)
+            logger.info("material_shortage: stock gsystem_item_id=%r not an int — skipped", stk.gsystem_item_id)
             continue
         local_id = item_by_gsys.get(gsys_id)
         if local_id is None:

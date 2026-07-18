@@ -106,8 +106,8 @@ def take_snapshot(session) -> dict:
 
     # Stock
     rows = q(session, f"""
-        SELECT item_id, wh_cd, able_qty::float, stk_ym
-        FROM {S}.aps_stock ORDER BY item_id, wh_cd
+        SELECT gsystem_item_id, wh_cd, able_qty::float, stk_ym
+        FROM {S}.aps_stock ORDER BY gsystem_item_id, wh_cd
     """)
     snap["stock"] = {"count": len(rows), "rows": rows}
 

@@ -38,7 +38,9 @@ class Stock(Base):
     stk_type:    Mapped[str | None] = mapped_column(String(20))
     wh_cd:       Mapped[str | None] = mapped_column(String(50), index=True)
     location_id: Mapped[str | None] = mapped_column(String(50))
-    item_id:     Mapped[str | None] = mapped_column(String(50), index=True)   # join key to aps_item
+    # G-System business item id (itemId) — join to aps_item.gsystem_id. Named
+    # gsystem_item_id for consistency with aps_mps_plan.gsystem_item_id.
+    gsystem_item_id: Mapped[str | None] = mapped_column(String(50), index=True)
     unit_cd:     Mapped[str | None] = mapped_column(String(20))
     lotno:       Mapped[str | None] = mapped_column(String(100))
 
@@ -81,4 +83,4 @@ class Stock(Base):
     mod_ip:      Mapped[str | None] = mapped_column(String(50))
 
     def __repr__(self) -> str:
-        return f"<Stock lg_stock_id={self.lg_stock_id} item={self.item_id} ym={self.stk_ym} able={self.able_qty}>"
+        return f"<Stock lg_stock_id={self.lg_stock_id} item={self.gsystem_item_id} ym={self.stk_ym} able={self.able_qty}>"
