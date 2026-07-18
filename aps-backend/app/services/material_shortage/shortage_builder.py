@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_logger
-from app.models import BOM, Item, MaterialShortage, MpsPlan, Stock
+from app.models import BOM, DailyPlan, Item, ItemRoutingSpec, MaterialShortage, MpsPlan, Stock
 
 logger = get_logger(__name__)
 
@@ -130,3 +130,100 @@ def rebuild_material_shortage(session: Session) -> int:
         "rebuild_material_shortage: %d (parent, component) rows across %d MPS lines", inserted, len(mps_lines)
     )
     return inserted
+
+
+def _raw_components_by_parent(session: Session, raw_material_ids: set[int]) -> dict[int, list[tuple[int, float]]]:
+    """{parent_item_id → [(raw_component_id, qty1/qty2)]} — raw-material components only."""
+    out: dict[int, list[tuple[int, float]]] = defaultdict(list)
+    for bom in session.execute(select(BOM)).scalars().all():
+        if bom.component_item_id not in raw_material_ids:
+            continue
+        qty1 = float(bom.qty1) if bom.qty1 is not None else 0.0
+        qty2 = float(bom.qty2) if bom.qty2 else 1.0
+        if qty1 <= 0:
+            continue
+        out[bom.parent_item_id].append((bom.component_item_id, qty1 / qty2))
+    return out
+
+
+def apply_daily_material_shortage(session: Session) -> int:
+    """Set aps_daily_plan.material_shortage_qty from a backward material balance.
+
+    Reads the already-built daily plan. Per MPS line the raw material is drawn at
+    its FIRST routing step (smallest proc_sno); consumption/day = that step's
+    planned_qty × qty1/qty2 per raw component. For each material the on-hand stock
+    (기초, aps_stock.in_qty) is consumed earliest-day-first, so any shortfall lands
+    on the LATEST production days (backward). The day's shortfall is split across
+    the first-step rows consuming that material that day, proportional to each
+    row's draw, and summed onto material_shortage_qty. Returns rows flagged (>0).
+    Caller owns commit. Run AFTER rebuild_daily_plan, in the same transaction.
+    """
+    item_id_by_gsys = _item_id_by_gsys(session)
+    raw_material_ids = {i.id for i in session.execute(select(Item)).scalars().all() if i.asset_type == "RawMaterial"}
+    raw_by_parent = _raw_components_by_parent(session, raw_material_ids)
+    available = _available_by_item(session, item_id_by_gsys)  # {material_id → on-hand}
+
+    parent_by_mps: dict[int, int] = {}
+    for mps in session.execute(
+        select(MpsPlan).where(MpsPlan.gsystem_item_id.isnot(None))
+    ).scalars().all():
+        pid = item_id_by_gsys.get(int(mps.gsystem_item_id))
+        if pid is not None:
+            parent_by_mps[mps.id] = pid
+
+    # daily_plan rows + their routing step's proc_sno.
+    rows = session.execute(
+        select(DailyPlan, ItemRoutingSpec.proc_sno)
+        .join(ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id)
+    ).all()
+
+    # Reset previous flags; find each MPS line's first-step proc_sno.
+    min_proc: dict[int, int] = {}
+    for dp, proc in rows:
+        dp.material_shortage_qty = 0
+        if proc is None:
+            continue
+        cur = min_proc.get(dp.mps_plan_id)
+        if cur is None or proc < cur:
+            min_proc[dp.mps_plan_id] = proc
+
+    # Material consumption timeline: {material_id: {work_date: [(daily_plan_row, amount)]}}.
+    consumption: dict[int, dict] = defaultdict(lambda: defaultdict(list))
+    for dp, proc in rows:
+        if proc is None or proc != min_proc.get(dp.mps_plan_id):
+            continue  # only the first (material-input) step draws raw material
+        parent_id = parent_by_mps.get(dp.mps_plan_id)
+        if parent_id is None:
+            continue
+        qty = float(dp.planned_qty)
+        for comp_id, ratio in raw_by_parent.get(parent_id, []):
+            amount = qty * ratio
+            if amount > 0:
+                consumption[comp_id][dp.work_date].append((dp, amount))
+
+    # Running balance per material: stock earliest-day-first → shortfall on latest days.
+    flagged: set[int] = set()
+    for material_id, by_day in consumption.items():
+        remaining = available.get(material_id, 0.0)
+        for day in sorted(by_day):
+            contributors = by_day[day]
+            day_total = sum(a for _dp, a in contributors)
+            if remaining >= day_total:
+                remaining -= day_total
+                continue
+            short_day = day_total - remaining
+            remaining = 0.0
+            for dp, amount in contributors:
+                dp.material_shortage_qty = float(dp.material_shortage_qty or 0) + round(short_day * amount / day_total, 4)
+                flagged.add(dp.id)
+
+    # Fold material shortage into the combined status flag:
+    #   overload + short → 'urgent' | short only → 'material-shortage' | else keep.
+    for dp, _proc in rows:
+        if float(dp.material_shortage_qty or 0) <= 0:
+            continue
+        dp.status = "urgent" if dp.status == "overload" else "material-shortage"
+
+    session.flush()
+    logger.info("apply_daily_material_shortage: %d daily rows flagged short", len(flagged))
+    return len(flagged)

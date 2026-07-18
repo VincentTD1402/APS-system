@@ -204,6 +204,13 @@ class DailyPlanRow(BaseModel):
         "normal",
         description="'overload' when required minutes for (workcenter, work_date) exceed capacity, else 'normal'",
     )
+    material_shortage_qty: float = Field(
+        0.0, description="Raw-material qty short for this (mps, work_date) from backward stock balance"
+    )
+    statuses: List[str] = Field(
+        default_factory=list,
+        description="All active risk flags for FE mapping: 'overload' and/or 'material-shortage'; ['normal'] if none",
+    )
 
 
 class WorkcenterDailyStatus(BaseModel):

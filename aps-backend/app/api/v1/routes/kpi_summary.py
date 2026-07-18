@@ -98,7 +98,7 @@ def _workcenter_daily_status_rollup(
     for dp, _wc, _ir in results:
         slot = (dp.workcenter_id, dp.work_date)
         qty_by_slot[slot] += float(dp.planned_qty)
-        if dp.status == "overload":
+        if dp.status in ("overload", "urgent"):  # urgent = overload + material shortage
             persisted_overload_by_slot[slot] = True
     capacity_index = _workcenter_capacity_index(db)
     meta_by_wc = {wc.id: wc for _dp, wc, _ir in results}
@@ -217,9 +217,13 @@ def get_load_kpi(
     description="Recompute aps_result.aps_daily_plan from aps_mps_plan x aps_item_routing_spec.",
 )
 def rebuild_daily_plan_endpoint(db: Session = Depends(get_db)) -> DailyPlanRebuildResponse:
+    from app.services.material_shortage import apply_daily_material_shortage
     from app.services.scheduling.daily_plan_builder import rebuild_daily_plan
 
     rows = rebuild_daily_plan(db)
+    # Backward material-shortage pass — flags aps_daily_plan.material_shortage_qty
+    # per (mps, day) from stock running balance. Must run after the daily plan is built.
+    apply_daily_material_shortage(db)
     db.commit()
     daily_status = _workcenter_daily_status_rollup(db)  # re-read persisted rows
     return DailyPlanRebuildResponse(rows_inserted=rows, daily_status=daily_status)
@@ -254,6 +258,14 @@ def list_daily_plan(
 
     results = db.execute(stmt).all()
 
+    def _statuses(dp) -> List[str]:
+        # status: normal | overload | material-shortage | urgent (both)
+        if dp.status == "urgent":
+            return ["overload", "material-shortage"]
+        if dp.status in ("overload", "material-shortage"):
+            return [dp.status]
+        return ["normal"]
+
     return [
         DailyPlanRow(
             work_date=dp.work_date,
@@ -266,6 +278,8 @@ def list_daily_plan(
             plan_no=mp.plan_no,
             item_no=it.item_no if it else None,
             status=dp.status,
+            material_shortage_qty=float(dp.material_shortage_qty or 0),
+            statuses=_statuses(dp),
         )
         for dp, wc, ir, mp, it in results
     ]
