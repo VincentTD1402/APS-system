@@ -26,6 +26,7 @@ from .output.gsystem_sync_job import GsystemSyncJob
 from .output.llm_response_cache import LlmResponseCache
 from .output.work_order import WorkOrder
 from .output.daily_plan import DailyPlan
+from .output.material_shortage import MaterialShortage
 
 __all__ = [
     "Customer",
@@ -55,4 +56,5 @@ __all__ = [
     "LlmResponseCache",
     "WorkOrder",
     "DailyPlan",
+    "MaterialShortage",
 ]

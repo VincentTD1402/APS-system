@@ -18,7 +18,10 @@ class DailyPlan(Base):
 
     __tablename__ = "aps_daily_plan"
     __table_args__ = (
-        CheckConstraint("status IN ('normal','overload')", name="ck_daily_plan_status"),
+        CheckConstraint(
+            "status IN ('normal','overload','material-shortage','urgent')",
+            name="ck_daily_plan_status",
+        ),
         {"schema": "aps_result"},
     )
 
@@ -34,10 +37,17 @@ class DailyPlan(Base):
     )
     work_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
     planned_qty: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
-    # Per-(workcenter, work_date) capacity check result — "normal" | "overload".
-    # Computed in daily_plan_builder.rebuild_daily_plan; string (not enum) leaves
-    # room for a future 3rd value (e.g. material-shortage).
+    # Combined risk flag: 'normal' | 'overload' | 'material-shortage' | 'urgent'
+    # (urgent = both overload and material shortage). Overload set by
+    # rebuild_daily_plan; material-shortage/urgent set by apply_daily_material_shortage.
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="normal")
+    # Raw-material quantity short for this (mps_plan, work_date), from the backward
+    # material running-balance (stock consumed earliest-day-first → shortfall lands
+    # on the latest production days). 0 = no material shortage. The API exposes it
+    # alongside `status` as a `statuses` array (overload and/or material-shortage).
+    material_shortage_qty: Mapped[float] = mapped_column(
+        Numeric(18, 4), nullable=False, server_default="0"
+    )
 
     mps_plan: Mapped["MpsPlan"] = relationship(foreign_keys=[mps_plan_id])
     item_routing: Mapped["ItemRoutingSpec"] = relationship(foreign_keys=[item_routing_id])
