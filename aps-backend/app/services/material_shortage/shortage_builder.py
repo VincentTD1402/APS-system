@@ -4,7 +4,7 @@ Direct 1-level BOM explosion (multi-level BOM nesting intentionally ignored):
 each MPS plan line's parent item maps straight to its BOM components.
 
   required(component)  = Σ over MPS lines using it ( plan_qty × qty1 / qty2 )
-  available(component) = Σ aps_stock.able_qty for that component (기초 재고)
+  available(component) = Σ aps_stock.in_qty for that component (기초 재고 / on-hand)
   shortage(component)  = max(0, required − available)
 
 Single-version: wipes and rewrites aps_material_shortage on every run. Caller
@@ -24,42 +24,55 @@ from app.models import BOM, Item, MaterialShortage, MpsPlan, Stock
 logger = get_logger(__name__)
 
 
-def _available_by_item(session: Session) -> dict[int, float]:
-    """Sum aps_stock.able_qty per local item id (기초 재고).
+def _item_id_by_gsys(session: Session) -> dict[int, int]:
+    """{aps_item.gsystem_id → aps_item.id} — the G-System-id → local-id resolver."""
+    out: dict[int, int] = {}
+    for local_id, gsys_id in session.execute(select(Item.id, Item.gsystem_id)).all():
+        if gsys_id is not None:
+            out[int(gsys_id)] = local_id
+    return out
+
+
+def _available_by_item(session: Session, item_id_by_gsys: dict[int, int]) -> dict[int, float]:
+    """Sum aps_stock.in_qty per local item id (기초 재고 / on-hand).
 
     aps_stock.gsystem_item_id is the G-System business item id (string) →
     resolved to the local aps_item via aps_item.gsystem_id.
     """
-    item_by_gsys: dict[int, int] = {}
-    for local_id, gsys_id in session.execute(select(Item.id, Item.gsystem_id)).all():
-        if gsys_id is not None:
-            item_by_gsys[int(gsys_id)] = local_id
-
     available: dict[int, float] = defaultdict(float)
     for stk in session.execute(select(Stock)).scalars().all():
-        if stk.able_qty is None or not stk.gsystem_item_id:
+        if stk.in_qty is None or not stk.gsystem_item_id:
             continue
         try:
             gsys_id = int(stk.gsystem_item_id)
         except (TypeError, ValueError):
             logger.info("material_shortage: stock gsystem_item_id=%r not an int — skipped", stk.gsystem_item_id)
             continue
-        local_id = item_by_gsys.get(gsys_id)
+        local_id = item_id_by_gsys.get(gsys_id)
         if local_id is None:
             continue
-        available[local_id] += float(stk.able_qty)
+        available[local_id] += float(stk.in_qty)
     return available
 
 
 def rebuild_material_shortage(session: Session) -> int:
-    """Wipe and rebuild aps_material_shortage. Returns rows written."""
-    # Required per component — Σ (plan_qty × qty1/qty2) across MPS lines (1-level BOM).
+    """Wipe and rebuild aps_material_shortage. Returns rows written.
+
+    Per MPS line: resolve its gsystem_item_id → local aps_item.id (= the BOM
+    parent_item_id), read that parent's BOM components (qty1/qty2), and sum the
+    material requirement plan_qty × qty1 / qty2 per component.
+    """
+    item_id_by_gsys = _item_id_by_gsys(session)
+
+    # Components (BOM children) grouped by BOM parent (local aps_item.id).
     bom_by_parent: dict[int, list[BOM]] = defaultdict(list)
     for bom in session.execute(select(BOM)).scalars().all():
         bom_by_parent[bom.parent_item_id].append(bom)
 
+    # Source MPS lines by gsystem_item_id (not the local item_id FK, which may be
+    # unresolved/NULL on some lines) — resolve to the local parent id ourselves.
     mps_lines = session.execute(
-        select(MpsPlan).where(MpsPlan.item_id.isnot(None), MpsPlan.plan_qty.isnot(None))
+        select(MpsPlan).where(MpsPlan.gsystem_item_id.isnot(None), MpsPlan.plan_qty.isnot(None))
     ).scalars().all()
 
     required: dict[int, float] = defaultdict(float)
@@ -67,14 +80,18 @@ def rebuild_material_shortage(session: Session) -> int:
         plan_qty = float(mps.plan_qty)
         if plan_qty <= 0:
             continue
-        for bom in bom_by_parent.get(mps.item_id, []):
+        parent_id = item_id_by_gsys.get(int(mps.gsystem_item_id))
+        if parent_id is None:
+            logger.info("material_shortage: mps=%s gsystem_item_id=%s not in aps_item — skipped", mps.id, mps.gsystem_item_id)
+            continue
+        for bom in bom_by_parent.get(parent_id, []):
             qty1 = float(bom.qty1) if bom.qty1 is not None else 0.0
             qty2 = float(bom.qty2) if bom.qty2 else 1.0  # qty2 None/0 → 1 (avoid div-by-zero)
             if qty1 <= 0:
                 continue
             required[bom.component_item_id] += plan_qty * qty1 / qty2
 
-    available = _available_by_item(session)
+    available = _available_by_item(session, item_id_by_gsys)
     item_meta: dict[int, tuple[str | None, str | None]] = {
         i.id: (i.item_no, i.item_name)
         for i in session.execute(select(Item)).scalars().all()
