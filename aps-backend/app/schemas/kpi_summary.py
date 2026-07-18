@@ -220,6 +220,21 @@ class MaterialShortageSummary(BaseModel):
     short_orders: int = Field(..., description="Distinct MPS lines (mps_plan_id) with any material shortage")
 
 
+class WorkcenterLoadAverage(BaseModel):
+    """Average workcenter load across the whole daily-plan schedule."""
+    avg_load_percent: float = Field(
+        ..., description="Mean load_percent over all (workcenter, work_date) slots with capacity > 0"
+    )
+    avg_overload_percent: float = Field(
+        0.0, description="Mean load_percent over overloaded slots only (load_percent > 100); 0 if none"
+    )
+    total_slots: int = Field(..., description="(workcenter, work_date) slots counted (capacity > 0)")
+    overloaded_slots: int = Field(..., description="Slots with load_percent > 100")
+    excluded_slots: int = Field(
+        0, description="Slots skipped from the mean because capacity <= 0 (missing capacity data)"
+    )
+
+
 class WorkcenterDailyStatus(BaseModel):
     """Workcenter-level rollup of aps_daily_plan for one (workcenter, work_date) — no item breakdown."""
     work_date: date
