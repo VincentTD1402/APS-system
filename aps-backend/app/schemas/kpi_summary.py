@@ -213,6 +213,13 @@ class DailyPlanRow(BaseModel):
     )
 
 
+class MaterialShortageSummary(BaseModel):
+    """Aggregate of aps_daily_plan.material_shortage_qty."""
+    total_shortage_qty: float = Field(..., description="Σ material_shortage_qty across daily-plan rows")
+    short_rows: int = Field(..., description="Daily-plan rows with material_shortage_qty > 0")
+    short_orders: int = Field(..., description="Distinct MPS lines (mps_plan_id) with any material shortage")
+
+
 class WorkcenterDailyStatus(BaseModel):
     """Workcenter-level rollup of aps_daily_plan for one (workcenter, work_date) — no item breakdown."""
     work_date: date
@@ -226,7 +233,15 @@ class WorkcenterDailyStatus(BaseModel):
     used_minutes: float
     capacity_minutes: float
     load_percent: float
-    status: str = Field("normal", description="'overload' when planned_qty_total > daily_out_qty, else 'normal'")
+    material_shortage_qty: float = Field(0.0, description="Σ material_shortage_qty of rows in this (workcenter, day)")
+    status: str = Field(
+        "normal",
+        description="Combined 부하내역 flag: normal | overload | material-shortage | urgent (both)",
+    )
+    statuses: List[str] = Field(
+        default_factory=list,
+        description="Active flags for FE color: 'overload' and/or 'material-shortage'; ['normal'] if none",
+    )
 
 
 class DailyPlanRebuildResponse(BaseModel):
