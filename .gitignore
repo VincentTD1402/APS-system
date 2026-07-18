@@ -107,6 +107,9 @@ ck.md
 .claude/.env
 .claude/.mcp.json
 
+# Root CLAUDE.md — local /init output, not shared with the team
+/CLAUDE.md
+
 # Gemini CLI settings (symlink to staged .claude/.mcp.json)
 .gemini/settings.json
 # Showoff/marketing assets (images, showcases)

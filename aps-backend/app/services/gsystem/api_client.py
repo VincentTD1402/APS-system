@@ -109,7 +109,9 @@ class GSystemClient:
             body = {}
 
         if self._cfg.all_data:
-            body = {**body, "allDataYn": True}
+            # G-System's stock endpoint only honors allDataYn as the string "Y";
+            # the other endpoints already work with the boolean True — leave them as-is.
+            body = {**body, "allDataYn": "Y" if key == "stock" else True}
         last_exc: Exception | None = None
         for attempt in range(1, self._cfg.retries + 1):
             try:

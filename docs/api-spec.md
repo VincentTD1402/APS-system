@@ -173,6 +173,18 @@ FE đọc `sync_status` để hiển thị kết quả action (đã đồng bộ
 
 ---
 
+## 6. Work Plan — `/api/v1/work-plan`
+
+### `GET /list`
+Danh sách kế hoạch sản xuất (작업계획 리스트) — gộp 2 nguồn: chỉ thị sản xuất chưa hoàn thành (`aps_result.work_order`, `source_type="WO"`) + kế hoạch MPS chưa tạo lệnh (`aps_input.aps_mps_plan` `status_cd='notCreated'`, `source_type="MPS"`). Các cột 공정/워크센터 và rủi ro `overload` được enrich từ `aps_result.aps_daily_plan` → gọi `POST /kpi-summary/daily-plan/rebuild` trước để có dữ liệu enrich (dòng thiếu item/routing sẽ để null các cột này — data gap, không phải lỗi).
+
+Query (optional): `workcenter_no?`, `item_no?`, `risk_type?` (vd `overload`), `plan_no?` (khớp `tmp_plan_no`/`work_order_no`/`order_no`), `date_from?`/`date_to?` (`YYYY-MM-DD`, lọc theo `plan_end`/`plan_start`).
+→ `WorkPlanRow[]`: `{ source_type ("WO"|"MPS"), work_order_no, tmp_plan_no, order_no, item_no, item_name, workcenter_no, workcenter_name, proc_name, planned_qty, plan_start, plan_end, delivery_date, risk_types[] }`
+
+Ghi chú: `risk_types` là tổ hợp con của `{"overload","material_short"}` (rỗng → `["normal"]`). `overload` từ `aps_daily_plan.status`; `material_short` (자재부족) = có ≥1 component trong BOM (1 cấp) mà `plan_qty × (bom.qty1/qty2) > Σ able_qty` (tồn tháng mới nhất, join `aps_stock.item_id = aps_item.gsystem_id`). `plan_start` = Backward từ ngày kết thúc (min ngày trong `aps_daily_plan`, else `plan_start_date`); `plan_end` = `plan_end_date` (MPS) / `prod_end_date` (WO). Dòng quá hạn (`plan_end` < hôm nay) có thể hiển thị `plan_start` > `plan_end` do quy tắc "không xếp lịch trước hôm nay".
+
+---
+
 ## Bảng tên (đổi tên 2026-07-16 — FE lưu ý nếu có mapping cứng theo tên bảng)
 
 | Tên cũ | Tên mới |
