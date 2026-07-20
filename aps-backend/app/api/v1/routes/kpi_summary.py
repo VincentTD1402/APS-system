@@ -28,6 +28,7 @@ from app.schemas.kpi_summary import (
     MaterialShortageSummary,
     PlanImpactedOrderRow,
     WorkcenterDailyStatus,
+    WorkcenterLoadAverage,
     WorkcenterLoadByWorkcenter,
     WorkcenterLoadLineItem,
     WorkcenterLoadEntry
@@ -328,6 +329,45 @@ def material_shortage_summary(
         total_shortage_qty=round(float(total or 0), 4),
         short_rows=int(rows or 0),
         short_orders=int(orders or 0),
+    )
+
+
+@router.get(
+    "/daily-plan/load-average",
+    response_model=WorkcenterLoadAverage,
+    summary="Average workcenter load across the schedule",
+    description=(
+        "Mean load_percent over all (workcenter, work_date) slots of the daily plan. "
+        "avg_overload_percent averages only overloaded slots (load_percent > 100). "
+        "Slots with capacity <= 0 are excluded from the means. Filterable by workcenter/date."
+    ),
+)
+def workcenter_load_average(
+    workcenter_id: Optional[int] = Query(None, description="Filter by workcenter ID"),
+    start_date: Optional[str] = Query(None, description="Filter work_date >= (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="Filter work_date <= (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+) -> WorkcenterLoadAverage:
+    rollup = _workcenter_daily_status_rollup(db, workcenter_id, start_date, end_date)
+
+    # Only slots with real capacity feed the mean; capacity<=0 slots carry a
+    # sentinel load_percent (999.99) that would skew the average.
+    counted = [r for r in rollup if r.capacity_minutes > 0]
+    excluded = len(rollup) - len(counted)
+    overloaded = [r for r in counted if r.load_percent > 100.0]
+
+    avg_load = (
+        round(sum(r.load_percent for r in counted) / len(counted), 2) if counted else 0.0
+    )
+    avg_overload = (
+        round(sum(r.load_percent for r in overloaded) / len(overloaded), 2) if overloaded else 0.0
+    )
+    return WorkcenterLoadAverage(
+        avg_load_percent=avg_load,
+        avg_overload_percent=avg_overload,
+        total_slots=len(counted),
+        overloaded_slots=len(overloaded),
+        excluded_slots=excluded,
     )
 
 
