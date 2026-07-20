@@ -202,7 +202,7 @@ Nếu cần gọi độc lập qua HTTP (không qua daily-plan/rebuild), uncomme
 | `aps_item_routing` | `aps_item_routing_spec` |
 | `aps_item_process` | `aps_item_process_step` |
 
-Xem `docs/routing-vs-item-process-data-model.md` (trong `aps-backend/docs/`) để hiểu rõ 2 nhóm bảng routing-level vs item-level.
+Xem `docs/routing-vs-item-process-data-model.md` (root) để hiểu rõ 2 nhóm bảng routing-level vs item-level (chưa tồn tại — sẽ viết khi cần).
 
 ## Unresolved / cần FE xác nhận
 
