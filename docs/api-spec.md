@@ -1,10 +1,14 @@
 # APS Backend API Spec
 
-Nguồn: tạo từ OpenAPI schema thật của `aps-backend` (2026-07-16, sau khi dọn bỏ scheduler/action/plan-version). Dùng file này làm hợp đồng chung giữa backend (implement) và frontend (mapping) — mọi thay đổi route phải update lại file này.
+Nguồn: cập nhật thủ công theo thay đổi thực tế trong `aps-backend` (2026-07-20). Dùng file này làm hợp đồng chung giữa backend (implement) và frontend (mapping) — mọi thay đổi route phải update lại file này.
 
 Base path: **`/api/v1`**. Swagger UI: **`/docs`**. OpenAPI JSON: **`/openapi.json`**.
 
-> **Đã gỡ bỏ khỏi backend** (không còn tồn tại, đừng map FE vào các route này nữa): `/actions/*`, `/plan-versions/*`, `/history/*`, `/schedule/*`, `/llm/plans/*` (plan detail), `/kpi-summary/{scenario_id}/risks` (KPI4 risk-count). Toàn bộ tính năng tạo lịch/scheduler, action execution, plan version history đã bị xóa khỏi backend.
+> **Đã gỡ bỏ khỏi backend** (không còn tồn tại trong code, đừng map FE vào các route này): `/actions/*`, `/plan-versions/*`, `/history/*`, `/schedule/*`, `/llm/plans/*` (plan detail), `/kpi-summary/{scenario_id}/risks` (KPI4 cũ, đã thay bằng `/kpi-summary/risk-count` mới — xem mục 3.4), `/kpi-summary/{scenario_id}/workcenter-schedule`, `/kpi-summary/{scenario_id}/workcenter-load-db`, `/kpi-summary/{scenario_id}/plan-impacted-orders`, `/kpi-summary/{scenario_id}/impacted-orders`, `/kpi-summary/daily-plan/material-shortage-summary`, `/kpi-summary/daily-plan/load-average`.
+>
+> **Ẩn khỏi Swagger** (`include_in_schema=False` — route vẫn hoạt động, chỉ không hiện trong `/docs`): toàn bộ `/llm/*`, toàn bộ `/workorder/*`.
+>
+> **Router tắt hẳn** (không mount, code giữ nguyên): `/material-shortage/*` (module 6) — dư thừa vì `POST /kpi-summary/daily-plan/rebuild` đã gọi `rebuild_material_shortage()` bên trong.
 
 ---
 
@@ -44,7 +48,7 @@ Poll kết quả. **202** khi đang chạy (`{detail:{job_id, status:"running"}}
 
 ---
 
-## 2. LLM — `/api/v1/llm`
+## 2. LLM — `/api/v1/llm` (ẩn khỏi Swagger)
 
 ### `POST /suggestions`
 Sinh gợi ý hành động AI từ context KPI. Cache theo `scenario_id`.
@@ -70,44 +74,50 @@ Sinh gợi ý hành động AI từ context KPI. Cache theo `scenario_id`.
 
 ## 3. KPI Summary — `/api/v1/kpi-summary`
 
-### `GET /{scenario_id}/delivery` — KPI1 Tỷ lệ giao hàng đúng hạn
-Đọc trực tiếp `aps_input.aps_mps_plan` × `aps_input.aps_item` — **không phụ thuộc scenario** (tham số giữ để tương thích interface).
+**Không còn theo `scenario_id`** (bỏ path param ở tất cả KPI1-4, 2026-07-20) — mỗi KPI đọc 1 snapshot dữ liệu duy nhất (không phân theo scenario). Gọi thẳng không cần tham số nào.
 
-`KPI1DeliveryResponse`: `{ kpi_name, kpi_value(0-100), total_orders, on_time_orders, delayed_orders, risk_triggered, delayed_order_details: DelayedOrderDetail[] }`
+### 3.1 `GET /delivery` — KPI1 Tỷ lệ giao hàng đúng hạn
+Đọc trực tiếp `aps_input.aps_mps_plan` × `aps_input.aps_item`.
 
-### `GET /{scenario_id}/shortage` — KPI2 Thiếu vật tư
-`KPI2ShortageResponse`: `{ kpi_name, kpi_value, total_shortage_qty, items_with_shortage, risk_triggered, shortage_items: ShortageItemDetail[] }`
+`KPI1DeliveryResponse`: `{ kpi_name, kpi_value(0-100, %), total_orders, on_time_orders, delayed_orders, risk_triggered, delayed_order_details: DelayedOrderDetail[] }`
 
-### `GET /{scenario_id}/load` — KPI3 Tải workcenter
-`KPI3LoadResponse`: `{ kpi_name, avg_load, max_load, min_load, risk_triggered, entries: WorkcenterLoadEntry[], overloaded_slots: WorkcenterLoadEntry[] }`
+### 3.2 `GET /shortage` — KPI2 Thiếu vật tư
+Đọc `aps_result.aps_material_shortage` (BOM `aps_bom` × tồn kho `aps_stock`, xem `POST /daily-plan/rebuild` bên dưới để refresh). `kpi_value` = **số lượng item bị thiếu** (`items_with_shortage`), không phải tổng số lượng thiếu.
+
+`KPI2ShortageResponse`: `{ kpi_name, kpi_value(=items_with_shortage), total_shortage_qty, items_with_shortage, risk_triggered, shortage_items: ShortageItemDetail[] }`
+`ShortageItemDetail`: `{ item_id, item_no, item_name, required_qty, available_qty, shortage_qty, shortage_percent }`
+
+### 3.3 `GET /load` — KPI3 Tỷ lệ workcenter vượt tải
+Đọc rollup của `aps_result.aps_daily_plan` (cùng nguồn `GET /daily-plan/workcenter-status`). `kpi_value` = **% số workcenter có ≥1 ngày vượt tải** trong toàn bộ lịch đã rebuild (`overloaded_wc_count / total_wc_count × 100`), khớp card FE "공정부하율 초과" kiểu "5%WC" — không phải avg/max/min load theo slot.
+
+`KPI3LoadResponse`: `{ kpi_name, kpi_value(%WC), overloaded_wc_count, total_wc_count, avg_load, max_load, min_load, risk_triggered, entries: WorkcenterLoadEntry[], overloaded_slots: WorkcenterLoadEntry[] }`
+`WorkcenterLoadEntry`: `{ workcenter_id, workcenter_code, workcenter_name, plan_date, total_load_minutes, capacity_minutes, load_percent, operation_count(luôn=0), overloaded }`
+
+### 3.4 `GET /risk-count` — KPI4 Tổng số rủi ro (mới 2026-07-20)
+`kpi_value` = `KPI1.delayed_orders + KPI2.items_with_shortage + KPI3.overloaded_wc_count` — gọi lại KPI1/2/3 nội bộ, không query thêm. Khớp card FE "계획 수립 예상 리스크" kiểu "20건".
+
+`KPI4RiskCountResponse`: `{ kpi_name, kpi_value, r1_delayed_orders, r2_shortage_items, r3_overloaded_wc, risk_triggered }`
 
 ### `POST /daily-plan/rebuild`
-Tính lại `aps_result.aps_daily_plan` từ `aps_mps_plan` × `aps_item_routing_spec` (backward-fill), lưu `status` (`normal`/`overload`) cho từng dòng, rồi đọc lại các dòng vừa lưu để trả về rollup theo (workcenter, ngày) luôn — không cần gọi thêm `GET /daily-plan/workcenter-status` sau khi rebuild.
-→ `DailyPlanRebuildResponse`: `{ rows_inserted, daily_status: WorkcenterDailyStatus[] }` — `daily_status` cùng shape với `GET /daily-plan/workcenter-status`, phản ánh đúng các dòng vừa rebuild.
+Tính lại **2 bảng cùng lúc**:
+1. `aps_result.aps_daily_plan` từ `aps_mps_plan` × `aps_item_routing_spec` (backward-fill) + backward material-shortage pass (`apply_daily_material_shortage`) — nguồn cho KPI3.
+2. `aps_result.aps_material_shortage` từ `aps_bom` × `aps_stock` (`rebuild_material_shortage`) — nguồn cho KPI2.
 
-`WorkcenterDailyStatus`: `{ work_date, workcenter_id, workcenter_no, workcenter_name, planned_qty_total, daily_out_qty, used_minutes, capacity_minutes, load_percent, status }`
+Phải gọi API này trước khi đọc KPI2/KPI3/KPI4 để có dữ liệu mới.
+
+`DailyPlanRebuildResponse`: `{ rows_inserted, daily_status: WorkcenterDailyStatus[] }` — `daily_status` cùng shape với `GET /daily-plan/workcenter-status`, phản ánh đúng các dòng vừa rebuild.
+
+`WorkcenterDailyStatus`: `{ work_date, workcenter_id, workcenter_no, workcenter_name, planned_qty_total, daily_out_qty, used_minutes, capacity_minutes, load_percent, material_shortage_qty, status, statuses }`
 
 ### `GET /daily-plan`
 Query: `workcenter_id?`, `start_date?`, `end_date?` (YYYY-MM-DD) → `DailyPlanRow[]`. `status` mỗi dòng đọc trực tiếp từ cột đã lưu `aps_daily_plan.status` (không tính lại).
 
 ### `GET /daily-plan/workcenter-status`
-Rollup theo (workcenter, ngày) — dùng để tô màu FE (`status`: `overload`/`normal`). Query như trên → `WorkcenterDailyStatus[]`. `status` đọc từ cột đã lưu `aps_daily_plan.status` (rollup: overload nếu bất kỳ dòng nào trong nhóm là overload), các trường số (`used_minutes`, `capacity_minutes`, `load_percent`, `daily_out_qty`, `planned_qty_total`) vẫn tính live như trước.
-
-### `GET /{scenario_id}/workcenter-schedule`
-Dữ liệu cho Gantt chart. Query: `start_date?`, `end_date?`, `workcenter_id?` → `WorkcenterLoadEntry[]`
-
-### `GET /{scenario_id}/workcenter-load-db`
-`workcenter_load` group theo workcenter. Query như trên → `WorkcenterLoadByWorkcenter[]` (mỗi item có `loads: WorkcenterLoadLineItem[]`)
-
-### `GET /{scenario_id}/plan-impacted-orders`
-Query: `plan_id?`, `reason_type?` (R1/R2/R3) → `PlanImpactedOrderRow[]`
-
-### `GET /{scenario_id}/impacted-orders`
-Query: `risk_type?` (R1/R2/R3) → `DelayedOrderDetail[]`
+Rollup theo (workcenter, ngày) — dùng để tô màu FE (`status`: `normal`/`overload`/`material-shortage`/`urgent`). Query như trên → `WorkcenterDailyStatus[]`.
 
 ---
 
-## 4. Work Order — `/api/v1/workorder`
+## 4. Work Order — `/api/v1/workorder` (ẩn khỏi Swagger)
 
 Không có Pydantic response_model (trả `dict` tự do) — shape thật lấy trực tiếp từ code, liệt kê dưới đây.
 
@@ -173,6 +183,17 @@ FE đọc `sync_status` để hiển thị kết quả action (đã đồng bộ
 
 ---
 
+## 6. Material Shortage — `/api/v1/material-shortage` (router tắt, không mount)
+
+Code giữ nguyên trong `material_shortage.py`, nhưng không đăng ký vào `api_router` — 2 hàm dùng trực tiếp (không qua HTTP) bởi `POST /kpi-summary/daily-plan/rebuild`:
+
+- `rebuild_material_shortage(session)` — wipe + rebuild `aps_result.aps_material_shortage` từ `aps_bom` × `aps_stock` (required = `plan_qty × qty1/qty2`, available = `Σ aps_stock.in_qty`, shortage = `max(0, required − available)`). Chỉ raw material (`asset_type == "RawMaterial"`), BOM 1 cấp.
+- `apply_daily_material_shortage(session)` — set `aps_daily_plan.material_shortage_qty` theo backward stock balance, chạy sau `rebuild_daily_plan`.
+
+Nếu cần gọi độc lập qua HTTP (không qua daily-plan/rebuild), uncomment `api_router.include_router(material_shortage.router, ...)` trong `routes/__init__.py`.
+
+---
+
 ## Bảng tên (đổi tên 2026-07-16 — FE lưu ý nếu có mapping cứng theo tên bảng)
 
 | Tên cũ | Tên mới |
@@ -184,4 +205,6 @@ FE đọc `sync_status` để hiển thị kết quả action (đã đồng bộ
 Xem `docs/routing-vs-item-process-data-model.md` (trong `aps-backend/docs/`) để hiểu rõ 2 nhóm bảng routing-level vs item-level.
 
 ## Unresolved / cần FE xác nhận
+
 - `neo4j_nodes/neo4j_relationships/rdf_triples` trong `SyncRunResponse` luôn 0 — FE nên bỏ hiển thị các field này nếu đang dùng.
+- KPI2/KPI3/KPI4 phụ thuộc dữ liệu đã rebuild qua `POST /daily-plan/rebuild` — nếu chưa gọi trước, các API này trả 0/rỗng. Có cần backend tự động rebuild khi dữ liệu cũ/rỗng thay vì bắt FE gọi thủ công không?

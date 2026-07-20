@@ -1,18 +1,20 @@
-import re
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.config.config import settings
+from app.models import MaterialShortage, WorkCenter
 from app.schemas.kpi_summary import (
     DelayedOrderDetail,
     KPI1DeliveryResponse,
     KPI2ShortageResponse,
     KPI3LoadResponse,
+    KPI4RiskCountResponse,
     WorkcenterLoadEntry,
     ShortageItemDetail,
 )
+from app.services.kpi_summary.daily_plan_rollup import workcenter_daily_status_rollup
 
 
 class KPISummaryService:
@@ -22,22 +24,6 @@ class KPISummaryService:
         self.db = db
         self.scenario_id = scenario_id
         self.run_id = run_id
-
-    def _resolve_parent_scenario_id(self, scenario_id: Optional[str] = None) -> Optional[str]:
-        """Baseline id for a simulation branch (DB FK or SCH-Rx_sim_N pattern)."""
-        sid = scenario_id or self.scenario_id
-        row = self.db.execute(
-            text(
-                "SELECT parent_scenario_id FROM aps_result.plan_scenario WHERE scenario_id = :sid"
-            ),
-            {"sid": sid},
-        ).fetchone()
-        if row is not None:
-            pid = row._mapping.get("parent_scenario_id")
-            if pid:
-                return str(pid)
-        m = re.match(r"^(.*)_sim_[123]$", sid)
-        return m.group(1) if m else None
 
     # ========================================================================
     # KPI 1 – Delivery Compliance Rate
@@ -127,53 +113,33 @@ class KPISummaryService:
     # KPI 2 – Material Shortage
     # ========================================================================
 
-    def calculate_kpi2_shortage(self, scenario_id: Optional[str] = None) -> KPI2ShortageResponse:
-        sid = scenario_id or self.scenario_id
-        query = text(
-            """
-                SELECT
-                    ps.item_id,
-                    i.item_no,
-                    i.item_name,
-                    SUM(ps.required_qty) AS total_required,
-                    SUM(ps.available_qty) AS total_available,
-                    SUM(GREATEST(0, ps.required_qty - ps.available_qty)) AS calculated_shortage
-                FROM aps_result.plan_shortage ps
-                LEFT JOIN aps_input.aps_item i ON ps.item_id = i.id
-                WHERE ps.scenario_id = :scenario_id
-                GROUP BY ps.item_id, i.item_no, i.item_name
-                HAVING SUM(GREATEST(0, ps.required_qty - ps.available_qty)) > 0
-                ORDER BY calculated_shortage DESC
-                """
-        )
+    def calculate_kpi2_shortage(self) -> KPI2ShortageResponse:
+        """Read aps_result.aps_material_shortage (call POST /material-shortage/rebuild first).
 
+        Per-component required/available/shortage, BOM-based — not scenario-scoped
+        (single G-System snapshot per production area, same as KPI1).
+        """
         rows = self.db.execute(
-            query, {"scenario_id": sid}).fetchall()
+            select(MaterialShortage)
+            .where(MaterialShortage.shortage_qty > 0)
+            .order_by(MaterialShortage.shortage_qty.desc())
+        ).scalars().all()
 
         shortage_items: List[ShortageItemDetail] = []
         global_total_shortage = 0.0
 
-        for row in rows:
-            m = row._mapping
-            item_id = m["item_id"]
-            item_no = m["item_no"]
-            item_name = m["item_name"]
-            required_qty = float(m["total_required"]) if m["total_required"] else 0.0
-            available_qty = float(m["total_available"]) if m["total_available"] else 0.0
-            shortage_qty = float(m["calculated_shortage"]) if m["calculated_shortage"] else 0.0
-
-            if required_qty > 0:
-                shortage_percent = (shortage_qty / required_qty) * 100
-            else:
-                shortage_percent = 0.0
-
+        for r in rows:
+            required_qty = float(r.required_qty or 0)
+            available_qty = float(r.available_qty or 0)
+            shortage_qty = float(r.shortage_qty or 0)
+            shortage_percent = (shortage_qty / required_qty) * 100 if required_qty > 0 else 0.0
             global_total_shortage += shortage_qty
 
             shortage_items.append(
                 ShortageItemDetail(
-                    item_id=item_id,
-                    item_no=item_no,
-                    item_name=item_name,
+                    item_id=r.item_id,
+                    item_no=r.item_no,
+                    item_name=r.item_name,
                     required_qty=round(required_qty, 2),
                     available_qty=round(available_qty, 2),
                     shortage_qty=round(shortage_qty, 2),
@@ -181,13 +147,11 @@ class KPISummaryService:
                 )
             )
 
-        risk_triggered = global_total_shortage > 0
-
         return KPI2ShortageResponse(
-            kpi_value=round(global_total_shortage, 2),
+            kpi_value=len(shortage_items),
             total_shortage_qty=round(global_total_shortage, 2),
             items_with_shortage=len(shortage_items),
-            risk_triggered=risk_triggered,
+            risk_triggered=len(shortage_items) > 0,
             shortage_items=shortage_items,
         )
 
@@ -195,133 +159,30 @@ class KPISummaryService:
     # KPI 3 – Workcenter Load
     # ========================================================================
 
-    def _entries_from_plan_utilization(
-        self, scenario_id: str
-    ) -> Tuple[List[WorkcenterLoadEntry], List[WorkcenterLoadEntry]]:
-        query = text(
-            """
-                SELECT
-                    pu.workcenter_id,
-                    wc.workcenter_no,
-                    wc.workcenter_name,
-                    pu.plan_date,
-                    pu.used_capacity,
-                    pu.available_capacity,
-                    pu.utilization_rate
-                FROM aps_result.plan_utilization pu
-                LEFT JOIN aps_input.aps_workcenter wc ON pu.workcenter_id = wc.id
-                WHERE pu.scenario_id = :scenario_id
-                ORDER BY wc.workcenter_no, pu.plan_date
-                """
-        )
+    def calculate_kpi3_load(self) -> KPI3LoadResponse:
+        """Read aps_result.aps_daily_plan rollup (call POST /kpi-summary/daily-plan/rebuild first).
 
-        rows = self.db.execute(
-            query, {"scenario_id": scenario_id}).fetchall()
+        kpi_value = % of workcenters (aps_workcenter master) with at least one
+        overload/urgent day across the whole rebuilt schedule — matches the FE
+        "공정부하율 초과" card (e.g. "5%WC"), not a slot-level average.
+        """
+        rollup = workcenter_daily_status_rollup(self.db)
 
-        entries: List[WorkcenterLoadEntry] = []
-        overloaded_slots: List[WorkcenterLoadEntry] = []
-
-        for row in rows:
-            m = row._mapping
-            workcenter_id = m["workcenter_id"]
-            workcenter_code = m["workcenter_no"]
-            workcenter_name = m["workcenter_name"]
-            plan_date = m["plan_date"]
-
-            used_capacity = float(m["used_capacity"]) if m["used_capacity"] else 0.0
-            available_capacity = float(m["available_capacity"]) if m["available_capacity"] else 0.0
-
-            if m["utilization_rate"] is not None:
-                load_percent = float(m["utilization_rate"])
-            elif available_capacity > 0:
-                load_percent = (used_capacity / available_capacity) * 100.0
-            else:
-                load_percent = 999.99 if used_capacity > 0 else 0.0
-
-            overloaded = load_percent > settings.KPI_R3_OVERLOAD_THRESHOLD
-
-            entry = WorkcenterLoadEntry(
-                workcenter_id=workcenter_id,
-                workcenter_code=workcenter_code,
-                workcenter_name=workcenter_name,
-                plan_date=plan_date,
-                total_load_minutes=round(used_capacity, 2),
-                capacity_minutes=round(available_capacity, 2),
-                load_percent=round(load_percent, 2),
+        entries: List[WorkcenterLoadEntry] = [
+            WorkcenterLoadEntry(
+                workcenter_id=r.workcenter_id,
+                workcenter_code=r.workcenter_no,
+                workcenter_name=r.workcenter_name,
+                plan_date=r.work_date,
+                total_load_minutes=r.used_minutes,
+                capacity_minutes=r.capacity_minutes,
+                load_percent=r.load_percent,
                 operation_count=0,
-                overloaded=overloaded,
+                overloaded=r.status in ("overload", "urgent"),
             )
-
-            entries.append(entry)
-            if overloaded:
-                overloaded_slots.append(entry)
-
-        return entries, overloaded_slots
-
-    def _entries_from_workcenter_load(
-        self, scenario_id: str
-    ) -> Tuple[List[WorkcenterLoadEntry], List[WorkcenterLoadEntry]]:
-        """Fallback when plan_utilization is empty (common on simulation branches)."""
-        query = text(
-            """
-                SELECT
-                    wl.workcenter_id,
-                    wc.workcenter_no,
-                    wc.workcenter_name,
-                    wl.work_date,
-                    wl.used_minutes,
-                    wl.capacity_minutes,
-                    wl.load_percent,
-                    wl.overloaded
-                FROM aps_result.workcenter_load wl
-                LEFT JOIN aps_input.aps_workcenter wc ON wl.workcenter_id = wc.id
-                WHERE wl.scenario_id = :scenario_id
-                ORDER BY wc.workcenter_no, wl.work_date
-                """
-        )
-        rows = self.db.execute(
-            query, {"scenario_id": scenario_id}).fetchall()
-        entries: List[WorkcenterLoadEntry] = []
-        overloaded_slots: List[WorkcenterLoadEntry] = []
-
-        for row in rows:
-            m = row._mapping
-            used_m = float(m["used_minutes"]) if m["used_minutes"] else 0.0
-            cap_m = float(m["capacity_minutes"]) if m["capacity_minutes"] else 0.0
-            load_percent = float(m["load_percent"]) if m["load_percent"] is not None else 0.0
-            overloaded_flag = bool(m["overloaded"]) if m["overloaded"] is not None else False
-            overloaded = overloaded_flag or load_percent > settings.KPI_R3_OVERLOAD_THRESHOLD
-
-            entry = WorkcenterLoadEntry(
-                workcenter_id=m["workcenter_id"],
-                workcenter_code=m["workcenter_no"],
-                workcenter_name=m["workcenter_name"],
-                plan_date=m["work_date"],
-                total_load_minutes=round(used_m, 2),
-                capacity_minutes=round(cap_m, 2),
-                load_percent=round(load_percent, 2),
-                operation_count=0,
-                overloaded=overloaded,
-            )
-            entries.append(entry)
-            if overloaded:
-                overloaded_slots.append(entry)
-
-        return entries, overloaded_slots
-
-    def calculate_kpi3_load(self, scenario_id: Optional[str] = None) -> KPI3LoadResponse:
-        """Load KPI from plan_utilization, then workcenter_load, then parent baseline."""
-        sid = scenario_id or self.scenario_id
-
-        entries, overloaded_slots = self._entries_from_plan_utilization(sid)
-        if not entries:
-            entries, overloaded_slots = self._entries_from_workcenter_load(sid)
-
-        parent = self._resolve_parent_scenario_id(sid)
-        if not entries and parent:
-            entries, overloaded_slots = self._entries_from_plan_utilization(parent)
-            if not entries:
-                entries, overloaded_slots = self._entries_from_workcenter_load(parent)
+            for r in rollup
+        ]
+        overloaded_slots = [e for e in entries if e.overloaded]
 
         if entries:
             avg_load = sum(e.load_percent for e in entries) / len(entries)
@@ -332,15 +193,42 @@ class KPISummaryService:
             max_load = 0.0
             min_load = 0.0
 
-        risk_triggered = bool(overloaded_slots)
+        total_wc_count = self.db.execute(select(func.count()).select_from(WorkCenter)).scalar_one()
+        overloaded_wc_count = len({r.workcenter_id for r in rollup if r.status in ("overload", "urgent")})
+        kpi_value = round(overloaded_wc_count / total_wc_count * 100, 2) if total_wc_count else 0.0
 
         return KPI3LoadResponse(
             kpi_name="workcenter_load",
+            kpi_value=kpi_value,
+            overloaded_wc_count=overloaded_wc_count,
+            total_wc_count=total_wc_count,
             avg_load=round(avg_load, 2),
             max_load=round(max_load, 2),
             min_load=round(min_load, 2),
-            risk_triggered=risk_triggered,
+            risk_triggered=overloaded_wc_count > 0,
             entries=entries,
             overloaded_slots=overloaded_slots,
+        )
+
+    # ========================================================================
+    # KPI 4 – Total Risk Count
+    # ========================================================================
+
+    def calculate_kpi4_risk_count(self) -> KPI4RiskCountResponse:
+        """kpi_value = R1 (delayed orders) + R2 (shortage items) + R3 (overloaded workcenters).
+
+        Reuses KPI1/KPI2/KPI3 as-is — no new query, just sums their counts.
+        """
+        r1 = self.calculate_kpi1_delivery().delayed_orders
+        r2 = self.calculate_kpi2_shortage().items_with_shortage
+        r3 = self.calculate_kpi3_load().overloaded_wc_count
+        total = r1 + r2 + r3
+
+        return KPI4RiskCountResponse(
+            kpi_value=total,
+            r1_delayed_orders=r1,
+            r2_shortage_items=r2,
+            r3_overloaded_wc=r3,
+            risk_triggered=total > 0,
         )
 
