@@ -29,5 +29,5 @@ class WorkPlanRow(BaseModel):
     delivery_date: Optional[date] = Field(None, description="납기일자 (aps_mps_plan.delivery_date)")
     risk_types: List[str] = Field(
         default_factory=list,
-        description="리스크유형 — currently 'overload' / 'normal'; '자재부족' added later when stock exists",
+        description="리스크유형 — subset of {'overload','material_short'} (empty → ['normal']); both from aps_daily_plan.status",
     )

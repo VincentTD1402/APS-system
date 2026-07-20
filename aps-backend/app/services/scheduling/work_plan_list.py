@@ -9,7 +9,8 @@ Column derivations follow the caller's spec (see docs/api-spec.md §6):
   - 워크센터: aps_item_routing_spec (item_id, routing_id) → workcenter → aps_workcenter.
   - 공정: aps_item_process_step (item_id, routing_id) → proc_sno → aps_item_routing_spec.
   - dates: raw aps_mps_plan.plan_start_date / plan_end_date / delivery_date.
-  - overload: aps_result.aps_daily_plan.status for the line; material_short: BOM × stock.
+  - risk (overload / material_short): aps_result.aps_daily_plan.status for the line
+    (rebuild via POST /kpi-summary/daily-plan/rebuild first).
 Columns whose source data is missing are returned as null (no fallback).
 """
 
@@ -23,13 +24,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    BOM,
     DailyPlan,
     Item,
     ItemProcessStep,
     ItemRoutingSpec,
     MpsPlan,
-    Stock,
     WorkCenter,
     WorkOrder,
 )
@@ -84,62 +83,22 @@ def _build_proc_index(db: Session) -> dict[tuple[int, int], str]:
     return index
 
 
-def _build_overload_set(db: Session) -> set[int]:
-    """mps_plan_id set with at least one overloaded aps_daily_plan row."""
-    overloaded: set[int] = set()
-    for mps_plan_id, status in db.execute(select(DailyPlan.mps_plan_id, DailyPlan.status)).all():
-        if status == "overload":
-            overloaded.add(mps_plan_id)
-    return overloaded
+def _build_risk_sets(db: Session) -> tuple[set[int], set[int]]:
+    """(overload_mps_ids, material_short_mps_ids) derived from aps_daily_plan.status.
 
-
-def _build_material_shortage(db: Session) -> set[int]:
-    """Return the set of mps_plan.id whose BOM has ≥1 short component (자재부족).
-
-    required(component) = plan_qty × (bom.qty1 / qty2); available = Σ able_qty of
-    the component's LATEST stock month (join aps_stock.item_id == aps_item.gsystem_id).
-    Level-1 BOM only; each MPS line evaluated independently against full stock (spec P5).
+    Both risks share one source: the per-day status folded by rebuild_daily_plan +
+    apply_daily_material_shortage (via POST /kpi-summary/daily-plan/rebuild). A line
+    is overloaded if any of its daily rows is 'overload'/'urgent', and material-short
+    if any is 'material-shortage'/'urgent'. Lines with no daily_plan rows → neither.
     """
-    # aps_stock.item_id (string) → aps_item.id, via aps_item.gsystem_id
-    gsid_to_item_id = {
-        str(gsid): iid
-        for iid, gsid in db.execute(select(Item.id, Item.gsystem_id)).all()
-        if gsid is not None
-    }
-    # latest stk_ym per stock item — avoid summing able_qty across months
-    latest_ym: dict[str, str] = {}
-    for item_key, ym in db.execute(select(Stock.item_id, Stock.stk_ym)).all():
-        if item_key is None or ym is None:
-            continue
-        if item_key not in latest_ym or ym > latest_ym[item_key]:
-            latest_ym[item_key] = ym
-    available_by_item_id: dict[int, float] = defaultdict(float)
-    for st in db.execute(select(Stock)).scalars().all():
-        if st.item_id is None or st.able_qty is None or st.stk_ym != latest_ym.get(st.item_id):
-            continue
-        iid = gsid_to_item_id.get(st.item_id)
-        if iid is not None:
-            available_by_item_id[iid] += float(st.able_qty)
-
-    # level-1 BOM: parent_item_id → [(component_item_id, ratio)]
-    bom_by_parent: dict[int, list[tuple[int, float]]] = defaultdict(list)
-    for b in db.execute(select(BOM)).scalars().all():
-        if b.parent_item_id is None or b.component_item_id is None:
-            continue
-        q1 = float(b.qty1) if b.qty1 is not None else 1.0
-        q2 = float(b.qty2) if b.qty2 else 1.0  # guard None/0 → 1
-        bom_by_parent[b.parent_item_id].append((b.component_item_id, q1 / q2))
-
+    overload: set[int] = set()
     short: set[int] = set()
-    for mps in db.execute(select(MpsPlan)).scalars().all():
-        if mps.item_id is None or mps.plan_qty is None:
-            continue
-        qty = float(mps.plan_qty)
-        for comp_id, ratio in bom_by_parent.get(mps.item_id, ()):
-            if qty * ratio > available_by_item_id.get(comp_id, 0.0) + 1e-9:
-                short.add(mps.id)
-                break
-    return short
+    for mps_plan_id, status in db.execute(select(DailyPlan.mps_plan_id, DailyPlan.status)).all():
+        if status in ("overload", "urgent"):
+            overload.add(mps_plan_id)
+        if status in ("material-shortage", "urgent"):
+            short.add(mps_plan_id)
+    return overload, short
 
 
 def _risk_types(overload: bool, material_short: bool) -> list[str]:
@@ -150,6 +109,14 @@ def _risk_types(overload: bool, material_short: bool) -> list[str]:
     if material_short:
         risks.append("material_short")
     return risks or ["normal"]
+
+
+def _risk_rank(row: WorkPlanRow) -> int:
+    """Sort weight for the risk-first ordering: count of real risks on the row.
+
+    2 = both overload+material_short, 1 = one risk, 0 = normal. Higher first.
+    """
+    return sum(1 for r in row.risk_types if r != "normal")
 
 
 def _row_matches_filters(
@@ -194,8 +161,7 @@ def build_work_plan_list(
     items_by_id = {it.id: it for it in db.execute(select(Item)).scalars().all()}
     wc_index = _build_workcenter_index(db)
     proc_index = _build_proc_index(db)
-    overload_ids = _build_overload_set(db)
-    short_mps_ids = _build_material_shortage(db)
+    overload_ids, short_mps_ids = _build_risk_sets(db)
 
     rows: list[WorkPlanRow] = []
     for mps in db.execute(select(MpsPlan)).scalars().all():
@@ -223,7 +189,7 @@ def build_work_plan_list(
             )
         )
 
-    return [
+    filtered = [
         r
         for r in rows
         if _row_matches_filters(
@@ -236,3 +202,8 @@ def build_work_plan_list(
             date_to=date_to,
         )
     ]
+    # 리스크 건 최우선 정렬: rows with more risks first, then earliest delivery.
+    # Stable sort keeps same-rank/same-delivery rows in aps_mps_plan order; rows
+    # without a delivery_date fall to the bottom of their risk group.
+    filtered.sort(key=lambda r: (-_risk_rank(r), r.delivery_date or date.max))
+    return filtered

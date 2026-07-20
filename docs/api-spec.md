@@ -200,7 +200,9 @@ Derive các cột (thiếu data → `null`, không fallback):
 Query (optional): `workcenter_no?`, `item_no?`, `risk_type?` (vd `overload`), `plan_no?` (khớp `tmp_plan_no`/`work_order_no`/`order_no`), `date_from?`/`date_to?` (`YYYY-MM-DD`, lọc theo `plan_end`/`plan_start`).
 → `WorkPlanRow[]`: `{ source_type ("WO"|"MPS"), work_order_no, tmp_plan_no, order_no, item_no, item_name, workcenter_no, workcenter_name, proc_name, planned_qty, plan_start, plan_end, delivery_date, risk_types[] }`
 
-Ghi chú: `risk_types` là tổ hợp con của `{"overload","material_short"}` (rỗng → `["normal"]`). `overload` = có ≥1 dòng `aps_daily_plan.status='overload'` cho `mps_plan_id` đó (gọi `POST /kpi-summary/daily-plan/rebuild` trước). `material_short` (자재부족, bản rút gọn) = có ≥1 component trong BOM (1 cấp) mà `plan_qty × (bom.qty1/qty2) > Σ able_qty` (tồn tháng mới nhất, join `aps_stock.item_id = aps_item.gsystem_id`) — công thức đầy đủ theo ngày chờ data 미입고/입고예정. Data hiện tại: `workcenter`/`proc_name` phần lớn `null` vì `aps_item_process_step.routing_id` và `aps_item_routing_spec.routing_id` chưa được nạp (data gap nguồn, không phải lỗi).
+**Sắp xếp mặc định** (리스크 건 최우선): dòng có risk lên đầu — theo số lượng risk giảm dần (cả 2 risk → 1 risk → normal), rồi `delivery_date` tăng dần (dòng thiếu `delivery_date` xuống cuối nhóm). Ổn định: cùng rank+delivery giữ thứ tự `aps_mps_plan` gốc.
+
+Ghi chú: `risk_types` là tổ hợp con của `{"overload","material_short"}` (rỗng → `["normal"]`), **cả 2 lấy từ `aps_result.aps_daily_plan.status`** theo `mps_plan_id` — `overload` nếu line có ≥1 dòng status `overload`/`urgent`; `material_short` nếu có ≥1 dòng `material-shortage`/`urgent` (`material_shortage_qty>0`, tính bằng backward material balance theo ngày trong `apply_daily_material_shortage`). **Bắt buộc gọi `POST /kpi-summary/daily-plan/rebuild` trước** (rebuild `aps_daily_plan` + set shortage); chưa rebuild → mọi risk = `normal`. Data hiện tại: `workcenter`/`proc_name` phần lớn `null` vì `aps_item_process_step.routing_id` và `aps_item_routing_spec.routing_id` chưa được nạp (data gap nguồn, không phải lỗi).
 
 ---
 
