@@ -67,6 +67,8 @@ class SyncResult:
     item_processes_enriched: int = 0  # rows enriched via by-routing APIs
     equipment_synced: int = 0  # rows synced via workPlaceEquipmentMng (by-workshop)
     mps_plan_synced: int = 0  # rows synced via prodPlanMpsMng (by-pareaId)
+    planned_work_order_created: int = 0  # local PLANNED stubs for MpsPlan.status_cd=="notCreated"
+    work_order_synced: int = 0  # rows synced via pd/workorder (by-pareaId)
     item_routing_synced: int = 0  # rows synced via itemRoutingMng (by-item x itemRev)
     item_routing_enriched: int = 0  # rows backfilled via routingProcessList/itemProcessListByRouting
     # Neo4j import stats (Phase 02-04) — disabled, nothing reads the graph anymore
@@ -141,6 +143,8 @@ def run_gsystem_sync() -> SyncResult:
             # Phase 4: sync MPS plan (by pareaId) + item routing input (by itemId x itemRev)
             (
                 result.mps_plan_synced,
+                result.planned_work_order_created,
+                result.work_order_synced,
                 result.item_routing_synced,
                 result.item_routing_enriched,
             ) = _enrich_mps_and_item_routing(client)
@@ -255,27 +259,38 @@ def _enrich_equipment(client: "GSystemClient") -> int:
     return total
 
 
-def _enrich_mps_and_item_routing(client: "GSystemClient") -> tuple[int, int, int]:
-    """Sync MPS plan + per-item routing input, then backfill NULL
+def _enrich_mps_and_item_routing(client: "GSystemClient") -> tuple[int, int, int, int, int]:
+    """Sync MPS plan + work orders + per-item routing input, then backfill NULL
     workcenter_id/work_time/jph left by itemRoutingMng.
 
     Flow:
       1. fetch_mps_plan(settings.GSYSTEM_DEFAULT_PAREA_ID) → upsert aps_mps_plan
-      2. Derive unique itemIds from the MPS records
-      3. For each item: fetch_item_routing(itemId) → upsert aps_item_routing_spec
-      4. For each item: enrich_item_routing_specs(...) → backfill still-NULL
+      2. create_planned_work_orders_from_mps_plan → for MPS lines with
+         status_cd=="notCreated" and no linked WorkOrder yet, create a local
+         PLANNED stub with a generated temp_id
+      3. fetch_work_orders(same pareaId) → upsert aps_input.work_order (links
+         existing G-System work orders to the aps_mps_plan rows just synced)
+      4. Derive unique itemIds from the MPS records
+      5. For each item: fetch_item_routing(itemId) → upsert aps_item_routing_spec
+      6. For each item: enrich_item_routing_specs(...) → backfill still-NULL
          workcenter_id/work_time/jph via routingProcessList (cached per routing
          for this whole run) + itemProcessListByRouting (lazy fallback)
 
-    Returns (mps_plan_synced, item_routing_synced, item_routing_enriched).
+    Returns (mps_plan_synced, work_order_synced, item_routing_synced, item_routing_enriched).
     """
     from app.config import settings
     from app.db.database import SessionLocal
     from app.models.input.item import Item
-    from app.services.gsystem.db_syncer import sync_item_routing, sync_mps_plan
+    from app.services.gsystem.db_syncer import (
+        create_planned_work_orders_from_mps_plan,
+        sync_item_routing,
+        sync_mps_plan,
+        sync_work_orders,
+    )
     from app.services.gsystem.db_syncer_item_routing import enrich_item_routing_specs
 
     mps_total = 0
+    work_order_total = 0
     routing_total = 0
     enriched_total = 0
     # Scoped to this whole run — a routing shared by many items is fetched once.
@@ -286,9 +301,21 @@ def _enrich_mps_and_item_routing(client: "GSystemClient") -> tuple[int, int, int
             mps_records = client.fetch_mps_plan(settings.GSYSTEM_DEFAULT_PAREA_ID)
         except Exception as exc:
             logger.warning("fetch_mps_plan failed for pareaId=%s: %s", settings.GSYSTEM_DEFAULT_PAREA_ID, exc)
-            return 0, 0, 0
+            return 0, 0, 0, 0, 0
 
         mps_total = sync_mps_plan(session, mps_records)
+        session.commit()
+
+        planned_work_order_total = create_planned_work_orders_from_mps_plan(session)
+        session.commit()
+
+        try:
+            work_order_records = client.fetch_work_orders(settings.GSYSTEM_DEFAULT_PAREA_ID)
+        except Exception as exc:
+            logger.warning("fetch_work_orders failed for pareaId=%s: %s", settings.GSYSTEM_DEFAULT_PAREA_ID, exc)
+            work_order_records = []
+
+        work_order_total = sync_work_orders(session, work_order_records)
         session.commit()
 
         gsys_item_ids = {
@@ -316,10 +343,12 @@ def _enrich_mps_and_item_routing(client: "GSystemClient") -> tuple[int, int, int
         session.commit()
 
     logger.info(
-        "_enrich_mps_and_item_routing: mps_plan=%d item_routing=%d item_routing_enriched=%d across %d items",
-        mps_total, routing_total, enriched_total, len(gsys_item_ids) if mps_records else 0,
+        "_enrich_mps_and_item_routing: mps_plan=%d planned_work_order=%d work_order=%d item_routing=%d "
+        "item_routing_enriched=%d across %d items",
+        mps_total, planned_work_order_total, work_order_total, routing_total, enriched_total,
+        len(gsys_item_ids) if mps_records else 0,
     )
-    return mps_total, routing_total, enriched_total
+    return mps_total, planned_work_order_total, work_order_total, routing_total, enriched_total
 
 
 def _enrich_item_processes(client: "GSystemClient", routing_gsys_ids: set[int]) -> int:

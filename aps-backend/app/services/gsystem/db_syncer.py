@@ -12,6 +12,7 @@ Usage:
         session.commit()
 """
 
+import random
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.config import get_logger
 from app.models import (
     BOM, Demand, Equipment, Item, ItemProcessStep, ItemRoutingSpec,
-    MpsPlan, RoutingStep, Routing, RoutingItem, WorkCenter,
+    MpsPlan, RoutingStep, Routing, RoutingItem, WorkCenter, WorkOrder,
 )
 from app.models.input.calendar import CalendarEntry
 from app.models.input.customer import Customer, CUSTOMER_TYPE_IMPACT
@@ -325,6 +326,161 @@ def sync_mps_plan(session: Session, records: list[dict[str, Any]]) -> int:
         session.flush()
         count += 1
     logger.info("sync_mps_plan: %d records synced", count)
+    return count
+
+
+def sync_work_orders(session: Session, records: list[dict[str, Any]]) -> int:
+    """Upsert existing G-System work orders (GET /pd/workorder); return rows synced.
+
+    Verified 2026-07-20 against the live dev endpoint (141 sample records).
+    Keyed by G-System record `id` (-> gsystem_work_order_id). `planId` links
+    back to aps_mps_plan.gsystem_id (the MPS plan's G-System integer id — more
+    reliable than the `planNo`/`prodNo` string, which is the same value
+    duplicated under two keys) and is only present on ~92% of records — the
+    rest are ad-hoc/manual work orders with no MPS plan behind them; those
+    still sync in with mps_plan_id=NULL (nullable on WorkOrder). Workcenter
+    FK uses `workshopId` (same convention as /cm/workPlaceMng, NOT
+    `workcenterId`). `statusCd`/`workStatus` ("notcompleted"/"complete"/...)
+    is the G-System completion state — kept in `response_json` for now; add
+    a dedicated column if the upcoming RUN APS list needs to filter on it
+    directly.
+    """
+    if not records:
+        return 0
+
+    plan_ids = {int(r["planId"]) for r in records if r.get("planId") is not None}
+    plan_by_gsys: dict[int, MpsPlan] = {
+        p.gsystem_id: p
+        for p in session.execute(select(MpsPlan).where(MpsPlan.gsystem_id.in_(plan_ids))).scalars().all()
+    } if plan_ids else {}
+
+    item_ids = {int(r["itemId"]) for r in records if r.get("itemId") is not None}
+    item_by_gsys: dict[int, Item] = {
+        i.gsystem_id: i
+        for i in session.execute(select(Item).where(Item.gsystem_id.in_(item_ids))).scalars().all()
+        if i.gsystem_id is not None
+    } if item_ids else {}
+
+    workshop_ids = {int(r["workshopId"]) for r in records if r.get("workshopId") is not None}
+    wc_by_gsys: dict[int, WorkCenter] = {
+        w.gsystem_id: w
+        for w in session.execute(select(WorkCenter).where(WorkCenter.gsystem_id.in_(workshop_ids))).scalars().all()
+        if w.gsystem_id is not None
+    } if workshop_ids else {}
+
+    count = 0
+    for rec in _sorted(records):
+        rec_id = rec.get("id")
+        if rec_id is None:
+            logger.warning("sync_work_orders: missing id — skipped workOrderNo=%s", rec.get("workOrderNo"))
+            continue
+
+        plan_id = _to_int(rec.get("planId"))
+        plan = plan_by_gsys.get(plan_id) if plan_id is not None else None
+        if plan is None:
+            # Ad-hoc/manual work order with no MPS plan behind it (no planId
+            # in the response) — still synced, just with mps_plan_id=NULL.
+            logger.debug(
+                "sync_work_orders: planId=%s not found in aps_mps_plan — syncing workOrderNo=%s without mps_plan_id",
+                plan_id, rec.get("workOrderNo"),
+            )
+
+        gsys_id = int(rec_id)
+        wo = session.execute(
+            select(WorkOrder).where(WorkOrder.gsystem_work_order_id == gsys_id)
+        ).scalar_one_or_none()
+        if wo is None and plan is not None:
+            # Upgrade an existing PLANNED stub for this MPS plan (created by
+            # create_planned_work_orders_from_mps_plan while status_cd was still
+            # "notCreated") instead of inserting a duplicate row now that
+            # G-System has a real work order for it.
+            wo = session.execute(
+                select(WorkOrder).where(
+                    WorkOrder.mps_plan_id == plan.id, WorkOrder.gsystem_work_order_id.is_(None)
+                )
+            ).scalar_one_or_none()
+        if wo is None:
+            wo = WorkOrder()
+            session.add(wo)
+
+        wo.gsystem_work_order_id = gsys_id
+        wo.temp_id = None
+        wo.mps_plan_id = plan.id if plan is not None else None
+        gsys_item_id = _to_int(rec.get("itemId"))
+        wo.item_id = item_by_gsys[gsys_item_id].id if gsys_item_id in item_by_gsys else None
+        gsys_wc_id = _to_int(rec.get("workshopId"))
+        wo.workcenter_id = wc_by_gsys[gsys_wc_id].id if gsys_wc_id in wc_by_gsys else None
+        wo.work_order_no = rec.get("workOrderNo")
+        wo.work_order_serl = _to_int(rec.get("workOrderSerl")) or 1
+        wo.work_order_date = _parse_date(rec.get("workOrderDate"))
+        wo.work_date = _parse_date(rec.get("workDate"))
+        wo.qty = _to_float(rec.get("orderQty")) or _to_float(rec.get("planQty"))
+        wo.status = "CONFIRMED"
+        wo.sync_status = "SUCCESS"
+        wo.response_json = rec
+        session.flush()
+        count += 1
+    logger.info("sync_work_orders: %d records synced", count)
+    return count
+
+
+def _gen_temp_id(session: Session, work_date: date | None) -> str:
+    """Generate a unique temp_id: WO-YYYYMMDD-<random8digit>.
+
+    Matches the legacy workOrderNo convention (WO-<date>-<serial>) so a
+    PLANNED row created locally still reads like a work order number until
+    G-System assigns the real one.
+    """
+    date_part = (work_date or datetime.now(timezone.utc).date()).strftime("%Y%m%d")
+    for _ in range(10):
+        candidate = f"WO-{date_part}-{random.randint(1, 99999999):08d}"
+        exists = session.execute(
+            select(WorkOrder.id).where(WorkOrder.temp_id == candidate)
+        ).scalar_one_or_none()
+        if exists is None:
+            return candidate
+    raise RuntimeError(f"_gen_temp_id: could not find unique temp_id for date={date_part} after 10 attempts")
+
+
+def create_planned_work_orders_from_mps_plan(session: Session) -> int:
+    """Create local PLANNED WorkOrder stubs for MpsPlan rows G-System hasn't ordered yet.
+
+    Reads aps_mps_plan.status_cd (synced verbatim from G-System prodPlanMpsMng
+    statusCd — "created" | "notCreated", same convention as workorder.prodStatus):
+      - status_cd == "created": G-System already created the work order for this
+        plan line — sync_work_orders links the real gsystem_work_order_id via
+        planId, so no local temp_id is generated here.
+      - status_cd is missing/anything else: no work order is expected — skipped.
+      - status_cd == "notCreated": no G-System work order exists yet. If this
+        MpsPlan has no WorkOrder row at all, create one with status=PLANNED and
+        a generated temp_id (WO-YYYYMMDD-<random>) as its stable local key.
+    Idempotent — skips MpsPlan rows that already have a linked WorkOrder
+    (either a prior PLANNED stub or one synced for real via sync_work_orders).
+    """
+    count = 0
+    plans = session.execute(
+        select(MpsPlan).where(MpsPlan.status_cd == "notCreated")
+    ).scalars().all()
+    for plan in plans:
+        existing = session.execute(
+            select(WorkOrder.id).where(WorkOrder.mps_plan_id == plan.id)
+        ).scalar_one_or_none()
+        if existing is not None:
+            continue
+
+        wo = WorkOrder(
+            temp_id=_gen_temp_id(session, plan.plan_start_date or plan.plan_date),
+            mps_plan_id=plan.id,
+            item_id=plan.item_id,
+            work_order_date=plan.plan_start_date or plan.plan_date,
+            work_date=plan.plan_start_date or plan.plan_date,
+            qty=plan.order_qty or plan.plan_qty,
+            status="PLANNED",
+        )
+        session.add(wo)
+        session.flush()
+        count += 1
+    logger.info("create_planned_work_orders_from_mps_plan: %d PLANNED work orders created", count)
     return count
 
 
