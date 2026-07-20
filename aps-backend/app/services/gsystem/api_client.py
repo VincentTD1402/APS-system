@@ -285,6 +285,34 @@ class GSystemClient:
                     time.sleep(2 ** (attempt - 1))
         raise RuntimeError(f"All {self._cfg.retries} attempts failed for {path} pareaId={parea_id}") from last_exc
 
+    def fetch_work_orders(self, parea_id: int) -> list[dict[str, Any]]:
+        """Fetch work orders for a production area (GET /pd/workorder?pareaId=).
+
+        Verified 2026-07-20 against the live dev endpoint. Key fields per record:
+        `id` (gsystem_work_order_id), `workOrderNo`, `workOrderSerl`, `planNo`
+        (present on ~92% of records — some work orders have no MPS link),
+        `planId`, `itemId`, `itemNo`, `routingId`, `procId`, `workshopId`
+        (NOT `workcenterId` — same convention as /cm/workPlaceMng), `orderQty`,
+        `planQty`, `dailyWorkQty`, `workDate`, `workOrderDate`, `endDate`,
+        `statusCd`/`workStatus` ("notcompleted" | "complete" | other codes —
+        matches FE 미완료/완료), `prodStatus` ("created" | "notCreated").
+        Full list for the production area, not delta/pending-based (mirrors
+        fetch_mps_plan).
+        """
+        path = "/pd/workorder"
+        last_exc: Exception | None = None
+        for attempt in range(1, self._cfg.retries + 1):
+            try:
+                r = self._http.get(path, params={"pareaId": parea_id})
+                r.raise_for_status()
+                return _parse_envelope(r.json(), path)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("attempt %d/%d failed for %s pareaId=%s: %s", attempt, self._cfg.retries, path, parea_id, exc)
+                if attempt < self._cfg.retries:
+                    time.sleep(2 ** (attempt - 1))
+        raise RuntimeError(f"All {self._cfg.retries} attempts failed for {path} pareaId={parea_id}") from last_exc
+
     def fetch_item_routing(self, item_id: int) -> list[dict[str, Any]]:
         """Fetch 품목별라우팅입력 for an item (GET /pd/itemRoutingMng?itemId=).
 
