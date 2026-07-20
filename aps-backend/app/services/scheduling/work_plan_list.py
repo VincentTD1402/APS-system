@@ -6,7 +6,7 @@ lookup only: if the line's `plan_no` exists there → `work_order_no = plan_no`
 (source_type "MPS", 미작성 생산계획). Exactly one of the two identifiers is set.
 
 Column derivations follow the caller's spec (see docs/api-spec.md §6):
-  - 워크센터: aps_item_routing_spec (item_id, routing_id) → workcenter → aps_workcenter.
+  - 워크센터: aps_item_routing_spec (item_id, routing_id, gsystem_routing_id) → workcenter → aps_workcenter.
   - 공정: aps_item_process_step (item_id, routing_id) → proc_sno → aps_item_routing_spec.
   - dates: raw aps_mps_plan.plan_start_date / plan_end_date / delivery_date.
   - risk (overload / material_short): aps_result.aps_daily_plan.status for the line
@@ -35,23 +35,36 @@ from app.models import (
 from app.schemas.work_plan import WorkPlanRow
 
 
-def _build_workcenter_index(db: Session) -> dict[tuple[int, int], tuple[Optional[str], Optional[str]]]:
-    """(item_id, routing_id) → (workcenter_no, workcenter_name).
+def _build_workcenter_index(
+    db: Session,
+) -> dict[tuple[int, int, Optional[int]], tuple[Optional[str], Optional[str]]]:
+    """(item_id, routing_id, gsystem_routing_id) → (workcenter_no, workcenter_name).
 
     From aps_item_routing_spec rows that carry a workcenter_id, joined to
-    aps_workcenter. Representative operation = lowest proc_sno.
+    aps_workcenter. The lookup keys are the fields shared by both mps and irs:
+    item_id + routing_id + gsystem_routing_id (the G-System routing id — equal on
+    both sides, so it cross-checks the routing). gsystem_id is NOT a join key (it
+    is each table's own record id, different id spaces) — it only breaks ties so
+    the representative pick is deterministic. Representative = lowest
+    (proc_sno, gsystem_id).
     """
     stmt = select(ItemRoutingSpec, WorkCenter).join(
         WorkCenter, ItemRoutingSpec.workcenter_id == WorkCenter.id
     )
-    grouped: dict[tuple[int, int], list] = defaultdict(list)
+    grouped: dict[tuple[int, int, Optional[int]], list] = defaultdict(list)
     for ir, wc in db.execute(stmt).all():
         if ir.item_id is not None and ir.routing_id is not None:
-            grouped[(ir.item_id, ir.routing_id)].append((ir, wc))
+            grouped[(ir.item_id, ir.routing_id, ir.gsystem_routing_id)].append((ir, wc))
 
-    index: dict[tuple[int, int], tuple[Optional[str], Optional[str]]] = {}
+    index: dict[tuple[int, int, Optional[int]], tuple[Optional[str], Optional[str]]] = {}
     for key, group in grouped.items():
-        _, wc = min(group, key=lambda t: t[0].proc_sno if t[0].proc_sno is not None else 0)
+        _, wc = min(
+            group,
+            key=lambda t: (
+                t[0].proc_sno if t[0].proc_sno is not None else 0,
+                t[0].gsystem_id if t[0].gsystem_id is not None else 0,
+            ),
+        )
         index[key] = (wc.workcenter_no, wc.workcenter_name)
     return index
 
@@ -166,8 +179,9 @@ def build_work_plan_list(
     rows: list[WorkPlanRow] = []
     for mps in db.execute(select(MpsPlan)).scalars().all():
         item = items_by_id.get(mps.item_id) if mps.item_id is not None else None
-        key = (mps.item_id, mps.routing_id)
-        wc = wc_index.get(key)  # (workcenter_no, workcenter_name) or None
+        key = (mps.item_id, mps.routing_id)  # 공정 index key
+        # 워크센터: match item_id + routing_id + gsystem_routing_id (routing cross-check).
+        wc = wc_index.get((mps.item_id, mps.routing_id, mps.gsystem_routing_id))
         has_wo = mps.plan_no in wo_plan_nos
         rows.append(
             WorkPlanRow(

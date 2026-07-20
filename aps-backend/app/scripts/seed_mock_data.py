@@ -411,7 +411,7 @@ def _seed_stock(session) -> int:
         if entry is None:
             entry = Stock(
                 id=r["id"],
-                item_id=r["item_id"],
+                gsystem_item_id=r["item_id"],  # column renamed item_id → gsystem_item_id (fb47e12)
                 stk_ym=r["stk_ym"],
                 wh_cd=r["wh_cd"],
                 stk_type="10",

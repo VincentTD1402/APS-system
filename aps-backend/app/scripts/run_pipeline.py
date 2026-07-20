@@ -66,6 +66,24 @@ def main(use_mock: bool = False, reset: bool = False) -> None:
         from app.scripts.seed_mock_data import seed
         seed(reset=reset)
         logger.info("   Mock data seeded (upsert — safe to re-run)")
+        # Work Plan List needs aps_mps_plan + aps_item_routing_spec (with workcenter_id),
+        # which seed_mock_data does not cover. Seed the self-consistent island so
+        # /work-plan/list resolves every column (워크센터/공정/risk) from mock data.
+        from app.scripts.seed_workplan_mock import seed as seed_workplan
+        seed_workplan()
+        logger.info("   Work Plan List mock island seeded (mps + item_routing_spec)")
+        # Compute derived risk so /work-plan/list shows overload/material_short —
+        # risk reads aps_daily_plan.status, which is empty until this runs. Mirrors
+        # POST /kpi-summary/daily-plan/rebuild.
+        from app.db.database import SessionLocal
+        from app.services.material_shortage import apply_daily_material_shortage, rebuild_material_shortage
+        from app.services.scheduling.daily_plan_builder import rebuild_daily_plan
+        with SessionLocal() as rebuild_session:
+            rebuild_daily_plan(rebuild_session)
+            apply_daily_material_shortage(rebuild_session)
+            rebuild_material_shortage(rebuild_session)
+            rebuild_session.commit()
+        logger.info("   Daily plan + material shortage rebuilt (risk ready)")
     else:
         logger.info("── Phase 01: Syncing from G-System API ───────────────────")
         from app.services.gsystem.sync_service import run_gsystem_sync
