@@ -54,7 +54,7 @@ class ShortageItemDetail(BaseModel):
 class KPI2ShortageResponse(BaseModel):
     """KPI 2 – Material Shortage response."""
     kpi_name: str = Field("material_shortage", description="KPI name")
-    kpi_value: float = Field(..., description="Total shortage quantity")
+    kpi_value: float = Field(..., description="Number of items with shortage (= items_with_shortage)")
     total_shortage_qty: float = Field(..., description="Total shortage quantity across all items")
     items_with_shortage: int = Field(..., description="Number of items with shortage")
     risk_triggered: bool = Field(..., description="Whether R2 risk is triggered (any shortage > 0)")
@@ -113,10 +113,15 @@ class WorkcenterLoadEntry(BaseModel):
 class KPI3LoadResponse(BaseModel):
     """KPI 3 – Workcenter Load response."""
     kpi_name: str = Field("workcenter_load", description="KPI name")
-    avg_load: float = Field(..., description="Average load percentage across all entries")
+    kpi_value: float = Field(
+        ..., description="% of workcenters with at least one overload/urgent day across the rebuilt schedule"
+    )
+    overloaded_wc_count: int = Field(..., description="Distinct workcenters with >=1 overload/urgent day")
+    total_wc_count: int = Field(..., description="Total workcenters (aps_workcenter master)")
+    avg_load: float = Field(..., description="Average load percentage across all (workcenter, day) slots")
     max_load: float = Field(..., description="Maximum load percentage")
     min_load: float = Field(..., description="Minimum load percentage")
-    risk_triggered: bool = Field(..., description="Whether R3 risk is triggered (any load > 100%)")
+    risk_triggered: bool = Field(..., description="Whether R3 risk is triggered (kpi_value > 0)")
     entries: List[WorkcenterLoadEntry] = Field(
         default_factory=list,
         description="List of workcenter load entries"
@@ -126,6 +131,20 @@ class KPI3LoadResponse(BaseModel):
         description="List of overloaded workcenter slots"
     )
 
+
+
+# ============================================================================
+# KPI 4 – Total Risk Count
+# ============================================================================
+
+class KPI4RiskCountResponse(BaseModel):
+    """KPI 4 – Total Risk Count response. kpi_value = r1 + r2 + r3 (예: FE "20건")."""
+    kpi_name: str = Field("total_risk_count", description="KPI name")
+    kpi_value: int = Field(..., description="Total risk count = r1_delayed_orders + r2_shortage_items + r3_overloaded_wc")
+    r1_delayed_orders: int = Field(..., description="KPI1 delayed order count")
+    r2_shortage_items: int = Field(..., description="KPI2 items-with-shortage count")
+    r3_overloaded_wc: int = Field(..., description="KPI3 overloaded-workcenter count")
+    risk_triggered: bool = Field(..., description="Whether kpi_value > 0")
 
 
 # ============================================================================
