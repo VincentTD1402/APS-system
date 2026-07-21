@@ -11,7 +11,9 @@ from app.api.v1.routes import (
     gsystem_sync,
     kpi_summary,
     llm,
+    master,
     # material_shortage,  # router disabled below, import commented to avoid unused-import lint
+    planning,
     purchase_requests,
 )
 
@@ -21,6 +23,8 @@ api_router.include_router(gsystem_sync.router, prefix="/gsystem", tags=["gsystem
 # Hidden from Swagger (not used by FE yet) — routes still active, just excluded from OpenAPI schema.
 api_router.include_router(llm.router, prefix="/llm", tags=["LLM"], include_in_schema=False)
 api_router.include_router(kpi_summary.router, prefix="/kpi-summary", tags=["kpi_summary"])
+api_router.include_router(master.router, prefix="/master", tags=["master"])
+api_router.include_router(planning.router, prefix="/planning", tags=["planning"])
 api_router.include_router(purchase_requests.router, prefix="/purchase-requests", tags=["purchase_requests"])
 # material_shortage router disabled — POST rebuild is redundant (already called inside
 # POST /kpi-summary/daily-plan/rebuild) and GET list is unused by FE. Code kept as-is.

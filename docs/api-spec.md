@@ -194,6 +194,40 @@ Nếu cần gọi độc lập qua HTTP (không qua daily-plan/rebuild), uncomme
 
 ---
 
+## 7. Master data — `/api/v1/master`
+
+Read-only master lists cho FE master views. Response **camelCase** (khớp FE type).
+
+### `GET /work-centers`
+→ `WorkCenter[]`: `{ code, nameKo, defaultRuntimeMin, totalRuntimeMin, equipments: [{ code, wcCode, nameKo, stRate }] }`
+`defaultRuntimeMin` = `std_capa`; `totalRuntimeMin` = `std_capa × số equipment`; `stRate` = `cycle_factor`.
+
+### `GET /items`
+→ `Item[]`: `{ code, nameKo, uom }` — `uom` mặc định `EA` (cột mới, G-System chưa sync).
+
+### `GET /routings`
+→ `Routing[]`: `{ id, itemCode, stepNo, wcCode, processNameKo, standardStMin }` — `standardStMin` = `work_time` (giây/đơn vị).
+
+### `GET /bom`
+→ `BomComponent[]`: `{ id, parentItemCode, childItemCode, qtyPer, scrapRate }` — `qtyPer` = `qty1/qty2`; `scrapRate` cột mới, mặc định 0.
+
+### `GET /inventory`
+→ `InventoryRow[]`: `{ id, itemCode, warehouseCode, onHand, asOfDate }` — `onHand` = `in_qty`; `asOfDate` = `stk_ym`(YYYYMM)+`-01`. `itemCode` null nếu stock orphan (gsystem_item_id không khớp item).
+
+---
+
+## 8. Planning — `/api/v1/planning`
+
+Response camelCase.
+
+### `GET /mps`
+→ `Mps[]`: `{ id, orderNo, itemCode, planQty, endDate, workStartDate, workEndDate, status }` — `endDate` = `delivery_date`; `status` map `status_cd`: `created→CONFIRMED`, `notCreated→DRAFT`.
+
+### `GET /work-orders`
+→ `WorkOrder[]`: `{ id, woNo, mpsId, itemCode, wcCode, planQty, planStartDate, planEndDate, status }` — `itemCode` fallback qua MPS khi `work_order.item_id` null; `planStartDate/EndDate` = min/max `daily_plan.work_date` của MPS (null nếu chưa RUN APS); `status` = PLANNED/SENT/CONFIRMED/FAILED.
+
+---
+
 ## Bảng tên (đổi tên 2026-07-16 — FE lưu ý nếu có mapping cứng theo tên bảng)
 
 | Tên cũ | Tên mới |

@@ -97,10 +97,28 @@ Trước đây KPI2 (`plan_shortage`) và KPI3 (`plan_utilization`/`workcenter_l
 
 `GET /kpi-summary/risk-count` — khớp card FE "계획 수립 예상 리스크" (kiểu "20건"). `kpi_value` = `KPI1.delayed_orders + KPI2.items_with_shortage + KPI3.overloaded_wc_count` — chỉ gọi lại 3 KPI đã có, không query thêm. Response: `{kpi_name, kpi_value, r1_delayed_orders, r2_shortage_items, r3_overloaded_wc, risk_triggered}`. Cần gọi `POST /kpi-summary/daily-plan/rebuild` trước để KPI2/KPI3 (và do đó KPI4) có dữ liệu mới.
 
+## Master / Planning endpoints (mới 2026-07-21)
+
+Thêm 7 GET read-only nối FE master/planning views (Tier 1, gap-matrix No 1–7). Response **camelCase**. Chi tiết schema xem `api-spec.md` mục 7–8.
+
+| Method | Path | FE view | Trạng thái FE |
+|---|---|---|---|
+| GET | `/master/work-centers` | Master > Work Centers | Sẵn sàng map |
+| GET | `/master/items` | Master > Items | Sẵn sàng map |
+| GET | `/master/routings` | scheduler / WorkPlan | Sẵn sàng map |
+| GET | `/master/bom` | Master > BOM | Sẵn sàng map |
+| GET | `/master/inventory` | Master > Inventory | Sẵn sàng map |
+| GET | `/planning/mps` | MPS > List | Sẵn sàng map |
+| GET | `/planning/work-orders` | scheduler (FROM_WORK_ORDER) | Sẵn sàng map |
+
+Migration `a1b2c3d4e5f6`: thêm `aps_item.uom` (default `EA`), `aps_bom.scrap_rate` (default 0).
+
 ## Gợi ý mapping cho FE (theo mock hiện có → API thay thế)
 
 | Mock hiện tại (`aps-frontend/src`) | API thay thế đề xuất |
 |---|---|
+| `mocks/master-data.ts` (work centers, items, routings, bom, inventory) | `GET /master/work-centers`, `/items`, `/routings`, `/bom`, `/inventory` |
+| `mocks/mps-data.ts` (MPS + work orders) | `GET /planning/mps`, `/planning/work-orders` |
 | `mock-scheduler.ts` (chạy scheduler giả lập) | `POST /gsystem/run` (sync data) + `POST /kpi-summary/daily-plan/rebuild` (tính lại plan) + `POST /material-shortage/rebuild` (tính lại shortage) |
 | KPI cards (delivery/shortage/load/risk) | `GET /kpi-summary/delivery`, `/shortage`, `/load`, `/risk-count` (không cần `scenario_id` nữa) |
 | Bảng tô màu workcenter theo ngày | `GET /kpi-summary/daily-plan/workcenter-status` |
