@@ -3,15 +3,29 @@ import { useI18n } from 'vue-i18n'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import { MOCK_MPS } from '@/mocks/mps-data'
+import { ref, onMounted } from 'vue'
+import type { Mps } from '@/types/planning'
+import { fetchMps } from '@/api/planning'
 
 const { t } = useI18n()
+
+const rows = ref<Mps[]>([])
+const loading = ref(false)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    rows.value = await fetchMps()
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
   <div class="page">
     <h2>{{ t('mps.list') }}</h2>
-    <DataTable :value="MOCK_MPS" data-key="id" size="small" striped-rows>
+    <DataTable :value="rows" data-key="id" size="small" striped-rows :loading="loading">
       <Column :header="t('mps.orderNo')" field="orderNo" class="mono" />
       <Column :header="t('master.item.code')" field="itemCode" class="mono" />
       <Column :header="t('workPlanList.col.planQty')">

@@ -1,21 +1,32 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
+import { useMasterStore } from '@/stores/master-store'
 import Button from 'primevue/button'
 import MultiSelect from 'primevue/multiselect'
-import { MOCK_WORK_CENTERS, MOCK_ITEMS } from '@/mocks/master-data'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import type { RiskType } from '@/types/enums'
 
 const { t, locale } = useI18n()
 const store = useApsStore()
+const master = useMasterStore()
 
+onMounted(() => master.ensureLoaded())
+
+// nameVi có thể null (BE không trả) → fallback về nameKo cho UI.
 const wcOptions = computed(() =>
-  MOCK_WORK_CENTERS.map((w) => ({ label: locale.value === 'ko' ? w.nameKo : w.nameVi, value: w.code }))
+  master.workCenters.map((w) => ({
+    label: locale.value === 'ko' ? w.nameKo : w.nameVi || w.nameKo,
+    value: w.code,
+  }))
 )
 const itemOptions = computed(() =>
-  MOCK_ITEMS.filter((i) => !i.code.startsWith('자재'))
-    .map((i) => ({ label: locale.value === 'ko' ? i.nameKo : i.nameVi, value: i.code }))
+  master.items
+    .filter((i) => !i.code.startsWith('자재'))
+    .map((i) => ({
+      label: locale.value === 'ko' ? i.nameKo : i.nameVi || i.nameKo,
+      value: i.code,
+    }))
 )
 const riskOptions = computed<Array<{ label: string; value: RiskType }>>(() => [
   { label: t('risk.normal'), value: 'NORMAL' },

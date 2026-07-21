@@ -3,7 +3,8 @@ import { ref, computed } from 'vue'
 import type { WorkPlan, LoadCell } from '@/types/planning'
 import type { KpiSnapshot } from '@/types/aps'
 import type { RiskType } from '@/types/enums'
-import { mockServer } from '@/api/mock-server'
+import * as apsApi from '@/api/aps'
+import * as erpApi from '@/api/erp'
 
 export interface ApsFilter {
   wcCodes: string[]
@@ -32,7 +33,7 @@ export const useApsStore = defineStore('aps', () => {
   async function runAps(): Promise<void> {
     isRunning.value = true
     try {
-      const result = await mockServer.runAps()
+      const result = await apsApi.runAps()
       runId.value = result.run.id
       workPlans.value = result.workPlans
       loadCells.value = result.loadCells
@@ -58,7 +59,8 @@ export const useApsStore = defineStore('aps', () => {
   async function applyAdjustments(): Promise<void> {
     if (pendingAdjustments.value.size === 0) return
     const drafts = Array.from(pendingAdjustments.value.values())
-    const result = await mockServer.applyPending(drafts)
+    const result = await apsApi.adjustAps(runId.value, drafts)
+    runId.value = result.run.id
     workPlans.value = result.workPlans
     loadCells.value = result.loadCells
     kpi.value = result.kpi
@@ -66,11 +68,11 @@ export const useApsStore = defineStore('aps', () => {
   }
 
   async function requestPurchase(planId: string, qty: number, note: string): Promise<void> {
-    await mockServer.createPurchaseRequest(planId, qty, note)
+    await erpApi.createPurchaseRequest(planId, qty, note)
   }
 
   async function dispatchWorkOrder(planId: string): Promise<void> {
-    await mockServer.createWorkOrder(planId)
+    await erpApi.createWorkOrder(planId)
   }
 
   const selectedPlan = computed(() => workPlans.value.find((p) => p.id === selectedPlanId.value) ?? null)
