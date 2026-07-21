@@ -194,6 +194,39 @@ Nếu cần gọi độc lập qua HTTP (không qua daily-plan/rebuild), uncomme
 
 ---
 
+## 7. Work Plan List — `/api/v1/work-plan`
+
+작업계획 리스트 (P6). Drive từ `aps_input.work_order`; bù field từ `aps_mps_plan`. Quy tắc lấy dữ liệu chi tiết: `docs/workplan.md`.
+
+### `GET /list`
+Query (tất cả optional): `workcenter_no?`, `item_no?`, `risk_type?` (vd `overload` / `material_short`), `plan_no?` (match `tmp_plan_no`/`work_order_no`/`order_no`), `date_from?`, `date_to?` (YYYY-MM-DD, lọc overlap theo `plan_start`/`plan_end`).
+
+**Load Grid drill-down** (부하내역 → list): `work_date` (1 ngày YYYY-MM-DD) + `workcenter_no` = ô Load Grid. Khi có `work_date`: chỉ giữ dòng có plan tải ô đó trong `aps_daily_plan` (`mps_plan_id` ∈ `aps_daily_plan WHERE work_date=D [AND workcenter_id = id(workcenter_no)]`). Lúc này `workcenter_no` là WC của ô (không phải WC đại diện của dòng). `work_date` một mình → mọi WC ngày đó; `workcenter_no` không tồn tại → rỗng. Bỏ `work_date` → filter như cũ.
+
+Phân trang: `limit` (default 50, 1..500) + `offset` (default 0), áp **sau** filter + sort. Tổng số dòng trước khi cắt trả ở header **`X-Total-Count`** (đã expose qua CORS). FE dùng `X-Total-Count` + `limit` để dựng page control.
+
+→ `WorkPlanRow[]` (tối đa `limit` dòng), sort risk-first (nhiều risk trước), rồi `delivery_date` sớm nhất.
+
+Base tables: `aps_input.work_order` + `aps_input.aps_mps_plan`. Phân loại mỗi `work_order`:
+- **`source_type="WO"`** (작업지시, chính thức): `work_order_no IS NOT NULL AND status='CONFIRMED' AND sync_status='SUCCESS' AND temp_id IS NULL`.
+- **`source_type="MPS"`** (작업계획, tạm): `work_order_no IS NULL AND status='PLANNED'`.
+- Row khác (SENT/FAILED/…) bị bỏ qua.
+
+`WorkPlanRow`: `{ source_type, work_order_no, tmp_plan_no, order_no, item_no, item_name, workcenter_no, workcenter_name, proc_name, planned_qty, plan_start, plan_end, delivery_date, risk_types[] }`. `risk_types` ⊆ `{overload, material_short}`, rỗng → `["normal"]`.
+
+Nguồn dữ liệu từng cột (theo spec chuẩn P6; field nào không có data → `null`):
+- `작업지시번호` = `work_order.work_order_no`; `(임시)작업계획번호` = `aps_mps_plan.plan_no`.
+- `품목`: `work_order.item_id` → `aps_item` (tên + mã), WO fallback `response_json.itemNo` → `aps_item`.
+- `워크센터`: WO lấy `work_order.workcenter_id` → `aps_workcenter`. MPS ưu tiên `work_order.workcenter_id`, NULL (luôn vậy với PLANNED) thì fallback `(item_id, routing_id)` → `aps_item_routing_spec` → workcenter (routing chưa gán workcenter nên MPS hiện trả `null`).
+- `공정`: WO = `response_json.procNm` (tên công đoạn của lệnh); MPS = bước đại diện (`proc_sno` nhỏ nhất) theo `item_id` trong `aps_item_routing_spec` (không scope routing vì link routing mps↔irs không đáng tin).
+- `계획수량`: WO = `work_order.qty`; MPS = `aps_mps_plan.plan_qty`.
+- `계획시작`: WO = `work_order.work_date` (작업시작일자 — ngày làm thật của lệnh), fallback Backward. MPS = `시작일자` tính **Backward** = `min(aps_daily_plan.work_date)` (không có work order → luôn Backward; cần `POST /kpi-summary/daily-plan/rebuild` trước, plan không có daily_plan → `null`).
+- `계획완료`: WO = `response_json.endDate` (작업종료일자 — ngày kết thúc của lệnh), fallback `plan_end_date`. MPS = `max(aps_daily_plan.work_date)` (đuôi window backward — trùng `plan_end_date`, hoặc = hôm nay nếu quá hạn), fallback `plan_end_date`.
+- `납기일자` = `aps_mps_plan.delivery_date`.
+- `risk_types`: gộp theo `mps_plan_id` trên `aps_daily_plan.status` — `overload` nếu có ngày nào `overload`/`urgent`, `material_short` nếu có ngày nào `material-shortage`/`urgent`, else `["normal"]`. Cần `POST /kpi-summary/daily-plan/rebuild` trước. (Key ngày chính xác của workplan.md §5 không khớp ngày backward-fill nên hiện thực bằng gộp theo plan.)
+
+---
+
 ## Bảng tên (đổi tên 2026-07-16 — FE lưu ý nếu có mapping cứng theo tên bảng)
 
 | Tên cũ | Tên mới |

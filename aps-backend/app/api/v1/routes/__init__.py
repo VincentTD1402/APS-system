@@ -13,6 +13,7 @@ from app.api.v1.routes import (
     llm,
     # material_shortage,  # router disabled below, import commented to avoid unused-import lint
     purchase_requests,
+    work_plan,
 )
 
 api_router = APIRouter()
@@ -22,6 +23,7 @@ api_router.include_router(gsystem_sync.router, prefix="/gsystem", tags=["gsystem
 api_router.include_router(llm.router, prefix="/llm", tags=["LLM"], include_in_schema=False)
 api_router.include_router(kpi_summary.router, prefix="/kpi-summary", tags=["kpi_summary"])
 api_router.include_router(purchase_requests.router, prefix="/purchase-requests", tags=["purchase_requests"])
+api_router.include_router(work_plan.router, prefix="/work-plan", tags=["work_plan"])
 # material_shortage router disabled — POST rebuild is redundant (already called inside
 # POST /kpi-summary/daily-plan/rebuild) and GET list is unused by FE. Code kept as-is.
 # api_router.include_router(material_shortage.router, prefix="/material-shortage", tags=["material_shortage"])
