@@ -242,8 +242,16 @@ def build_work_plan_list(
     plan_no: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
+    work_date: Optional[date] = None,
 ) -> list[WorkPlanRow]:
-    """Build the Work Plan List — one row per confirmed/planned aps_input.work_order."""
+    """Build the Work Plan List — one row per confirmed/planned aps_input.work_order.
+
+    Load Grid drill-down: when `work_date` is given, keep only rows whose plan loads the
+    aps_daily_plan cell — i.e. wo.mps_plan_id has a daily_plan row on `work_date` (and, if
+    `workcenter_no` is given, at that workcenter). In this mode `workcenter_no` names the
+    cell's workcenter (resolved to workcenter_id via aps_daily_plan), NOT the row's
+    representative workcenter, so the representative `workcenter_no` filter is skipped.
+    """
     items_by_id = {it.id: it for it in db.execute(select(Item)).scalars().all()}
     items_by_no = {it.item_no: it for it in items_by_id.values() if it.item_no is not None}
     wc_by_id = {wc.id: wc for wc in db.execute(select(WorkCenter)).scalars().all()}
@@ -253,8 +261,24 @@ def build_work_plan_list(
     overload_ids, short_ids = _build_risk_sets(db)
     backward = _build_backward_window_index(db)
 
+    # Load Grid cell drill-down: mps_plan_ids that load (work_date [, workcenter]) in
+    # aps_daily_plan. None → no drill-down (all rows pass this stage).
+    cell_mps_ids: Optional[set[int]] = None
+    if work_date is not None:
+        cell_stmt = select(DailyPlan.mps_plan_id).where(DailyPlan.work_date == work_date)
+        if workcenter_no is not None:
+            wc_id = next((wc.id for wc in wc_by_id.values() if wc.workcenter_no == workcenter_no), None)
+            if wc_id is None:
+                cell_mps_ids = set()  # unknown workcenter_no → empty cell
+            else:
+                cell_stmt = cell_stmt.where(DailyPlan.workcenter_id == wc_id)
+        if cell_mps_ids is None:
+            cell_mps_ids = {mid for (mid,) in db.execute(cell_stmt).all()}
+
     rows: list[WorkPlanRow] = []
     for wo in db.execute(select(WorkOrder)).scalars().all():
+        if cell_mps_ids is not None and wo.mps_plan_id not in cell_mps_ids:
+            continue  # not part of the selected Load Grid cell
         mps = mps_by_id.get(wo.mps_plan_id) if wo.mps_plan_id is not None else None
 
         if _is_confirmed(wo):
@@ -329,12 +353,15 @@ def build_work_plan_list(
             )
         # else: SENT / FAILED / partial rows are not part of the work plan list.
 
+    # In cell drill-down, workcenter_no already selected the cell (via aps_daily_plan),
+    # so don't also apply it as the row's representative-workcenter filter.
+    effective_wc_no = None if work_date is not None else workcenter_no
     filtered = [
         r
         for r in rows
         if _row_matches_filters(
             r,
-            workcenter_no=workcenter_no,
+            workcenter_no=effective_wc_no,
             item_no=item_no,
             risk_type=risk_type,
             plan_no=plan_no,

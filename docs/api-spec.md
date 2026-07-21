@@ -201,6 +201,8 @@ Nếu cần gọi độc lập qua HTTP (không qua daily-plan/rebuild), uncomme
 ### `GET /list`
 Query (tất cả optional): `workcenter_no?`, `item_no?`, `risk_type?` (vd `overload` / `material_short`), `plan_no?` (match `tmp_plan_no`/`work_order_no`/`order_no`), `date_from?`, `date_to?` (YYYY-MM-DD, lọc overlap theo `plan_start`/`plan_end`).
 
+**Load Grid drill-down** (부하내역 → list): `work_date` (1 ngày YYYY-MM-DD) + `workcenter_no` = ô Load Grid. Khi có `work_date`: chỉ giữ dòng có plan tải ô đó trong `aps_daily_plan` (`mps_plan_id` ∈ `aps_daily_plan WHERE work_date=D [AND workcenter_id = id(workcenter_no)]`). Lúc này `workcenter_no` là WC của ô (không phải WC đại diện của dòng). `work_date` một mình → mọi WC ngày đó; `workcenter_no` không tồn tại → rỗng. Bỏ `work_date` → filter như cũ.
+
 Phân trang: `limit` (default 50, 1..500) + `offset` (default 0), áp **sau** filter + sort. Tổng số dòng trước khi cắt trả ở header **`X-Total-Count`** (đã expose qua CORS). FE dùng `X-Total-Count` + `limit` để dựng page control.
 
 → `WorkPlanRow[]` (tối đa `limit` dòng), sort risk-first (nhiều risk trước), rồi `delivery_date` sớm nhất.
