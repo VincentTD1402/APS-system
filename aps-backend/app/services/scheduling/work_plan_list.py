@@ -21,11 +21,11 @@ sourcing follows the standard spec P6 (docs/workplan.md):
   - 품목 = work_order.item_id → aps_item (name + code); WO falls back to response
     itemNo → aps_item. Any column/join with no data → null (do not fabricate).
 
-Deviations forced by the actual data (verified):
-  1. 공정: the /pd/workorder payload has no ``procNm`` — only procId/routingId.
-     proc_name is resolved from aps_item_routing_spec (by procId for WO rows; by the
-     item's representative lowest-proc_sno step, keyed on item_id alone, for MPS rows —
-     the mps<->routing link is unreliable so routing is not part of the key).
+Notes / deviations (verified against data):
+  1. 공정: WO uses response_json.procNm (the order's own process name, present on all
+     confirmed rows). MPS has no such field → proc_name is the item's representative
+     lowest-proc_sno step from aps_item_routing_spec, keyed on item_id alone (the
+     mps<->routing link is unreliable, so routing is not part of the key).
   2. 워크센터 for MPS rows: PLANNED work_order rows have workcenter_id NULL, so the
      workcenter is derived from aps_item_routing_spec via (item_id, routing_id).
   3. Risk status literal is 'material-shortage' (the aps_daily_plan CHECK value),
@@ -146,19 +146,6 @@ def _build_proc_by_item(db: Session) -> dict[int, str]:
     return index
 
 
-def _build_proc_by_gsystem_id(db: Session) -> dict[tuple[int, int], str]:
-    """(item_id, gsystem_proc_id) → proc_name — exact process for a confirmed row.
-
-    Confirmed work orders carry response_json.procId (the G-System process id);
-    match it against aps_item_routing_spec.gsystem_proc_id for that item.
-    """
-    index: dict[tuple[int, int], str] = {}
-    for irs in db.execute(select(ItemRoutingSpec)).scalars().all():
-        if irs.item_id is not None and irs.gsystem_proc_id is not None and irs.proc_name is not None:
-            index[(irs.item_id, irs.gsystem_proc_id)] = irs.proc_name
-    return index
-
-
 def _build_risk_sets(db: Session) -> tuple[set[int], set[int]]:
     """(overload_mps_ids, material_short_mps_ids) from aps_daily_plan.status.
 
@@ -263,7 +250,6 @@ def build_work_plan_list(
     mps_by_id = {mps.id: mps for mps in db.execute(select(MpsPlan)).scalars().all()}
     wc_repr_index = _build_wc_representative_index(db)
     proc_by_item = _build_proc_by_item(db)
-    proc_by_gsys = _build_proc_by_gsystem_id(db)
     overload_ids, short_ids = _build_risk_sets(db)
     backward = _build_backward_window_index(db)
 
@@ -278,12 +264,6 @@ def build_work_plan_list(
             if item is None and resp.get("itemNo"):
                 item = items_by_no.get(resp["itemNo"])
             wc = wc_by_id.get(wo.workcenter_id) if wo.workcenter_id is not None else None
-            proc_id = resp.get("procId")
-            proc_name = (
-                proc_by_gsys.get((wo.item_id, int(proc_id)))
-                if wo.item_id is not None and proc_id is not None
-                else None
-            )
             # 계획시작 (P6, 미완료 작업지시): 작업시작일자 = the work order's own scheduled
             # work date (work_order.work_date = response_json.workDate); else Backward-computed.
             wo_window = backward.get(wo.mps_plan_id) if wo.mps_plan_id is not None else None
@@ -303,7 +283,7 @@ def build_work_plan_list(
                     item_name=item.item_name if item else None,  # 품목 명 (P6 = tên Item)
                     workcenter_no=wc.workcenter_no if wc else None,
                     workcenter_name=wc.workcenter_name if wc else None,
-                    proc_name=proc_name,  # 공정 (derived — payload has no procNm)
+                    proc_name=resp.get("procNm"),  # 공정 (work order's own process name)
                     planned_qty=(  # 계획수량: work_order.qty (base table)
                         float(wo.qty) if wo.qty is not None
                         else (float(resp["planQty"]) if resp.get("planQty") is not None else None)

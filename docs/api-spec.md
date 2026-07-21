@@ -216,7 +216,7 @@ Nguồn dữ liệu từng cột (theo spec chuẩn P6; field nào không có da
 - `작업지시번호` = `work_order.work_order_no`; `(임시)작업계획번호` = `aps_mps_plan.plan_no`.
 - `품목`: `work_order.item_id` → `aps_item` (tên + mã), WO fallback `response_json.itemNo` → `aps_item`.
 - `워크센터`: WO lấy `work_order.workcenter_id` → `aps_workcenter`. MPS ưu tiên `work_order.workcenter_id`, NULL (luôn vậy với PLANNED) thì fallback `(item_id, routing_id)` → `aps_item_routing_spec` → workcenter (routing chưa gán workcenter nên MPS hiện trả `null`).
-- `공정`: `aps_item_routing_spec` — WO: match `response_json.procId`; MPS: bước đại diện (`proc_sno` nhỏ nhất) theo `item_id` (không scope routing vì link routing mps↔irs không đáng tin).
+- `공정`: WO = `response_json.procNm` (tên công đoạn của lệnh); MPS = bước đại diện (`proc_sno` nhỏ nhất) theo `item_id` trong `aps_item_routing_spec` (không scope routing vì link routing mps↔irs không đáng tin).
 - `계획수량`: WO = `work_order.qty`; MPS = `aps_mps_plan.plan_qty`.
 - `계획시작`: WO = `work_order.work_date` (작업시작일자 — ngày làm thật của lệnh), fallback Backward. MPS = `시작일자` tính **Backward** = `min(aps_daily_plan.work_date)` (không có work order → luôn Backward; cần `POST /kpi-summary/daily-plan/rebuild` trước, plan không có daily_plan → `null`).
 - `계획완료`: WO = `response_json.endDate` (작업종료일자 — ngày kết thúc của lệnh), fallback `plan_end_date`. MPS = `max(aps_daily_plan.work_date)` (đuôi window backward — trùng `plan_end_date`, hoặc = hôm nay nếu quá hạn), fallback `plan_end_date`.
