@@ -27,6 +27,24 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+# FE's ErpOutboxStatus = 'PENDING' | 'PUSHED' | 'FAILED' — map the underlying
+# domain-specific status columns onto it rather than exposing them raw.
+def _purchase_request_outbox_status(row: PurchaseRequest) -> str:
+    if row.sync_status == "SUCCESS":
+        return "PUSHED"
+    if row.sync_status in ("FAILED", "ERROR"):
+        return "FAILED"
+    return "PENDING"
+
+
+def _work_order_outbox_status(row: WorkOrder) -> str:
+    if row.status == "CONFIRMED":
+        return "PUSHED"
+    if row.status == "FAILED":
+        return "FAILED"
+    return "PENDING"  # PLANNED | SENT
+
+
 def _resolve_mps_plan(db: Session, plan_id: str) -> tuple[MpsPlan, ItemRoutingSpec]:
     try:
         mps_plan_id, item_routing_id = decode_plan_id(plan_id)
@@ -68,9 +86,10 @@ def create_purchase_request(body: PurchaseRequestCreateIn, db: Session = Depends
     db.refresh(row)
 
     return ErpOutboxRow(
-        id=row.id, run_id=None, action="CREATE_PURCHASE_REQUEST",
+        id=str(row.id), run_id=None, action="CREATE_PURCHASE_REQUEST",
         payload={"planId": body.plan_id, "qty": body.qty, "note": body.note},
-        status=row.status, created_at=row.created_at, pushed_at=None, error=None,
+        status=_purchase_request_outbox_status(row), created_at=row.created_at,
+        pushed_at=row.sent_at, error=None,
     )
 
 
@@ -111,6 +130,7 @@ def create_work_order(body: WorkOrderDispatchIn, db: Session = Depends(get_db)) 
     db.refresh(wo)
 
     return ErpOutboxRow(
-        id=wo.id, run_id=None, action="CREATE_WORK_ORDER", payload=payload,
-        status=wo.status, created_at=wo.created_at, pushed_at=wo.sent_at, error=None,
+        id=str(wo.id), run_id=None, action="CREATE_WORK_ORDER", payload=payload,
+        status=_work_order_outbox_status(wo), created_at=wo.created_at,
+        pushed_at=wo.sent_at, error=None,
     )

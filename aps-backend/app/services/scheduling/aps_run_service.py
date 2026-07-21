@@ -68,7 +68,7 @@ class WorkPlan:
     run_id: str
     source_type: str
     work_order_no: str | None
-    tmp_plan_no: str | None
+    tmp_plan_no: str
     order_no: str | None
     item_code: str
     item_name_ko: str
@@ -291,7 +291,10 @@ def assemble(session: Session, started_at: datetime | None = None) -> AssembledR
             run_id=run_id,
             source_type="FROM_WORK_ORDER" if wo is not None else "FROM_MPS",
             work_order_no=wo.work_order_no if wo is not None else None,
-            tmp_plan_no=wo.temp_id if wo is not None else None,
+            # FE's tmpPlanNo is a non-null per-plan correlation string (never absent in the
+            # mock it replaces) — fall back to this WorkPlan's own id when no WorkOrder is
+            # linked yet (FROM_MPS), instead of leaving it null.
+            tmp_plan_no=(wo.temp_id if wo is not None and wo.temp_id else None) or encode_plan_id(mps_plan_id, item_routing_id),
             order_no=(wo.work_order_no if wo is not None else None) or mps.plan_no,
             item_code=item.item_no if item is not None else "",
             item_name_ko=(item.item_name if item is not None and item.item_name else (item.item_no if item is not None else "")),
@@ -300,7 +303,9 @@ def assemble(session: Session, started_at: datetime | None = None) -> AssembledR
             plan_qty=sum(e.qty for e in daily_entries),
             plan_start_date=work_dates[0],
             plan_end_date=work_dates[-1],
-            delivery_date=mps.delivery_date,
+            # FE's deliveryDate is non-null — best-effort fallback chain; can still end up
+            # None if the MPS line genuinely has neither (real data gap, not a code bug).
+            delivery_date=mps.delivery_date or mps.plan_end_date or work_dates[-1],
             risk_type=risk_type,
             shortage_qty=round(shortage_qty, 4),
             adjusted=any_adjusted,

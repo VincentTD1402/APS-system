@@ -19,7 +19,12 @@ from app.schemas.aps import (
     LoadCellOut,
     WorkPlanOut,
 )
-from app.services.scheduling.aps_run_service import AssembledResult, adjust_work_plans, run_full_pipeline
+from app.services.scheduling.aps_run_service import (
+    AssembledResult,
+    PlanIdError,
+    adjust_work_plans,
+    run_full_pipeline,
+)
 
 logger = get_logger(__name__)
 
@@ -92,6 +97,9 @@ def adjust_aps(request: ApsAdjustRequest, db: Session = Depends(get_db)) -> ApsR
     try:
         result = adjust_work_plans(db, adjustments)
         db.commit()
+    except PlanIdError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         db.rollback()
         logger.exception("POST /aps/adjust failed")

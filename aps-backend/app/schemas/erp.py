@@ -21,10 +21,16 @@ class WorkOrderDispatchIn(CamelModel):
 
 
 class ErpOutboxRow(CamelModel):
-    id: int
+    # FE's ErpOutboxRow.id is `string` (aps-frontend/src/types/planning.ts) — the
+    # underlying PK is an int (PurchaseRequest.id / WorkOrder.id); stringify at the
+    # route boundary, not here, so callers can't accidentally pass an int through.
+    id: str
     run_id: str | None = None
     action: str
     payload: dict[str, Any]
+    # FE's ErpOutboxStatus = 'PENDING' | 'PUSHED' | 'FAILED' — routes must map the
+    # underlying PurchaseRequest.status ("PENDING"/"APPLIED") / WorkOrder.status
+    # ("PLANNED"/"SENT"/"CONFIRMED"/"FAILED") onto this before constructing the row.
     status: str
     created_at: datetime
     pushed_at: datetime | None = None

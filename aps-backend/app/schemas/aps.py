@@ -36,7 +36,7 @@ class WorkPlanOut(CamelModel):
     run_id: str
     source_type: str
     work_order_no: str | None = None
-    tmp_plan_no: str | None = None
+    tmp_plan_no: str
     order_no: str | None = None
     item_code: str
     item_name_ko: str
@@ -45,7 +45,7 @@ class WorkPlanOut(CamelModel):
     plan_qty: float
     plan_start_date: date
     plan_end_date: date
-    delivery_date: date | None = None
+    delivery_date: date
     risk_type: str
     shortage_qty: float
     adjusted: bool
