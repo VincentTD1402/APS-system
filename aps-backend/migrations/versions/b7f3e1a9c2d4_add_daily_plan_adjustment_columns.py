@@ -1,7 +1,7 @@
 """add daily_plan adjustment columns
 
-Revision ID: a1b2c3d4e5f6
-Revises: f9c3a7b1d2e6
+Revision ID: b7f3e1a9c2d4
+Revises: b2c3d4e5f6a7
 Create Date: 2026-07-21 00:00:00
 
 POST /aps/adjust needs to persist manual drag/drop overrides on aps_daily_plan
@@ -13,8 +13,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "a1b2c3d4e5f6"
-down_revision: Union[str, Sequence[str], None] = "f9c3a7b1d2e6"
+revision: str = "b7f3e1a9c2d4"
+down_revision: Union[str, Sequence[str], None] = "b2c3d4e5f6a7"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

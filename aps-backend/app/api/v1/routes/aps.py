@@ -1,7 +1,10 @@
 """POST /aps/run and POST /aps/adjust — the scheduling core (fe-be-gap-matrix rows 8-9).
 
-Both are synchronous compute-and-return, matching POST /kpi-summary/daily-plan/rebuild's
-pattern rather than the async job+poll pattern used by /gsystem/run.
+/aps/run rebuilds aps_daily_plan/aps_material_shortage (same sequence as
+POST /kpi-summary/daily-plan/rebuild) before assembling, so the FE always
+gets a fresh WorkPlan/LoadCell/KPI result without a separate rebuild call.
+/aps/adjust only re-backward-fills the named plans on top of current state —
+it does not re-run the full rebuild.
 """
 from __future__ import annotations
 
@@ -38,7 +41,7 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
             WorkPlanOut(
                 id=wp.id, run_id=wp.run_id, source_type=wp.source_type, work_order_no=wp.work_order_no,
                 tmp_plan_no=wp.tmp_plan_no, order_no=wp.order_no, item_code=wp.item_code,
-                item_name_ko=wp.item_name_ko, wc_code=wp.wc_code, process_name_ko=wp.process_name_ko,
+                item_name_ko=wp.item_name_ko, wc_code=wp.wc_code, wc_name=wp.wc_name, process_name_ko=wp.process_name_ko,
                 plan_qty=wp.plan_qty, plan_start_date=wp.plan_start_date, plan_end_date=wp.plan_end_date,
                 delivery_date=wp.delivery_date, risk_type=wp.risk_type, shortage_qty=wp.shortage_qty,
                 adjusted=wp.adjusted, original_start=wp.original_start, original_end=wp.original_end,
@@ -48,7 +51,7 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
         ],
         load_cells=[
             LoadCellOut(
-                wc_code=lc.wc_code, cell_date=lc.cell_date, minutes_loaded=lc.minutes_loaded,
+                wc_code=lc.wc_code, wc_name=lc.wc_name, cell_date=lc.cell_date, minutes_loaded=lc.minutes_loaded,
                 minutes_capacity=lc.minutes_capacity, status=lc.status,
             )
             for lc in result.load_cells

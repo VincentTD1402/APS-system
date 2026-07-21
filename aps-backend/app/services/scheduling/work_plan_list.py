@@ -27,7 +27,8 @@ Notes / deviations (verified against data):
      lowest-proc_sno step from aps_item_routing_spec, keyed on item_id alone (the
      mps<->routing link is unreliable, so routing is not part of the key).
   2. 워크센터 for MPS rows: PLANNED work_order rows have workcenter_id NULL, so the
-     workcenter is derived from aps_item_routing_spec via (item_id, routing_id).
+     workcenter is derived from aps_item_routing_spec via item_id (routing_id is
+     too sparse to key on — see _build_wc_representative_index).
   3. Risk status literal is 'material-shortage' (the aps_daily_plan CHECK value),
      not workplan.md's 'lack_material'. Exposed to the API as 'material_short'.
 
@@ -56,7 +57,7 @@ from app.models import (
     WorkCenter,
     WorkOrder,
 )
-from app.schemas.work_plan import WorkPlanDailyRow, WorkPlanRow
+from app.schemas.work_plan import WorkPlanDailyEntry, WorkPlanRow
 
 
 def _parse_iso_date(value: object) -> Optional[date]:
@@ -86,29 +87,27 @@ def _is_planned(wo: WorkOrder) -> bool:
 
 def _build_wc_representative_index(
     db: Session,
-) -> dict[tuple[int, int], tuple[int, Optional[str], Optional[str]]]:
-    """(item_id, routing_id) → (workcenter_id, workcenter_no, workcenter_name).
+) -> dict[int, tuple[int, Optional[str], Optional[str]]]:
+    """item_id → (workcenter_id, workcenter_no, workcenter_name).
 
-    Representative workcenter for an item's routing, from aps_item_routing_spec
-    rows carrying a workcenter, joined to aps_workcenter. Representative = lowest
-    (proc_sno, gsystem_id). Keyed on (item_id, routing_id) because
-    aps_item_routing_spec is item-specific — routing_id alone could belong to
-    another item. Used for PLANNED rows, whose work_order.workcenter_id is NULL.
-
-    Note: on current data this index is effectively empty for workcenter purposes —
-    the item_routing_spec rows that carry a workcenter have no routing_id, so a
-    routing-based match resolves nothing until routing steps get a workcenter
-    assigned upstream. Intended (business-correct) behaviour: show null until then.
+    Representative workcenter for an item, from aps_item_routing_spec rows
+    carrying a workcenter, joined to aps_workcenter. Representative = lowest
+    (proc_sno, gsystem_id). Keyed on item_id ALONE — same rationale as
+    _build_proc_by_item: routing_id is sparse (verified 0/16 aps_item_routing_spec
+    rows carry both routing_id and workcenter_id), so a (item_id, routing_id) key
+    never matches and leaves every PLANNED row's workcenter_no null, dropping it
+    out of any workcenter-scoped filter/click (work_order.workcenter_id is NULL
+    for PLANNED stubs, so this index is their only source of workcenter).
     """
     stmt = select(ItemRoutingSpec, WorkCenter).join(
         WorkCenter, ItemRoutingSpec.workcenter_id == WorkCenter.id
     )
-    grouped: dict[tuple[int, int], list] = defaultdict(list)
+    grouped: dict[int, list] = defaultdict(list)
     for irs, wc in db.execute(stmt).all():
-        if irs.item_id is not None and irs.routing_id is not None:
-            grouped[(irs.item_id, irs.routing_id)].append((irs, wc))
+        if irs.item_id is not None:
+            grouped[irs.item_id].append((irs, wc))
 
-    index: dict[tuple[int, int], tuple[int, Optional[str], Optional[str]]] = {}
+    index: dict[int, tuple[int, Optional[str], Optional[str]]] = {}
     for key, group in grouped.items():
         _, wc = min(
             group,
@@ -169,43 +168,6 @@ def _build_risk_sets(db: Session) -> tuple[set[int], set[int]]:
     return overload, short
 
 
-def _build_daily_plans_index(
-    db: Session,
-) -> tuple[dict[int, list[WorkPlanDailyRow]], dict[int, float]]:
-    """mps_plan_id → (sorted daily rows, total material shortage qty).
-
-    Groups aps_daily_plan rows by mps_plan_id. Each daily row exposes
-    `date/qty/minutes`; `minutes = planned_qty × item_routing_spec.work_time`
-    (null when the routing row / work_time is missing — see business-rule note in
-    the report on `work_time` unit).
-
-    Also returns the aggregate `shortage_qty` per plan (sum of
-    material_shortage_qty across the plan's days) for `WorkPlanRow.shortage_qty`.
-    """
-    work_time_by_routing: dict[int, Optional[float]] = {}
-    for irs in db.execute(select(ItemRoutingSpec)).scalars().all():
-        work_time_by_routing[irs.id] = (
-            float(irs.work_time) if irs.work_time is not None else None
-        )
-
-    daily: dict[int, list[WorkPlanDailyRow]] = defaultdict(list)
-    shortage: dict[int, float] = defaultdict(float)
-    for dp in db.execute(select(DailyPlan)).scalars().all():
-        qty = float(dp.planned_qty)
-        wt = work_time_by_routing.get(dp.item_routing_id)
-        # work_time stored as SECONDS per unit (jph = 3600 / work_time) → convert to minutes.
-        minutes = qty * wt / 60.0 if wt is not None else None
-        daily[dp.mps_plan_id].append(
-            WorkPlanDailyRow(date=dp.work_date, qty=qty, minutes=minutes)
-        )
-        if dp.material_shortage_qty is not None:
-            shortage[dp.mps_plan_id] += float(dp.material_shortage_qty)
-
-    for rows in daily.values():
-        rows.sort(key=lambda r: r.date)
-    return dict(daily), dict(shortage)
-
-
 def _build_backward_window_index(db: Session) -> dict[int, tuple[date, date]]:
     """mps_plan_id → (earliest, latest) aps_daily_plan.work_date — the Backward window.
 
@@ -226,6 +188,77 @@ def _build_backward_window_index(db: Session) -> dict[int, tuple[date, date]]:
         if mps_plan_id not in hi or work_date > hi[mps_plan_id]:
             hi[mps_plan_id] = work_date
     return {k: (lo[k], hi[k]) for k in lo}
+
+
+class _MpsDailyDetail:
+    """Per-mps_plan_id aggregate used to fill WorkPlanRow.{shortageQty,dailyPlans,adjusted,original*}."""
+
+    __slots__ = ("entries", "shortage_qty", "adjusted", "original_start", "original_end")
+
+    def __init__(self) -> None:
+        self.entries: list[WorkPlanDailyEntry] = []
+        self.shortage_qty: float = 0.0
+        self.adjusted: bool = False
+        self.original_start: Optional[date] = None
+        self.original_end: Optional[date] = None
+
+
+def _build_daily_detail_by_mps(
+    db: Session,
+) -> tuple[dict[int, _MpsDailyDetail], dict[tuple[int, int], _MpsDailyDetail]]:
+    """mps_plan_id → whole-line detail, and (mps_plan_id, workcenter_id) → per-step detail.
+
+    A confirmed work_order row never sets item_routing_id (only PLANNED stubs we
+    create do), but it DOES carry its own workcenter_id — so its daily_plans/
+    shortage_qty must be scoped to (mps_plan_id, workcenter_id), not the whole
+    MPS line, else every work_order sharing a line (one G-System MPS line can
+    back several dispatched work orders, one per routing step — seen live, up
+    to 11 for one line) shows the SAME aggregated daily_plans/shortage_qty,
+    including days that belong to a different step's workcenter entirely. A
+    PLANNED (MPS-sourced) row IS the whole line (exactly one work_order stub
+    per mps_plan_id), so it keeps the whole-line aggregate.
+    """
+    out: dict[int, _MpsDailyDetail] = {}
+    out_by_wc: dict[tuple[int, int], _MpsDailyDetail] = {}
+    rows = db.execute(
+        select(DailyPlan, ItemRoutingSpec.work_time).join(
+            ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id
+        )
+    ).all()
+    original_dates: dict[int, list[date]] = defaultdict(list)
+    original_dates_by_wc: dict[tuple[int, int], list[date]] = defaultdict(list)
+    for dp, work_time in rows:
+        minutes = float(dp.planned_qty) * (float(work_time) / 60.0) if work_time else 0.0
+        entry = WorkPlanDailyEntry(date=dp.work_date, qty=float(dp.planned_qty), minutes=minutes)
+
+        detail = out.setdefault(dp.mps_plan_id, _MpsDailyDetail())
+        detail.entries.append(entry)
+        detail.shortage_qty += float(dp.material_shortage_qty or 0)
+
+        wc_key = (dp.mps_plan_id, dp.workcenter_id)
+        wc_detail = out_by_wc.setdefault(wc_key, _MpsDailyDetail())
+        wc_detail.entries.append(entry)
+        wc_detail.shortage_qty += float(dp.material_shortage_qty or 0)
+
+        if dp.adjusted:
+            detail.adjusted = True
+            wc_detail.adjusted = True
+            if dp.original_work_date is not None:
+                original_dates[dp.mps_plan_id].append(dp.original_work_date)
+                original_dates_by_wc[wc_key].append(dp.original_work_date)
+    for mps_plan_id, detail in out.items():
+        detail.entries.sort(key=lambda e: e.date)
+        dates = original_dates.get(mps_plan_id)
+        if dates:
+            detail.original_start = min(dates)
+            detail.original_end = max(dates)
+    for wc_key, wc_detail in out_by_wc.items():
+        wc_detail.entries.sort(key=lambda e: e.date)
+        dates = original_dates_by_wc.get(wc_key)
+        if dates:
+            wc_detail.original_start = min(dates)
+            wc_detail.original_end = max(dates)
+    return out, out_by_wc
 
 
 def _risk_types(overload: bool, material_short: bool) -> list[str]:
@@ -297,7 +330,8 @@ def build_work_plan_list(
     proc_by_item = _build_proc_by_item(db)
     overload_ids, short_ids = _build_risk_sets(db)
     backward = _build_backward_window_index(db)
-    daily_index, shortage_totals = _build_daily_plans_index(db)
+    daily_detail_by_mps, daily_detail_by_mps_wc = _build_daily_detail_by_mps(db)
+    _empty_detail = _MpsDailyDetail()
 
     # Load Grid cell drill-down: mps_plan_ids that load (work_date [, workcenter]) in
     # aps_daily_plan. None → no drill-down (all rows pass this stage).
@@ -335,9 +369,22 @@ def build_work_plan_list(
             plan_end = _parse_iso_date(resp.get("endDate")) or (mps.plan_end_date if mps else None)
             # 리스크유형: plan-level — any risky day of this plan's aps_daily_plan (see _build_risk_sets).
             overload, short = (wo.mps_plan_id in overload_ids, wo.mps_plan_id in short_ids)
+            # Scoped to THIS work_order's own workcenter — a line backing several
+            # work_orders (one per routing step) must not share one step's
+            # daily_plans/shortage_qty with another (see _build_daily_detail_by_mps).
+            detail = (
+                daily_detail_by_mps_wc.get((wo.mps_plan_id, wo.workcenter_id), _empty_detail)
+                if wo.mps_plan_id is not None and wo.workcenter_id is not None
+                else (daily_detail_by_mps.get(wo.mps_plan_id, _empty_detail) if wo.mps_plan_id is not None else _empty_detail)
+            )
             rows.append(
                 WorkPlanRow(
-                    id=str(wo.id),  # FE reference for adjust/PR/WO action
+                    id=str(wo.id),
+                    shortage_qty=round(detail.shortage_qty, 4),
+                    daily_plans=detail.entries,
+                    adjusted=detail.adjusted,
+                    original_start=detail.original_start,
+                    original_end=detail.original_end,
                     source_type="WO",
                     work_order_no=wo.work_order_no,  # 작업지시번호 (P6 = số lệnh SX = work_order.work_order_no)
                     tmp_plan_no=None,
@@ -355,8 +402,6 @@ def build_work_plan_list(
                     plan_end=plan_end,  # 계획완료 (WO's own end date)
                     delivery_date=mps.delivery_date if mps else None,  # 납기일자
                     risk_types=_risk_types(overload, short),
-                    shortage_qty=shortage_totals.get(wo.mps_plan_id, 0.0) if wo.mps_plan_id else 0.0,
-                    daily_plans=daily_index.get(wo.mps_plan_id, []) if wo.mps_plan_id else [],
                 )
             )
         elif _is_planned(wo) and mps is not None:
@@ -369,14 +414,20 @@ def build_work_plan_list(
                 wc_no = wc_obj.workcenter_no if wc_obj else None
                 wc_name = wc_obj.workcenter_name if wc_obj else None
             else:
-                rep = wc_repr_index.get((mps.item_id, mps.routing_id))
+                rep = wc_repr_index.get(mps.item_id) if mps.item_id is not None else None
                 wc_no = rep[1] if rep else None
                 wc_name = rep[2] if rep else None
             # 리스크유형: plan-level — any risky day of this plan's aps_daily_plan.
             overload, short = (mps.id in overload_ids, mps.id in short_ids)
+            detail = daily_detail_by_mps.get(mps.id, _empty_detail)
             rows.append(
                 WorkPlanRow(
-                    id=str(wo.id),  # FE reference for adjust/PR/WO action
+                    id=str(wo.id),
+                    shortage_qty=round(detail.shortage_qty, 4),
+                    daily_plans=detail.entries,
+                    adjusted=detail.adjusted,
+                    original_start=detail.original_start,
+                    original_end=detail.original_end,
                     source_type="MPS",
                     work_order_no=None,
                     tmp_plan_no=mps.plan_no,  # (임시)작업계획번호
@@ -391,8 +442,6 @@ def build_work_plan_list(
                     plan_end=(window[1] if window else mps.plan_end_date),  # 계획완료 (Backward-end; fallback 종료일자)
                     delivery_date=mps.delivery_date,  # 납기일자
                     risk_types=_risk_types(overload, short),
-                    shortage_qty=shortage_totals.get(mps.id, 0.0),
-                    daily_plans=daily_index.get(mps.id, []),
                 )
             )
         # else: SENT / FAILED / partial rows are not part of the work plan list.

@@ -1,19 +1,24 @@
 """Assembly service for POST /aps/run and POST /aps/adjust.
 
-Reshapes the existing daily-plan compute engine (daily_plan_builder,
-shortage_builder) into the WorkPlan/LoadCell/KPI shape the FE needs (see
-docs/specs/fe-be-gap-matrix-260721-1128.csv rows 8-9), instead of
-re-implementing scheduling from scratch.
+/aps/run recomputes aps_daily_plan/aps_material_shortage itself (same
+sequence as POST /kpi-summary/daily-plan/rebuild: rebuild_daily_plan →
+apply_daily_material_shortage → rebuild_material_shortage) before assembling —
+FE/KPI2/KPI3/KPI4 need those tables current on every run, and rebuild_daily_plan
+already preserves hand-adjusted rows, so re-running it here is safe.
+/aps/adjust does NOT re-run this — it only re-backward-fills the named plans
+on top of current DB state (see adjust_work_plans).
 
-There is no persisted "work plan" table — a WorkPlan is one
-(mps_plan_id, item_routing_id) group of aps_daily_plan rows (both columns are
-NOT NULL, so the key is always well-defined). Its API id is the synthetic
-string `encode_plan_id(mps_plan_id, item_routing_id)`.
+WorkPlan assembly is built on top of work_plan_list.build_work_plan_list,
+which is already driven by aps_input.work_order (joined to aps_mps_plan) —
+not re-derived from aps_daily_plan groups, so there's one source of truth
+for "what is a work plan" shared with GET /work-plan/list. This module only
+adds the run/loadCells/kpi envelope and the FE camelCase field names.
+
+WorkPlan.id = str(work_order.id) — the real PK, not a synthetic key.
 """
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
@@ -21,7 +26,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_logger
-from app.models import DailyPlan, Item, ItemRoutingSpec, MpsPlan, WorkCenter, WorkOrder
+from app.models import DailyPlan, ItemRoutingSpec, MaterialShortage, MpsPlan, WorkCenter, WorkOrder
+from app.services.kpi_summary.daily_plan_rollup import workcenter_daily_status_rollup
 from app.services.material_shortage.shortage_builder import (
     apply_daily_material_shortage,
     rebuild_material_shortage,
@@ -31,28 +37,20 @@ from app.services.scheduling.daily_plan_builder import (
     build_workcenter_capacity_index,
     rebuild_daily_plan,
 )
+from app.services.scheduling.work_plan_list import build_work_plan_list
 
 logger = get_logger(__name__)
 
-_PLAN_ID_SEP = ":"
-
 
 class PlanIdError(ValueError):
-    """Raised when a planId doesn't decode to a (mps_plan_id, item_routing_id) pair."""
+    """Raised when a planId doesn't resolve to a work_order.id."""
 
 
-def encode_plan_id(mps_plan_id: int, item_routing_id: int) -> str:
-    return f"{mps_plan_id}{_PLAN_ID_SEP}{item_routing_id}"
-
-
-def decode_plan_id(plan_id: str) -> tuple[int, int]:
-    parts = plan_id.split(_PLAN_ID_SEP)
-    if len(parts) != 2:
-        raise PlanIdError(f"malformed planId: {plan_id!r}")
+def parse_plan_id(plan_id: str) -> int:
     try:
-        return int(parts[0]), int(parts[1])
+        return int(plan_id)
     except ValueError as exc:
-        raise PlanIdError(f"malformed planId: {plan_id!r}") from exc
+        raise PlanIdError(f"malformed planId (expected work_order.id): {plan_id!r}") from exc
 
 
 @dataclass
@@ -68,16 +66,17 @@ class WorkPlan:
     run_id: str
     source_type: str
     work_order_no: str | None
-    tmp_plan_no: str
+    tmp_plan_no: str | None
     order_no: str | None
     item_code: str
     item_name_ko: str
     wc_code: str
+    wc_name: str | None
     process_name_ko: str
     plan_qty: float
     plan_start_date: date
     plan_end_date: date
-    delivery_date: date | None
+    delivery_date: date
     risk_type: str
     shortage_qty: float
     adjusted: bool
@@ -89,6 +88,7 @@ class WorkPlan:
 @dataclass
 class LoadCell:
     wc_code: str
+    wc_name: str | None
     cell_date: date
     minutes_loaded: float
     minutes_capacity: float
@@ -118,30 +118,212 @@ class AssembledResult:
     kpi: KpiSnapshot
 
 
-def run_full_pipeline(session: Session) -> AssembledResult:
-    """POST /aps/run: full G-System-driven recompute, then assemble."""
+_SOURCE_TYPE_MAP = {"WO": "FROM_WORK_ORDER", "MPS": "FROM_MPS"}
+
+
+_ROLLUP_STATUS_MAP = {
+    "normal": "NORMAL",
+    "overload": "OVERLOAD",
+    "material-shortage": "MATERIAL_SHORT",
+    "urgent": "OVERLOAD_AND_MATERIAL_SHORT",
+}
+
+
+def _build_load_cells(session: Session) -> tuple[list[LoadCell], set[str]]:
+    """Reuses workcenter_daily_status_rollup — the same persisted aps_daily_plan.status
+    GET /kpi-summary/load (KPI3) reads — instead of recomputing overload live from
+    planned_qty/work_time, so the Load Grid and overloadWcPct always agree with KPI3.
+    """
+    overloaded_wc_codes: set[str] = set()
+    load_cells = []
+    for r in workcenter_daily_status_rollup(session):
+        load_cells.append(LoadCell(
+            wc_code=r.workcenter_no, wc_name=r.workcenter_name, cell_date=r.work_date,
+            minutes_loaded=r.used_minutes, minutes_capacity=r.capacity_minutes,
+            status=_ROLLUP_STATUS_MAP.get(r.status, "NORMAL"),
+        ))
+        if r.status in ("overload", "urgent"):
+            overloaded_wc_codes.add(r.workcenter_no)
+    return load_cells, overloaded_wc_codes
+
+
+def _compute_kpi(session: Session, work_plans: list[WorkPlan], overloaded_wc_codes: set[str]) -> KpiSnapshot:
+    """Mirrors KPI1/KPI2/KPI3/KPI4's own formulas exactly, at MPS-line grain.
+
+    aps_input.work_order can carry several rows for the same mps_plan_id (one
+    G-System MPS line can be split into multiple dispatched work orders — seen
+    live, e.g. one line with 11 work_order rows), so on-time is deduped by
+    mps_plan_id first — each work_order resolves to its aps_mps_plan row and
+    is judged the same way KPI1 judges it (plan_end_date > delivery_date),
+    not by the work_order's own backward-filled/response dates.
+    """
+    wo_ids = [int(p.id) for p in work_plans]
+    mps_plan_id_by_wo_id: dict[str, int | None] = {
+        str(wo_id): mps_plan_id
+        for wo_id, mps_plan_id in session.execute(
+            select(WorkOrder.id, WorkOrder.mps_plan_id).where(WorkOrder.id.in_(wo_ids))
+        ).all()
+    } if wo_ids else {}
+    mps_plan_ids = {v for v in mps_plan_id_by_wo_id.values() if v is not None}
+    mps_by_id = {
+        m.id: m for m in session.execute(select(MpsPlan).where(MpsPlan.id.in_(mps_plan_ids))).scalars().all()
+    } if mps_plan_ids else {}
+
+    lines_seen: set[int | str] = set()
+    counted = 0
+    delayed = 0
+    for p in work_plans:
+        key = mps_plan_id_by_wo_id.get(p.id) or f"wo:{p.id}"
+        if key in lines_seen:
+            continue
+        lines_seen.add(key)
+        mps = mps_by_id.get(key) if isinstance(key, int) else None
+        # Same WHERE clause as KPI1: skip lines with no plan_end_date/delivery_date.
+        if mps is None or mps.plan_end_date is None or mps.delivery_date is None:
+            continue
+        counted += 1
+        if mps.plan_end_date > mps.delivery_date:
+            delayed += 1
+    on_time_rate = round(((counted - delayed) / counted) * 100, 1) if counted else 100.0
+
+    # Same query as KPI2 (calculate_kpi2_shortage) — count, not scoped to work_plans.
+    material_shortage_count = len(
+        session.execute(select(MaterialShortage.id).where(MaterialShortage.shortage_qty > 0)).scalars().all()
+    )
+
+    total_wc_count = len(session.execute(select(WorkCenter.id)).scalars().all())
+    overloaded_wc_count = len(overloaded_wc_codes)
+    overload_wc_pct = round((overloaded_wc_count / total_wc_count) * 100, 1) if total_wc_count else 0.0
+
+    # Same formula as KPI4 (r1 delayed + r2 shortage items + r3 overloaded wc).
+    planning_risk_count = delayed + material_shortage_count + overloaded_wc_count
+
+    return KpiSnapshot(
+        on_time_rate_pct=on_time_rate,
+        material_shortage_count=material_shortage_count,
+        overload_wc_pct=overload_wc_pct,
+        planning_risk_count=planning_risk_count,
+    )
+
+
+def assemble(session: Session) -> AssembledResult:
+    """Pure read + assemble — no writes. Used by both /aps/run and /aps/adjust."""
     started_at = datetime.now(timezone.utc)
+    run_id = str(uuid.uuid4())
+
+    rows = build_work_plan_list(session)
+    work_plans: list[WorkPlan] = []
+    for row in rows:
+        risk_short = "material_short" in row.risk_types
+        risk_over = "overload" in row.risk_types
+        if risk_short and risk_over:
+            risk_type = "MATERIAL_AND_OVERLOAD"
+        elif risk_short:
+            risk_type = "MATERIAL_SHORT"
+        elif risk_over:
+            risk_type = "OVERLOAD"
+        else:
+            risk_type = "NORMAL"
+
+        entries = [DailyPlanEntry(date=d.date, qty=d.qty, minutes=d.minutes) for d in row.daily_plans]
+        plan_start = row.plan_start or (entries[0].date if entries else None)
+        plan_end = row.plan_end or (entries[-1].date if entries else None)
+        if plan_start is None or plan_end is None:
+            logger.warning("assemble: work_order id=%s has no plan_start/plan_end — skipped", row.id)
+            continue
+
+        work_plans.append(WorkPlan(
+            id=row.id,
+            run_id=run_id,
+            source_type=_SOURCE_TYPE_MAP.get(row.source_type, "FROM_MPS"),
+            work_order_no=row.work_order_no,
+            # work_plan_list only sets this for MPS rows (aps_mps_plan.plan_no) —
+            # null for WO rows (they have no temp plan; workOrderNo already covers
+            # their real identifier). Do not fabricate a value from row.id.
+            tmp_plan_no=row.tmp_plan_no,
+            order_no=row.order_no,
+            item_code=row.item_no or "",
+            item_name_ko=row.item_name or row.item_no or "",
+            wc_code=row.workcenter_no or "",
+            wc_name=row.workcenter_name,
+            process_name_ko=row.proc_name or "",
+            plan_qty=row.planned_qty or 0.0,
+            plan_start_date=plan_start,
+            plan_end_date=plan_end,
+            # FE's deliveryDate is non-null — fall back to plan_end when the MPS
+            # line genuinely has no delivery_date.
+            delivery_date=row.delivery_date or plan_end,
+            risk_type=risk_type,
+            shortage_qty=row.shortage_qty,
+            adjusted=row.adjusted,
+            original_start=row.original_start,
+            original_end=row.original_end,
+            daily_plans=entries,
+        ))
+
+    load_cells, overloaded_wc_codes = _build_load_cells(session)
+    kpi = _compute_kpi(session, work_plans, overloaded_wc_codes)
+
+    finished_at = datetime.now(timezone.utc)
+    return AssembledResult(
+        run=ApsRunInfo(id=run_id, started_at=started_at, finished_at=finished_at),
+        work_plans=work_plans,
+        load_cells=load_cells,
+        kpi=kpi,
+    )
+
+
+def run_full_pipeline(session: Session) -> AssembledResult:
+    """POST /aps/run: rebuild aps_daily_plan/aps_material_shortage, then assemble.
+
+    Same rebuild sequence as POST /kpi-summary/daily-plan/rebuild — kept in
+    sync here so /aps/run always reflects a fresh schedule without requiring
+    the FE to call the rebuild endpoint separately first. Caller owns commit.
+    """
     rebuild_daily_plan(session)
     apply_daily_material_shortage(session)
     rebuild_material_shortage(session)
     session.flush()
-    return assemble(session, started_at=started_at)
+    return assemble(session)
+
+
+def _resolve_item_routing_id(session: Session, wo: WorkOrder) -> int:
+    """A WorkOrder rarely carries item_routing_id (only PLANNED stubs we create do —
+    real G-System-synced rows never set it). Fall back to the MPS line's routing
+    step via aps_daily_plan. Multi-step MPS lines (>1 distinct item_routing_id)
+    aren't supported by /aps/adjust yet — raise rather than guess wrong.
+    """
+    if wo.item_routing_id is not None:
+        return wo.item_routing_id
+    routing_ids = set(session.execute(
+        select(DailyPlan.item_routing_id).where(DailyPlan.mps_plan_id == wo.mps_plan_id).distinct()
+    ).scalars().all())
+    if len(routing_ids) == 1:
+        return routing_ids.pop()
+    if not routing_ids:
+        raise PlanIdError(f"work_order id={wo.id}: no aps_daily_plan rows to adjust (rebuild first)")
+    raise PlanIdError(
+        f"work_order id={wo.id}: MPS line has {len(routing_ids)} routing steps — "
+        "/aps/adjust doesn't support multi-step MPS lines yet"
+    )
 
 
 def adjust_work_plans(session: Session, adjustments: list[tuple[str, date, date]]) -> AssembledResult:
-    """POST /aps/adjust: re-backward-fill the given (planId, newStart, newEnd) groups.
+    """POST /aps/adjust: re-backward-fill the given (planId, newStart, newEnd) plans.
 
-    Does NOT call rebuild_daily_plan/rebuild_material_shortage — operates on
-    top of the current DB state (the last /aps/run or /aps/adjust), only
-    touching the groups named in `adjustments`.
+    planId = work_order.id. Does NOT call rebuild_daily_plan/rebuild_material_shortage —
+    operates on top of the current DB state, only touching the named plans.
     """
-    started_at = datetime.now(timezone.utc)
     capacity_index = build_workcenter_capacity_index(session)
-    routing_by_id = {r.id: r for r in session.execute(select(ItemRoutingSpec)).scalars().all()}
 
     for plan_id, new_start, new_end in adjustments:
-        mps_plan_id, item_routing_id = decode_plan_id(plan_id)
-        routing = routing_by_id.get(item_routing_id)
+        wo_id = parse_plan_id(plan_id)
+        wo = session.get(WorkOrder, wo_id)
+        if wo is None or wo.mps_plan_id is None:
+            logger.warning("adjust_work_plans: planId=%s not found — skipped", plan_id)
+            continue
+        item_routing_id = _resolve_item_routing_id(session, wo)
+        routing = session.get(ItemRoutingSpec, item_routing_id)
         if routing is None or routing.workcenter_id is None or not routing.work_time:
             logger.warning("adjust_work_plans: planId=%s has no usable routing — skipped", plan_id)
             continue
@@ -150,7 +332,7 @@ def adjust_work_plans(session: Session, adjustments: list[tuple[str, date, date]
 
         rows = session.execute(
             select(DailyPlan).where(
-                DailyPlan.mps_plan_id == mps_plan_id, DailyPlan.item_routing_id == item_routing_id
+                DailyPlan.mps_plan_id == wo.mps_plan_id, DailyPlan.item_routing_id == item_routing_id
             )
         ).scalars().all()
         if not rows:
@@ -183,7 +365,7 @@ def adjust_work_plans(session: Session, adjustments: list[tuple[str, date, date]
             if qty <= 0:
                 continue
             session.add(DailyPlan(
-                mps_plan_id=mps_plan_id,
+                mps_plan_id=wo.mps_plan_id,
                 item_routing_id=item_routing_id,
                 workcenter_id=wc_id,
                 work_date=work_date,
@@ -197,163 +379,4 @@ def adjust_work_plans(session: Session, adjustments: list[tuple[str, date, date]
 
     apply_daily_material_shortage(session)
     session.flush()
-    return assemble(session, started_at=started_at)
-
-
-def assemble(session: Session, started_at: datetime | None = None) -> AssembledResult:
-    """Pure read + group — no writes. Shared tail of /aps/run and /aps/adjust."""
-    started_at = started_at or datetime.now(timezone.utc)
-    run_id = str(uuid.uuid4())
-
-    rows = session.execute(
-        select(DailyPlan, ItemRoutingSpec, WorkCenter, MpsPlan)
-        .join(ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id)
-        .join(WorkCenter, DailyPlan.workcenter_id == WorkCenter.id)
-        .join(MpsPlan, DailyPlan.mps_plan_id == MpsPlan.id)
-    ).all()
-
-    item_ids = {mps.item_id for _dp, _ir, _wc, mps in rows if mps.item_id is not None}
-    items_by_id: dict[int, Item] = {
-        i.id: i for i in session.execute(select(Item).where(Item.id.in_(item_ids))).scalars().all()
-    } if item_ids else {}
-
-    mps_ids = {mps.id for _dp, _ir, _wc, mps in rows}
-    routing_ids = {ir.id for _dp, ir, _wc, _mps in rows}
-    work_orders = session.execute(
-        select(WorkOrder).where(
-            WorkOrder.mps_plan_id.in_(mps_ids), WorkOrder.item_routing_id.in_(routing_ids)
-        )
-    ).scalars().all() if mps_ids and routing_ids else []
-    wo_by_group: dict[tuple[int, int], WorkOrder] = {
-        (wo.mps_plan_id, wo.item_routing_id): wo for wo in work_orders
-        if wo.mps_plan_id is not None and wo.item_routing_id is not None
-    }
-
-    groups: dict[tuple[int, int], list[tuple[DailyPlan, ItemRoutingSpec, WorkCenter, MpsPlan]]] = defaultdict(list)
-    for dp, ir, wc, mps in rows:
-        groups[(dp.mps_plan_id, dp.item_routing_id)].append((dp, ir, wc, mps))
-
-    work_plans: list[WorkPlan] = []
-    cell_map: dict[tuple[str, date], dict[str, float | bool]] = defaultdict(
-        lambda: {"minutes_loaded": 0.0, "capacity": 0.0, "has_material_short": False}
-    )
-    wc_capacity_index = build_workcenter_capacity_index(session)
-
-    for (mps_plan_id, item_routing_id), group_rows in groups.items():
-        _dp0, ir, wc, mps = group_rows[0]
-        work_time_minutes = float(ir.work_time) / 60.0 if ir.work_time else 0.0
-        item = items_by_id.get(mps.item_id) if mps.item_id is not None else None
-        wo = wo_by_group.get((mps_plan_id, item_routing_id))
-
-        daily_entries: list[DailyPlanEntry] = []
-        shortage_qty = 0.0
-        has_overload = False
-        has_material_short = False
-        any_adjusted = False
-        work_dates: list[date] = []
-        original_dates: list[date] = []
-
-        for dp, _ir, _wc, _mps in group_rows:
-            minutes = float(dp.planned_qty) * work_time_minutes
-            daily_entries.append(DailyPlanEntry(date=dp.work_date, qty=float(dp.planned_qty), minutes=minutes))
-            shortage_qty += float(dp.material_shortage_qty or 0)
-            if dp.status in ("overload", "urgent"):
-                has_overload = True
-            if float(dp.material_shortage_qty or 0) > 0:
-                has_material_short = True
-            if dp.adjusted:
-                any_adjusted = True
-            work_dates.append(dp.work_date)
-            original_dates.append(dp.original_work_date or dp.work_date)
-
-            cell_key = (wc.workcenter_no, dp.work_date)
-            cell = cell_map[cell_key]
-            cell["minutes_loaded"] += minutes
-            cell["capacity"] = wc_capacity_index.minutes_on(wc.id, dp.work_date)
-            if float(dp.material_shortage_qty or 0) > 0:
-                cell["has_material_short"] = True
-
-        if has_material_short and has_overload:
-            risk_type = "MATERIAL_AND_OVERLOAD"
-        elif has_material_short:
-            risk_type = "MATERIAL_SHORT"
-        elif has_overload:
-            risk_type = "OVERLOAD"
-        else:
-            risk_type = "NORMAL"
-
-        daily_entries.sort(key=lambda e: e.date)
-        work_dates.sort()
-        original_dates.sort()
-
-        work_plans.append(WorkPlan(
-            id=encode_plan_id(mps_plan_id, item_routing_id),
-            run_id=run_id,
-            source_type="FROM_WORK_ORDER" if wo is not None else "FROM_MPS",
-            work_order_no=wo.work_order_no if wo is not None else None,
-            # FE's tmpPlanNo is a non-null per-plan correlation string (never absent in the
-            # mock it replaces) — fall back to this WorkPlan's own id when no WorkOrder is
-            # linked yet (FROM_MPS), instead of leaving it null.
-            tmp_plan_no=(wo.temp_id if wo is not None and wo.temp_id else None) or encode_plan_id(mps_plan_id, item_routing_id),
-            order_no=(wo.work_order_no if wo is not None else None) or mps.plan_no,
-            item_code=item.item_no if item is not None else "",
-            item_name_ko=(item.item_name if item is not None and item.item_name else (item.item_no if item is not None else "")),
-            wc_code=wc.workcenter_no,
-            process_name_ko=ir.proc_name or "",
-            plan_qty=sum(e.qty for e in daily_entries),
-            plan_start_date=work_dates[0],
-            plan_end_date=work_dates[-1],
-            # FE's deliveryDate is non-null — best-effort fallback chain; can still end up
-            # None if the MPS line genuinely has neither (real data gap, not a code bug).
-            delivery_date=mps.delivery_date or mps.plan_end_date or work_dates[-1],
-            risk_type=risk_type,
-            shortage_qty=round(shortage_qty, 4),
-            adjusted=any_adjusted,
-            original_start=original_dates[0] if any_adjusted else None,
-            original_end=original_dates[-1] if any_adjusted else None,
-            daily_plans=daily_entries,
-        ))
-
-    load_cells: list[LoadCell] = []
-    overloaded_wc_codes: set[str] = set()
-    for (wc_code, cell_date), val in cell_map.items():
-        minutes_loaded = float(val["minutes_loaded"])
-        capacity = float(val["capacity"])
-        overload = capacity > 0 and minutes_loaded > capacity
-        has_material_short = bool(val["has_material_short"])
-        if overload and has_material_short:
-            status = "OVERLOAD_AND_MATERIAL_SHORT"
-        elif overload:
-            status = "OVERLOAD"
-        elif has_material_short:
-            status = "MATERIAL_SHORT"
-        else:
-            status = "NORMAL"
-        if overload:
-            overloaded_wc_codes.add(wc_code)
-        load_cells.append(LoadCell(
-            wc_code=wc_code, cell_date=cell_date, minutes_loaded=round(minutes_loaded, 2),
-            minutes_capacity=round(capacity, 2), status=status,
-        ))
-
-    total_plans = len(work_plans)
-    on_time = sum(1 for p in work_plans if p.delivery_date is not None and p.plan_end_date <= p.delivery_date)
-    material_count = sum(1 for p in work_plans if p.risk_type in ("MATERIAL_SHORT", "MATERIAL_AND_OVERLOAD"))
-    risk_count = sum(1 for p in work_plans if p.risk_type != "NORMAL")
-    total_wc = session.execute(select(WorkCenter.id)).scalars().all()
-    total_wc_count = len(total_wc)
-
-    kpi = KpiSnapshot(
-        on_time_rate_pct=round((on_time / total_plans) * 100, 1) if total_plans else 100.0,
-        material_shortage_count=material_count,
-        overload_wc_pct=round((len(overloaded_wc_codes) / total_wc_count) * 100, 1) if total_wc_count else 0.0,
-        planning_risk_count=risk_count,
-    )
-
-    finished_at = datetime.now(timezone.utc)
-    return AssembledResult(
-        run=ApsRunInfo(id=run_id, started_at=started_at, finished_at=finished_at),
-        work_plans=work_plans,
-        load_cells=load_cells,
-        kpi=kpi,
-    )
+    return assemble(session)

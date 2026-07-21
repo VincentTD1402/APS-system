@@ -36,11 +36,12 @@ class WorkPlanOut(CamelModel):
     run_id: str
     source_type: str
     work_order_no: str | None = None
-    tmp_plan_no: str
+    tmp_plan_no: str | None = None
     order_no: str | None = None
     item_code: str
     item_name_ko: str
     wc_code: str
+    wc_name: str | None = None
     process_name_ko: str
     plan_qty: float
     plan_start_date: date
@@ -56,6 +57,7 @@ class WorkPlanOut(CamelModel):
 
 class LoadCellOut(CamelModel):
     wc_code: str
+    wc_name: str | None = None
     cell_date: date
     minutes_loaded: float
     minutes_capacity: float
