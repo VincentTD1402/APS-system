@@ -28,6 +28,9 @@ class Item(Base):
     # "Product" | "SemiProduct" | "RawMaterial"
     asset_type: Mapped[str | None] = mapped_column(String(20))
     spec: Mapped[str | None] = mapped_column(String(200))
+    # Unit of measure shown in FE master views. G-System item sync does not
+    # provide it yet — defaults to 'EA', backfilled later.
+    uom: Mapped[str | None] = mapped_column(String(20), server_default="EA")
 
     demands: Mapped[List["Demand"]] = relationship(back_populates="item")
     bom_parent_links: Mapped[List["BOM"]] = relationship(

@@ -29,6 +29,9 @@ class BOM(Base):
     qty1: Mapped[float | None] = mapped_column(Numeric(18, 4))
     qty2: Mapped[float | None] = mapped_column(Numeric(18, 4))
     bom_seq: Mapped[int | None] = mapped_column(Integer)
+    # Scrap/loss rate of the component (0.05 = 5% extra consumed for defects).
+    # G-System BOM sync does not provide it yet — defaults to 0 (no scrap).
+    scrap_rate: Mapped[float | None] = mapped_column(Numeric(9, 4), server_default="0")
 
     # G-System interface ids
     gsystem_if_id: Mapped[int | None] = mapped_column(Integer)
