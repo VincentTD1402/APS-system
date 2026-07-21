@@ -1,7 +1,10 @@
 """POST /aps/run and POST /aps/adjust — the scheduling core (fe-be-gap-matrix rows 8-9).
 
-Both are synchronous compute-and-return, matching POST /kpi-summary/daily-plan/rebuild's
-pattern rather than the async job+poll pattern used by /gsystem/run.
+Both are pure reads/mutations over the current DB state — neither calls
+daily_plan_builder.rebuild_daily_plan or shortage_builder.rebuild_material_shortage.
+That compute already exists as POST /kpi-summary/daily-plan/rebuild; call it
+first (or after a G-System sync) so aps_daily_plan/aps_material_shortage are
+current. Re-running it here would just duplicate that work.
 """
 from __future__ import annotations
 
@@ -23,7 +26,7 @@ from app.services.scheduling.aps_run_service import (
     AssembledResult,
     PlanIdError,
     adjust_work_plans,
-    run_full_pipeline,
+    assemble,
 )
 
 logger = get_logger(__name__)
@@ -65,18 +68,17 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
 @router.post(
     "/run",
     response_model=ApsRunResult,
-    summary="Run the backward-fill scheduler + material shortage + load + KPI",
+    summary="Assemble the WorkPlan/LoadCell/KPI result from the current schedule",
     description=(
-        "Rebuilds aps_daily_plan (preserving hand-adjusted rows) and aps_material_shortage, "
-        "then assembles the full WorkPlan/LoadCell/KPI result for the FE Work Plan view."
+        "Read-only — assembles aps_input.work_order + aps_daily_plan (already computed by "
+        "POST /kpi-summary/daily-plan/rebuild) into the full WorkPlan/LoadCell/KPI result "
+        "for the FE Work Plan view. Call the rebuild endpoint first if the schedule is stale."
     ),
 )
 def run_aps(db: Session = Depends(get_db)) -> ApsRunResult:
     try:
-        result = run_full_pipeline(db)
-        db.commit()
+        result = assemble(db)
     except Exception as exc:
-        db.rollback()
         logger.exception("POST /aps/run failed")
         raise HTTPException(status_code=500, detail=str(exc))
     return _to_response(result)

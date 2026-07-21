@@ -5,6 +5,14 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 
+class WorkPlanDailyEntry(BaseModel):
+    """One aps_daily_plan row nested under a WorkPlanRow."""
+
+    date: date
+    qty: float
+    minutes: float
+
+
 class WorkPlanRow(BaseModel):
     """One row of the Work Plan List.
 
@@ -32,3 +40,14 @@ class WorkPlanRow(BaseModel):
         default_factory=list,
         description="리스크유형 — subset of {'overload','material_short'} from aps_daily_plan.status (empty → ['normal'])",
     )
+    # Added for POST /aps/run (fe-be-gap-vi-detail mapping report §4bis) — GET
+    # /work-plan/list gets these for free too, all additive/optional.
+    id: str = Field(..., description="work_order.id (stringified) — stable per-row reference for actions/adjust")
+    shortage_qty: float = Field(0.0, description="Σ aps_daily_plan.material_shortage_qty for this MPS line")
+    daily_plans: list[WorkPlanDailyEntry] = Field(
+        default_factory=list,
+        description="aps_daily_plan rows for this MPS line (all routing steps), date-sorted",
+    )
+    adjusted: bool = Field(False, description="True if any of this MPS line's daily_plan rows were hand-adjusted")
+    original_start: date | None = Field(None, description="Pre-adjustment plan_start snapshot, if adjusted")
+    original_end: date | None = Field(None, description="Pre-adjustment plan_end snapshot, if adjusted")
