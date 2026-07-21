@@ -159,7 +159,15 @@ def _backward_fill_step(
 def rebuild_daily_plan(session: Session) -> int:
     """Wipe and rebuild aps_daily_plan from aps_mps_plan × aps_item_routing_spec.
 
-    Returns rows inserted. Caller owns commit.
+    Rows with `adjusted=True` (set by POST /aps/adjust) are preserved instead of
+    wiped — a manual override must survive a G-System resync. Any
+    (mps_plan_id, item_routing_id) group with a surviving adjusted row is
+    skipped entirely (not regenerated), so the schedule isn't half hand-edited/
+    half backward-filled. Adjusted rows still feed the overload second pass so
+    their capacity usage is accounted for.
+
+    Returns rows inserted (adjusted rows kept from a prior run are not counted).
+    Caller owns commit.
     """
     today = date.today()
     capacity_index = build_workcenter_capacity_index(session)
@@ -175,11 +183,25 @@ def rebuild_daily_plan(session: Session) -> int:
     for steps in routing_steps_by_item.values():
         steps.sort(key=lambda s: s.proc_sno if s.proc_sno is not None else 0)
 
-    session.query(DailyPlan).delete(synchronize_session=False)
+    session.query(DailyPlan).filter(DailyPlan.adjusted.is_(False)).delete(synchronize_session=False)
+    session.flush()
 
-    inserted = 0
+    adjusted_groups: set[tuple[int, int]] = set()
     required_minutes_by_slot: dict[tuple[int, date], float] = defaultdict(float)
     rows_by_slot: dict[tuple[int, date], list[DailyPlan]] = defaultdict(list)
+    work_time_by_routing_id: dict[int, float] = {
+        step.id: float(step.work_time) / 60.0
+        for steps in routing_steps_by_item.values() for step in steps if step.work_time
+    }
+    for row in session.execute(select(DailyPlan).where(DailyPlan.adjusted.is_(True))).scalars().all():
+        adjusted_groups.add((row.mps_plan_id, row.item_routing_id))
+        wtm = work_time_by_routing_id.get(row.item_routing_id, 0.0)
+        if wtm > 0:
+            slot = (row.workcenter_id, row.work_date)
+            required_minutes_by_slot[slot] += float(row.planned_qty) * wtm
+            rows_by_slot[slot].append(row)
+
+    inserted = 0
     for mps in mps_lines:
         anchor = _anchor_end_date(mps)
         if anchor is None or not mps.plan_qty or float(mps.plan_qty) <= 0:
@@ -192,6 +214,10 @@ def rebuild_daily_plan(session: Session) -> int:
             if matching:
                 steps = matching
         if not steps:
+            continue
+        # Any step already hand-adjusted for this MPS line — skip the whole
+        # line so a partial regeneration doesn't fight the adjustment.
+        if any((mps.id, step.id) in adjusted_groups for step in steps):
             continue
 
         window_end = anchor

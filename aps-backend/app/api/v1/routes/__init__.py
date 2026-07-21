@@ -8,6 +8,8 @@ TODO: Add authentication/authorization middleware (e.g. OAuth2, API key)
 from fastapi import APIRouter
 
 from app.api.v1.routes import (
+    aps,
+    erp,
     gsystem_sync,
     kpi_summary,
     llm,
@@ -22,6 +24,8 @@ api_router.include_router(gsystem_sync.router, prefix="/gsystem", tags=["gsystem
 api_router.include_router(llm.router, prefix="/llm", tags=["LLM"], include_in_schema=False)
 api_router.include_router(kpi_summary.router, prefix="/kpi-summary", tags=["kpi_summary"])
 api_router.include_router(purchase_requests.router, prefix="/purchase-requests", tags=["purchase_requests"])
+api_router.include_router(aps.router, prefix="/aps", tags=["aps"])
+api_router.include_router(erp.router, prefix="/erp", tags=["erp"])
 # material_shortage router disabled — POST rebuild is redundant (already called inside
 # POST /kpi-summary/daily-plan/rebuild) and GET list is unused by FE. Code kept as-is.
 # api_router.include_router(material_shortage.router, prefix="/material-shortage", tags=["material_shortage"])

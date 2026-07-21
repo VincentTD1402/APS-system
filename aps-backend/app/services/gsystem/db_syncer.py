@@ -424,7 +424,7 @@ def sync_work_orders(session: Session, records: list[dict[str, Any]]) -> int:
     return count
 
 
-def _gen_temp_id(session: Session, work_date: date | None) -> str:
+def gen_temp_id(session: Session, work_date: date | None) -> str:
     """Generate a unique temp_id: WO-YYYYMMDD-<random8digit>.
 
     Matches the legacy workOrderNo convention (WO-<date>-<serial>) so a
@@ -439,7 +439,7 @@ def _gen_temp_id(session: Session, work_date: date | None) -> str:
         ).scalar_one_or_none()
         if exists is None:
             return candidate
-    raise RuntimeError(f"_gen_temp_id: could not find unique temp_id for date={date_part} after 10 attempts")
+    raise RuntimeError(f"gen_temp_id: could not find unique temp_id for date={date_part} after 10 attempts")
 
 
 def create_planned_work_orders_from_mps_plan(session: Session) -> int:
@@ -469,7 +469,7 @@ def create_planned_work_orders_from_mps_plan(session: Session) -> int:
             continue
 
         wo = WorkOrder(
-            temp_id=_gen_temp_id(session, plan.plan_start_date or plan.plan_date),
+            temp_id=gen_temp_id(session, plan.plan_start_date or plan.plan_date),
             mps_plan_id=plan.id,
             item_id=plan.item_id,
             work_order_date=plan.plan_start_date or plan.plan_date,
