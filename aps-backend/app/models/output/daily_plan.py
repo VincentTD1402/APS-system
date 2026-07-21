@@ -7,7 +7,7 @@ load). Rebuilt wholesale on every sync (see daily_plan_builder.rebuild_daily_pla
 
 from datetime import date
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -48,6 +48,16 @@ class DailyPlan(Base):
     material_shortage_qty: Mapped[float] = mapped_column(
         Numeric(18, 4), nullable=False, server_default="0"
     )
+
+    # Set by POST /aps/adjust (drag/drop). Adjusted rows are skipped (preserved)
+    # by rebuild_daily_plan's wipe-and-rebuild instead of being regenerated —
+    # a manual override must survive the next G-System resync.
+    adjusted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Pre-adjustment snapshot, captured only on the FIRST adjustment of a work
+    # plan (re-adjusting doesn't overwrite these — same semantics as the FE
+    # mock-server.ts cascade logic).
+    original_work_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    original_planned_qty: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
 
     mps_plan: Mapped["MpsPlan"] = relationship(foreign_keys=[mps_plan_id])
     item_routing: Mapped["ItemRoutingSpec"] = relationship(foreign_keys=[item_routing_id])
