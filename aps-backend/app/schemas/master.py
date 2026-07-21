@@ -41,7 +41,7 @@ class RoutingOut(CamelModel):
     step_no: int | None = Field(None, description="aps_item_routing_spec.proc_sno")
     wc_code: str | None = Field(None, description="Workcenter's workcenter_no")
     process_name_ko: str | None = Field(None, description="proc_name")
-    standard_st_min: float | None = Field(None, description="work_time (seconds per unit)")
+    standard_st_min: float | None = Field(None, description="Standard time per unit in MINUTES (BE stores work_time as seconds; route divides by 60)")
 
 
 class BomComponentOut(CamelModel):
@@ -56,5 +56,5 @@ class InventoryRowOut(CamelModel):
     id: int
     item_code: str | None = Field(None, description="Item's item_no (resolved via gsystem_item_id)")
     warehouse_code: str | None = Field(None, description="aps_stock.wh_cd")
-    on_hand: float | None = Field(None, description="aps_stock.in_qty")
+    on_hand: float | None = Field(None, description="Available stock qty (aps_stock.able_qty) — not in_qty which is inbound-in-period")
     as_of_date: str | None = Field(None, description="stk_ym (YYYYMM) → YYYY-MM-01")

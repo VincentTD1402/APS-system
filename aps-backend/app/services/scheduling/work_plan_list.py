@@ -56,7 +56,7 @@ from app.models import (
     WorkCenter,
     WorkOrder,
 )
-from app.schemas.work_plan import WorkPlanRow
+from app.schemas.work_plan import WorkPlanDailyRow, WorkPlanRow
 
 
 def _parse_iso_date(value: object) -> Optional[date]:
@@ -169,6 +169,43 @@ def _build_risk_sets(db: Session) -> tuple[set[int], set[int]]:
     return overload, short
 
 
+def _build_daily_plans_index(
+    db: Session,
+) -> tuple[dict[int, list[WorkPlanDailyRow]], dict[int, float]]:
+    """mps_plan_id → (sorted daily rows, total material shortage qty).
+
+    Groups aps_daily_plan rows by mps_plan_id. Each daily row exposes
+    `date/qty/minutes`; `minutes = planned_qty × item_routing_spec.work_time`
+    (null when the routing row / work_time is missing — see business-rule note in
+    the report on `work_time` unit).
+
+    Also returns the aggregate `shortage_qty` per plan (sum of
+    material_shortage_qty across the plan's days) for `WorkPlanRow.shortage_qty`.
+    """
+    work_time_by_routing: dict[int, Optional[float]] = {}
+    for irs in db.execute(select(ItemRoutingSpec)).scalars().all():
+        work_time_by_routing[irs.id] = (
+            float(irs.work_time) if irs.work_time is not None else None
+        )
+
+    daily: dict[int, list[WorkPlanDailyRow]] = defaultdict(list)
+    shortage: dict[int, float] = defaultdict(float)
+    for dp in db.execute(select(DailyPlan)).scalars().all():
+        qty = float(dp.planned_qty)
+        wt = work_time_by_routing.get(dp.item_routing_id)
+        # work_time stored as SECONDS per unit (jph = 3600 / work_time) → convert to minutes.
+        minutes = qty * wt / 60.0 if wt is not None else None
+        daily[dp.mps_plan_id].append(
+            WorkPlanDailyRow(date=dp.work_date, qty=qty, minutes=minutes)
+        )
+        if dp.material_shortage_qty is not None:
+            shortage[dp.mps_plan_id] += float(dp.material_shortage_qty)
+
+    for rows in daily.values():
+        rows.sort(key=lambda r: r.date)
+    return dict(daily), dict(shortage)
+
+
 def _build_backward_window_index(db: Session) -> dict[int, tuple[date, date]]:
     """mps_plan_id → (earliest, latest) aps_daily_plan.work_date — the Backward window.
 
@@ -260,6 +297,7 @@ def build_work_plan_list(
     proc_by_item = _build_proc_by_item(db)
     overload_ids, short_ids = _build_risk_sets(db)
     backward = _build_backward_window_index(db)
+    daily_index, shortage_totals = _build_daily_plans_index(db)
 
     # Load Grid cell drill-down: mps_plan_ids that load (work_date [, workcenter]) in
     # aps_daily_plan. None → no drill-down (all rows pass this stage).
@@ -299,6 +337,7 @@ def build_work_plan_list(
             overload, short = (wo.mps_plan_id in overload_ids, wo.mps_plan_id in short_ids)
             rows.append(
                 WorkPlanRow(
+                    id=str(wo.id),  # FE reference for adjust/PR/WO action
                     source_type="WO",
                     work_order_no=wo.work_order_no,  # 작업지시번호 (P6 = số lệnh SX = work_order.work_order_no)
                     tmp_plan_no=None,
@@ -316,6 +355,8 @@ def build_work_plan_list(
                     plan_end=plan_end,  # 계획완료 (WO's own end date)
                     delivery_date=mps.delivery_date if mps else None,  # 납기일자
                     risk_types=_risk_types(overload, short),
+                    shortage_qty=shortage_totals.get(wo.mps_plan_id, 0.0) if wo.mps_plan_id else 0.0,
+                    daily_plans=daily_index.get(wo.mps_plan_id, []) if wo.mps_plan_id else [],
                 )
             )
         elif _is_planned(wo) and mps is not None:
@@ -335,6 +376,7 @@ def build_work_plan_list(
             overload, short = (mps.id in overload_ids, mps.id in short_ids)
             rows.append(
                 WorkPlanRow(
+                    id=str(wo.id),  # FE reference for adjust/PR/WO action
                     source_type="MPS",
                     work_order_no=None,
                     tmp_plan_no=mps.plan_no,  # (임시)작업계획번호
@@ -349,6 +391,8 @@ def build_work_plan_list(
                     plan_end=(window[1] if window else mps.plan_end_date),  # 계획완료 (Backward-end; fallback 종료일자)
                     delivery_date=mps.delivery_date,  # 납기일자
                     risk_types=_risk_types(overload, short),
+                    shortage_qty=shortage_totals.get(mps.id, 0.0),
+                    daily_plans=daily_index.get(mps.id, []),
                 )
             )
         # else: SENT / FAILED / partial rows are not part of the work plan list.
