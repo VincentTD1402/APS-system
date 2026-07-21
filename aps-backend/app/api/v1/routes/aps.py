@@ -1,10 +1,10 @@
 """POST /aps/run and POST /aps/adjust — the scheduling core (fe-be-gap-matrix rows 8-9).
 
-Both are pure reads/mutations over the current DB state — neither calls
-daily_plan_builder.rebuild_daily_plan or shortage_builder.rebuild_material_shortage.
-That compute already exists as POST /kpi-summary/daily-plan/rebuild; call it
-first (or after a G-System sync) so aps_daily_plan/aps_material_shortage are
-current. Re-running it here would just duplicate that work.
+/aps/run rebuilds aps_daily_plan/aps_material_shortage (same sequence as
+POST /kpi-summary/daily-plan/rebuild) before assembling, so the FE always
+gets a fresh WorkPlan/LoadCell/KPI result without a separate rebuild call.
+/aps/adjust only re-backward-fills the named plans on top of current state —
+it does not re-run the full rebuild.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from app.services.scheduling.aps_run_service import (
     AssembledResult,
     PlanIdError,
     adjust_work_plans,
-    assemble,
+    run_full_pipeline,
 )
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
         ],
         load_cells=[
             LoadCellOut(
-                wc_code=lc.wc_code, cell_date=lc.cell_date, minutes_loaded=lc.minutes_loaded,
+                wc_code=lc.wc_code, wc_name=lc.wc_name, cell_date=lc.cell_date, minutes_loaded=lc.minutes_loaded,
                 minutes_capacity=lc.minutes_capacity, status=lc.status,
             )
             for lc in result.load_cells
@@ -68,17 +68,18 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
 @router.post(
     "/run",
     response_model=ApsRunResult,
-    summary="Assemble the WorkPlan/LoadCell/KPI result from the current schedule",
+    summary="Run the backward-fill scheduler + material shortage + load + KPI",
     description=(
-        "Read-only — assembles aps_input.work_order + aps_daily_plan (already computed by "
-        "POST /kpi-summary/daily-plan/rebuild) into the full WorkPlan/LoadCell/KPI result "
-        "for the FE Work Plan view. Call the rebuild endpoint first if the schedule is stale."
+        "Rebuilds aps_daily_plan (preserving hand-adjusted rows) and aps_material_shortage, "
+        "then assembles the full WorkPlan/LoadCell/KPI result for the FE Work Plan view."
     ),
 )
 def run_aps(db: Session = Depends(get_db)) -> ApsRunResult:
     try:
-        result = assemble(db)
+        result = run_full_pipeline(db)
+        db.commit()
     except Exception as exc:
+        db.rollback()
         logger.exception("POST /aps/run failed")
         raise HTTPException(status_code=500, detail=str(exc))
     return _to_response(result)

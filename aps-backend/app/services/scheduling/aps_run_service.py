@@ -1,10 +1,12 @@
 """Assembly service for POST /aps/run and POST /aps/adjust.
 
-/aps/run is a pure READ — it does NOT recompute aps_daily_plan/
-aps_material_shortage. That compute already exists as
-POST /kpi-summary/daily-plan/rebuild (daily_plan_builder.rebuild_daily_plan +
-shortage_builder.apply_daily_material_shortage/rebuild_material_shortage);
-re-running it here would duplicate that work. Callers must rebuild first.
+/aps/run recomputes aps_daily_plan/aps_material_shortage itself (same
+sequence as POST /kpi-summary/daily-plan/rebuild: rebuild_daily_plan →
+apply_daily_material_shortage → rebuild_material_shortage) before assembling —
+FE/KPI2/KPI3/KPI4 need those tables current on every run, and rebuild_daily_plan
+already preserves hand-adjusted rows, so re-running it here is safe.
+/aps/adjust does NOT re-run this — it only re-backward-fills the named plans
+on top of current DB state (see adjust_work_plans).
 
 WorkPlan assembly is built on top of work_plan_list.build_work_plan_list,
 which is already driven by aps_input.work_order (joined to aps_mps_plan) —
@@ -17,7 +19,6 @@ WorkPlan.id = str(work_order.id) — the real PK, not a synthetic key.
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
@@ -25,9 +26,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_logger
-from app.models import DailyPlan, ItemRoutingSpec, WorkCenter, WorkOrder
-from app.services.material_shortage.shortage_builder import apply_daily_material_shortage
-from app.services.scheduling.daily_plan_builder import _backward_fill_step, build_workcenter_capacity_index
+from app.models import DailyPlan, ItemRoutingSpec, MaterialShortage, MpsPlan, WorkCenter, WorkOrder
+from app.services.kpi_summary.daily_plan_rollup import workcenter_daily_status_rollup
+from app.services.material_shortage.shortage_builder import (
+    apply_daily_material_shortage,
+    rebuild_material_shortage,
+)
+from app.services.scheduling.daily_plan_builder import (
+    _backward_fill_step,
+    build_workcenter_capacity_index,
+    rebuild_daily_plan,
+)
 from app.services.scheduling.work_plan_list import build_work_plan_list
 
 logger = get_logger(__name__)
@@ -78,6 +87,7 @@ class WorkPlan:
 @dataclass
 class LoadCell:
     wc_code: str
+    wc_name: str | None
     cell_date: date
     minutes_loaded: float
     minutes_capacity: float
@@ -110,104 +120,88 @@ class AssembledResult:
 _SOURCE_TYPE_MAP = {"WO": "FROM_WORK_ORDER", "MPS": "FROM_MPS"}
 
 
+_ROLLUP_STATUS_MAP = {
+    "normal": "NORMAL",
+    "overload": "OVERLOAD",
+    "material-shortage": "MATERIAL_SHORT",
+    "urgent": "OVERLOAD_AND_MATERIAL_SHORT",
+}
+
+
 def _build_load_cells(session: Session) -> tuple[list[LoadCell], set[str]]:
-    """Group aps_daily_plan by (workcenter, day) — independent of work_order."""
-    rows = session.execute(
-        select(DailyPlan, ItemRoutingSpec, WorkCenter)
-        .join(ItemRoutingSpec, DailyPlan.item_routing_id == ItemRoutingSpec.id)
-        .join(WorkCenter, DailyPlan.workcenter_id == WorkCenter.id)
-    ).all()
-    capacity_index = build_workcenter_capacity_index(session)
-
-    cell_map: dict[tuple[str, date], dict[str, float | bool]] = defaultdict(
-        lambda: {"minutes_loaded": 0.0, "capacity": 0.0, "has_material_short": False}
-    )
-    for dp, ir, wc in rows:
-        minutes = float(dp.planned_qty) * (float(ir.work_time) / 60.0) if ir.work_time else 0.0
-        key = (wc.workcenter_no, dp.work_date)
-        cell = cell_map[key]
-        cell["minutes_loaded"] += minutes
-        cell["capacity"] = capacity_index.minutes_on(wc.id, dp.work_date)
-        if float(dp.material_shortage_qty or 0) > 0:
-            cell["has_material_short"] = True
-
-    load_cells: list[LoadCell] = []
+    """Reuses workcenter_daily_status_rollup — the same persisted aps_daily_plan.status
+    GET /kpi-summary/load (KPI3) reads — instead of recomputing overload live from
+    planned_qty/work_time, so the Load Grid and overloadWcPct always agree with KPI3.
+    """
     overloaded_wc_codes: set[str] = set()
-    for (wc_code, cell_date), val in cell_map.items():
-        minutes_loaded = float(val["minutes_loaded"])
-        capacity = float(val["capacity"])
-        overload = capacity > 0 and minutes_loaded > capacity
-        has_material_short = bool(val["has_material_short"])
-        if overload and has_material_short:
-            status = "OVERLOAD_AND_MATERIAL_SHORT"
-        elif overload:
-            status = "OVERLOAD"
-        elif has_material_short:
-            status = "MATERIAL_SHORT"
-        else:
-            status = "NORMAL"
-        if overload:
-            overloaded_wc_codes.add(wc_code)
+    load_cells = []
+    for r in workcenter_daily_status_rollup(session):
         load_cells.append(LoadCell(
-            wc_code=wc_code, cell_date=cell_date, minutes_loaded=round(minutes_loaded, 2),
-            minutes_capacity=round(capacity, 2), status=status,
+            wc_code=r.workcenter_no, wc_name=r.workcenter_name, cell_date=r.work_date,
+            minutes_loaded=r.used_minutes, minutes_capacity=r.capacity_minutes,
+            status=_ROLLUP_STATUS_MAP.get(r.status, "NORMAL"),
         ))
+        if r.status in ("overload", "urgent"):
+            overloaded_wc_codes.add(r.workcenter_no)
     return load_cells, overloaded_wc_codes
 
 
-def _compute_kpi(
-    session: Session, work_plans: list[WorkPlan], overloaded_wc_codes: set[str],
-) -> KpiSnapshot:
-    """KPI counts at MPS-line grain, not work_order-row grain.
+def _compute_kpi(session: Session, work_plans: list[WorkPlan], overloaded_wc_codes: set[str]) -> KpiSnapshot:
+    """Mirrors KPI1/KPI2/KPI3/KPI4's own formulas exactly, at MPS-line grain.
 
     aps_input.work_order can carry several rows for the same mps_plan_id (one
     G-System MPS line can be split into multiple dispatched work orders — seen
-    live, e.g. one line with 11 work_order rows). WorkPlan is one row per
-    work_order (needed so each is independently actionable), so counting KPI
-    directly over work_plans would count that one line up to 11 times. Group
-    by mps_plan_id first — same unit KPI1/KPI4 use — so a line contributes
-    once regardless of how many work orders back it.
+    live, e.g. one line with 11 work_order rows), so on-time is deduped by
+    mps_plan_id first — each work_order resolves to its aps_mps_plan row and
+    is judged the same way KPI1 judges it (plan_end_date > delivery_date),
+    not by the work_order's own backward-filled/response dates.
     """
     wo_ids = [int(p.id) for p in work_plans]
-    mps_plan_by_wo_id: dict[str, int | None] = {
+    mps_plan_id_by_wo_id: dict[str, int | None] = {
         str(wo_id): mps_plan_id
         for wo_id, mps_plan_id in session.execute(
             select(WorkOrder.id, WorkOrder.mps_plan_id).where(WorkOrder.id.in_(wo_ids))
         ).all()
     } if wo_ids else {}
+    mps_plan_ids = {v for v in mps_plan_id_by_wo_id.values() if v is not None}
+    mps_by_id = {
+        m.id: m for m in session.execute(select(MpsPlan).where(MpsPlan.id.in_(mps_plan_ids))).scalars().all()
+    } if mps_plan_ids else {}
 
-    groups: dict[int | str, list[WorkPlan]] = defaultdict(list)
+    lines_seen: set[int | str] = set()
+    counted = 0
+    delayed = 0
     for p in work_plans:
-        # Ad-hoc work orders (no mps_plan_id) have no line to dedupe against —
-        # each stands alone.
-        key = mps_plan_by_wo_id.get(p.id) or f"wo:{p.id}"
-        groups[key].append(p)
+        key = mps_plan_id_by_wo_id.get(p.id) or f"wo:{p.id}"
+        if key in lines_seen:
+            continue
+        lines_seen.add(key)
+        mps = mps_by_id.get(key) if isinstance(key, int) else None
+        # Same WHERE clause as KPI1: skip lines with no plan_end_date/delivery_date.
+        if mps is None or mps.plan_end_date is None or mps.delivery_date is None:
+            continue
+        counted += 1
+        if mps.plan_end_date > mps.delivery_date:
+            delayed += 1
+    on_time_rate = round(((counted - delayed) / counted) * 100, 1) if counted else 100.0
 
-    total_lines = len(groups)
-    on_time_lines = 0
-    material_lines = 0
-    risk_lines = 0
-    for members in groups.values():
-        # All members of a line share the same risk_type/delivery_date (both
-        # derive from the same aps_mps_plan/aps_daily_plan rows) — worst-case
-        # plan_end across members decides on-time, since the line isn't done
-        # until every one of its work orders is.
-        worst_end = max(m.plan_end_date for m in members)
-        delivery = members[0].delivery_date
-        if worst_end <= delivery:
-            on_time_lines += 1
-        risk_type = members[0].risk_type
-        if risk_type in ("MATERIAL_SHORT", "MATERIAL_AND_OVERLOAD"):
-            material_lines += 1
-        if risk_type != "NORMAL":
-            risk_lines += 1
+    # Same query as KPI2 (calculate_kpi2_shortage) — count, not scoped to work_plans.
+    material_shortage_count = len(
+        session.execute(select(MaterialShortage.id).where(MaterialShortage.shortage_qty > 0)).scalars().all()
+    )
 
     total_wc_count = len(session.execute(select(WorkCenter.id)).scalars().all())
+    overloaded_wc_count = len(overloaded_wc_codes)
+    overload_wc_pct = round((overloaded_wc_count / total_wc_count) * 100, 1) if total_wc_count else 0.0
+
+    # Same formula as KPI4 (r1 delayed + r2 shortage items + r3 overloaded wc).
+    planning_risk_count = delayed + material_shortage_count + overloaded_wc_count
+
     return KpiSnapshot(
-        on_time_rate_pct=round((on_time_lines / total_lines) * 100, 1) if total_lines else 100.0,
-        material_shortage_count=material_lines,
-        overload_wc_pct=round((len(overloaded_wc_codes) / total_wc_count) * 100, 1) if total_wc_count else 0.0,
-        planning_risk_count=risk_lines,
+        on_time_rate_pct=on_time_rate,
+        material_shortage_count=material_shortage_count,
+        overload_wc_pct=overload_wc_pct,
+        planning_risk_count=planning_risk_count,
     )
 
 
@@ -274,6 +268,20 @@ def assemble(session: Session) -> AssembledResult:
         load_cells=load_cells,
         kpi=kpi,
     )
+
+
+def run_full_pipeline(session: Session) -> AssembledResult:
+    """POST /aps/run: rebuild aps_daily_plan/aps_material_shortage, then assemble.
+
+    Same rebuild sequence as POST /kpi-summary/daily-plan/rebuild — kept in
+    sync here so /aps/run always reflects a fresh schedule without requiring
+    the FE to call the rebuild endpoint separately first. Caller owns commit.
+    """
+    rebuild_daily_plan(session)
+    apply_daily_material_shortage(session)
+    rebuild_material_shortage(session)
+    session.flush()
+    return assemble(session)
 
 
 def _resolve_item_routing_id(session: Session, wo: WorkOrder) -> int:

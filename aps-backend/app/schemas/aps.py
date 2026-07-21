@@ -56,6 +56,7 @@ class WorkPlanOut(CamelModel):
 
 class LoadCellOut(CamelModel):
     wc_code: str
+    wc_name: str | None = None
     cell_date: date
     minutes_loaded: float
     minutes_capacity: float
