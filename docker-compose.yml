@@ -3,21 +3,38 @@ services:
     image: postgres:15-alpine
     container_name: aps-db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-aps}
-      POSTGRES_USER: ${POSTGRES_USER:-aps}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aps_dev_pw}
-      TZ: Asia/Seoul
-      PGTZ: Asia/Seoul
+      POSTGRES_DB: ${APS_DB_NAME:-aps_db}
+      POSTGRES_USER: ${APS_DB_USER:-aps_user}
+      POSTGRES_PASSWORD: ${APS_DB_PASSWORD:-aps12345}
+      TZ: ${APS_TIMEZONE:-Asia/Seoul}
+      PGTZ: ${APS_TIMEZONE:-Asia/Seoul}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${APS_DB_PORT:-5433}:5432"
     volumes:
       - aps-db-data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aps} -d ${POSTGRES_DB:-aps}"]
+      test: ["CMD-SHELL", "pg_isready -U ${APS_DB_USER:-aps_user} -d ${APS_DB_NAME:-aps_db}"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5
+    container_name: aps-neo4j
+    environment:
+      NEO4J_AUTH: ${APS_NEO4J_USER:-neo4j}/${APS_NEO4J_PASSWORD:-aps-password}
+    ports:
+      - "${APS_NEO4J_HTTP_PORT:-7474}:7474"
+      - "${APS_NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - aps-neo4j-data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "${APS_NEO4J_USER:-neo4j}", "-p", "${APS_NEO4J_PASSWORD:-aps-password}", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
     restart: unless-stopped
 
   backend:
@@ -25,19 +42,30 @@ services:
       context: ./aps-backend
       dockerfile: Dockerfile
     container_name: aps-backend
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aps}:${POSTGRES_PASSWORD:-aps_dev_pw}@db:5432/${POSTGRES_DB:-aps}
-      APS_TIMEZONE: Asia/Seoul
-      GSYSTEM_MODE: mock
-      ERP_MODE: outbox
-      PYTHONPATH: /app
+      # In-container overrides — reach db/neo4j via docker network hostnames.
+      APS_DB_URL: postgresql://${APS_DB_USER:-aps_user}:${APS_DB_PASSWORD:-aps12345}@db:5432/${APS_DB_NAME:-aps_db}
+      APS_NEO4J_URI: bolt://neo4j:7687
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${APS_API_PORT:-8001}:8000"
     volumes:
       - ./aps-backend:/app
     depends_on:
       db:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --max-time 5 http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 8s
+      start_period: 30s
+      retries: 5
     restart: unless-stopped
 
   frontend:
@@ -46,9 +74,9 @@ services:
       dockerfile: Dockerfile
     container_name: aps-frontend
     environment:
-      VITE_API_BASE_URL: http://localhost:${BACKEND_PORT:-8000}
+      VITE_API_BASE_URL: http://localhost:${APS_API_PORT:-8001}/api/${API_VERSION:-v1}
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${APS_FE_PORT:-5173}:5173"
     volumes:
       - ./aps-frontend:/app
       - /app/node_modules
@@ -58,3 +86,4 @@ services:
 
 volumes:
   aps-db-data:
+  aps-neo4j-data:

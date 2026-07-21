@@ -1,71 +1,53 @@
 # APS System Backend Core
 
-Advanced Planning and Scheduling System — Core Module
+Advanced Planning and Scheduling System — Core Module (FastAPI).
+
+Toàn bộ orchestration (docker compose, migrate, seed, lint, test…) chạy qua **root Justfile** — file này chỉ mô tả riêng backend.
+
+Xem `../justfile` (root) và `../docs/` cho quick start + API contract.
 
 ---
 
-## Quick Start (local dev)
+## Bố cục thư mục
 
-Tất cả lệnh chạy **trong container** qua `docker compose exec`. Ở host chỉ cần `docker`, `just`, và file `.env`.
-
-### 1. Prerequisites
-
-- Docker Desktop (compose v2)
-- [`just`](https://github.com/casey/just) — `brew install just` (macOS) hoặc `scoop install just` (Windows)
-- VPN / network truy cập được G-System DB (host `192.168.205.231:5432`)
-
-### 2. Setup env
-
-```bash
-cp .env.example .env
-# Mở .env và điền: GSYSTEM_DB_USER, GSYSTEM_DB_PASSWORD (hỏi team lead)
+```
+aps-backend/
+├── .env.example          # tham chiếu, .env thật ở root
+├── Dockerfile            # image runtime (python 3.11-slim + uv)
+├── alembic.ini           # hard-code host `db` — chỉ resolve trong docker network
+├── pyproject.toml        # deps quản lý bằng uv
+├── uv.lock
+├── migrations/           # Alembic revisions
+├── ontology/             # OWL TBox + SHACL shapes (dành cho AI/graph pipeline sau)
+└── app/
+    ├── main.py           # FastAPI entry
+    ├── api/v1/routes/    # REST endpoints (chi tiết: ../docs/api-spec.md)
+    ├── config/           # pydantic-settings (đọc env APS_* / GSYSTEM_* / LLM_*)
+    ├── db/               # SQLAlchemy session
+    ├── models/           # ORM models (input/ vs output/)
+    ├── schemas/          # Pydantic response schemas
+    ├── services/         # gsystem / kpi_summary / material_shortage / scheduling / llm / neo4j / ontology
+    ├── scheduler/        # APScheduler cron cho G-System sync
+    └── scripts/
+        ├── run_pipeline.py         # entry point seed (G-System hoặc --use-mock)
+        ├── dump_databases.py
+        └── ...
 ```
 
-### 3. Start services
+---
+
+## Quick start (từ project root)
 
 ```bash
-just up-build              # lần đầu (build image)
-# hoặc just up            # những lần sau
-just ps                    # cả 3 container phải Healthy
+cd ..                             # về project root
+cp .env.example .env              # điền GSYSTEM_DB_USER/PASSWORD khi cần dữ liệu thật
+just up -d                        # start 4 container: db, neo4j, backend, frontend
+just migrate                      # alembic upgrade head
+just seed                         # mock G-System pipeline (thêm --use-mock trong recipe)
+just ps                           # cả 4 container Healthy
 ```
 
-3 services lên:
-- `aps_core_api` — FastAPI (port **8001** ngoài → 8000 trong container)
-- `aps_core_db` — PostgreSQL 15 (port **5433**)
-- `aps_neo4j` — Neo4j 5 (port **7474** HTTP, **7687** Bolt)
-
-### 4. Migrate DB
-
-```bash
-just migrate
-```
-
-Tương đương: `docker compose exec api alembic upgrade head`.
-(`alembic.ini` hard-code host `db` — chỉ resolve được trong docker network nên **phải** chạy trong container.)
-
-### 5. Seed data (G-System pipeline)
-
-```bash
-just seed
-```
-
-Tương đương: `docker compose exec api python app/scripts/run_pipeline.py`.
-
-Pipeline gồm 4 phase:
-1. **Sync G-System** → APS Postgres (9 entities)
-2. **Build RDF ABox**
-3. **Validate** OWL-RL + SHACL
-4. **Import Neo4j** (~886 nodes / 1879 relationships)
-
-Mất ~1–2 phút. Kết thúc log `── Pipeline complete ──` là OK.
-
-#### Reseed bằng mock data (không cần G-System)
-
-```bash
-docker compose exec api python app/scripts/run_pipeline.py --use-mock --reset
-```
-
-### 6. Verify
+Verify:
 
 | Endpoint | URL |
 |---|---|
@@ -73,79 +55,43 @@ docker compose exec api python app/scripts/run_pipeline.py --use-mock --reset
 | Health | http://localhost:8001/health |
 | Swagger UI | http://localhost:8001/docs |
 | OpenAPI JSON | http://localhost:8001/openapi.json |
-| Neo4j Browser | http://localhost:7474 (`neo4j` / xem `.env`) |
+| Neo4j Browser | http://localhost:7474 |
+
+Recipe khác: `just --list` ở root.
 
 ---
 
-## Common chores
+## Env vars backend đọc
 
-```bash
-just logs                           # tail API log (default service=api)
-just logs db                        # log của Postgres
-just restart                        # restart api sau khi đổi code (có volume mount)
-just down                           # stop services (giữ data)
-just down-v                         # stop + xoá volume (mất DB — có confirm)
-just sh                             # bash trong container api
-just ps                             # status
+Full list trong `../.env.example`. Nhóm chính:
 
-just db-reset                       # soft reset: migrate + seed (giữ data cũ)
-just db-wipe                        # FULL reset: wipe volumes → up → migrate → seed
-just migration "add_xxx_table"      # tạo Alembic revision mới
-just backup                         # dump Postgres + Neo4j
-just check-format                   # black + flake8 + mypy
-```
+- `APS_DB_URL`, `APS_DB_USER/PASSWORD/NAME` — Postgres (in-container hostname `db`)
+- `APS_NEO4J_URI`, `APS_NEO4J_USER/PASSWORD/DATABASE` — Neo4j (giữ cho AI/graph platform, APS không query)
+- `GSYSTEM_DB_URL`, `GSYSTEM_DB_USER/PASSWORD` — external ERP source DB (VPN required)
+- `GSYSTEM_BASE_URL`, `GSYSTEM_API_KEY` — G-System REST API
+- `GSYSTEM_SYNC_CRON_ENABLED`, `GSYSTEM_SYNC_CRON`, `GSYSTEM_SYNC_CRON_TIMEZONE` — APScheduler
+- `LLM_LLM_CONFIGS__THINK__*`, `..._NO_THINK__*` — Qwen3-8B via OpenAI-compatible API
+- `API_VERSION`, `DEBUG`, `LOG_LEVEL`, `APS_CALENDAR_TIMEZONE`
 
-Xem hết recipes: `just` hoặc `just --list`.
+Env code path: `app/config/config.py` (pydantic-settings).
 
 ---
 
-## Service Details
+## Pipeline seed
 
-### PostgreSQL (APS)
-- Image: `postgres:15-alpine`
-- Port host: **5433** (tránh đụng port 5432 của backend-ontology nếu có)
-- Credentials xem `.env` (`APS_DB_URL`)
-- Container name: `aps_core_db`
+`app/scripts/run_pipeline.py` gồm 4 phase:
 
-### Neo4j
-- Image: `neo4j:5`
-- HTTP: **7474** · Bolt: **7687**
-- Credentials xem `.env` (`APS_NEO4J_*`)
-- Container name: `aps_neo4j`
+1. **Sync G-System** → `aps_input.*` (9 entities)
+2. **Build RDF ABox** (ontology)
+3. **Validate** OWL-RL + SHACL
+4. **Import Neo4j** (~886 nodes / 1879 relationships)
 
-### G-System (external — không host)
-- Host: `192.168.205.231:5432`
-- Read-only source, cần VPN
-- Config: `GSYSTEM_DB_*` trong `.env`
+Recipe:
 
----
+- `just seed` → `run_pipeline.py --use-mock --reset` (không cần VPN)
+- `just seed-real` → `run_pipeline.py` (yêu cầu VPN + `GSYSTEM_DB_*`)
 
-## App Structure
-
-```
-.
-├── .env.example
-├── docker-compose.yml
-├── Dockerfile
-├── Justfile                 # task runner
-├── alembic.ini              # uses docker service `db` → chạy trong container
-├── migrations/              # Alembic revisions
-├── app/
-│   ├── main.py              # FastAPI entry
-│   ├── api/v1/routes/       # REST endpoints
-│   ├── config/              # Settings
-│   ├── db/                  # SQLAlchemy session
-│   ├── models/              # ORM models
-│   ├── schemas/             # Pydantic
-│   ├── services/            # Business logic (gsystem, ontology, neo4j, llm)
-│   └── scripts/
-│       ├── run_pipeline.py  # ← entry point seed (G-System hoặc --use-mock)
-│       ├── dump_databases.py
-│       └── ...
-├── ontology/                # TBox (OWL) + SHACL shapes
-├── new-frontend/            # Vue 3 dashboard (đang rebuild)
-└── old-frontend/            # React dashboard (legacy)
-```
+Phase 02-04 hiện chưa được API dùng (API-spec: `neo4j_nodes/relationships/rdf_triples` luôn = 0). Neo4j giữ nguyên cho platform AI về sau.
 
 ---
 
@@ -153,20 +99,22 @@ Xem hết recipes: `just` hoặc `just --list`.
 
 | Triệu chứng | Nguyên nhân | Fix |
 |---|---|---|
-| `could not translate host name "db"` khi chạy alembic | Chạy alembic từ host (không trong container) | Dùng `just migrate` (đã wrap docker exec) |
-| `just seed` báo connection refused tới `192.168.205.231` | Không có VPN / G-System unreachable | Bật VPN hoặc dùng `--use-mock --reset` |
-| Container `api` không healthy | Postgres chưa sẵn sàng | `docker compose restart api` sau khi `db` healthy |
-| Port 5433 / 8001 / 7474 đã chiếm | Process khác đang dùng | `just kill-port 8001` (hoặc đổi mapping trong `docker-compose.yml`) |
-| Neo4j báo lỗi auth | Sai password trong `.env` | Sync `APS_NEO4J_PASSWORD` với `NEO4J_AUTH` ở `docker-compose.yml` |
+| `could not translate host name "db"` khi chạy alembic từ host | alembic.ini hard-code hostname `db` | Dùng `just migrate` (đã wrap `docker compose exec backend`) |
+| `just seed` báo connection refused tới G-System | Không có VPN | Dùng `just seed` mặc định (mock), hoặc bật VPN + `just seed-real` |
+| Container `backend` không healthy | Postgres chưa sẵn sàng | `just restart backend` sau khi `db` healthy |
+| Port 5433/8001/7474/5173 đã bị chiếm | Process khác | `just kill-port 8001` hoặc đổi `.env` (`APS_API_PORT` etc.) |
+| Neo4j báo lỗi auth | Sai password | Sync `APS_NEO4J_PASSWORD` với `NEO4J_AUTH` trong compose (cả 2 đọc từ `.env`) |
 
 ---
 
-## Roadmap & Docs
+## Docs & Contracts
 
-- Roadmap: `docs/project-roadmap.md`
-- System architecture: `docs/system-architecture.md`
-- Pipeline overview: `docs/aps-pipeline-overview.md`
-- API field reference: `docs/aps-gsystem-api-field-reference.md`
-- LLM service: `docs/aps-llm-services-reference.md`
-- Scheduling engine: `docs/aps-scheduling-engine-reference.md`
-- Frontend rebuild plan: `plans/260509-1648-new-frontend-rebuild/plan.md`
+Tất cả docs/plans nằm ở **root** — không có `aps-backend/docs/` hay `aps-backend/plans/`.
+
+- API spec (BE ↔ FE contract): `../docs/api-spec.md`
+- API usage mapping (FE integration status): `../docs/api-usage-mapping.md`
+- FE mock data explanation: `../docs/fe-mock-data-explanation-vi.md`
+- Code conventions: `../docs/convention-code.md`
+- Ontology / Neo4j overview: `../docs/ontology/`
+- Original specs (Korean): `../docs/specs/`
+- Plans: `../plans/`

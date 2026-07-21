@@ -2,15 +2,14 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 set dotenv-load
 
 compose := "docker compose"
-
-backend-justfile := "aps-backend/Justfile"
-frontend-justfile := "aps-frontend/Justfile"
+be := "docker compose exec backend"
+fe := "docker compose exec frontend"
 
 # Import OS-specific recipes (auto-picked by [unix] / [windows] attributes)
 import '.just/unix.just'
 import '.just/windows.just'
 
-# Default: list recipes with OS info
+# Default: banner + recipe list
 default:
     @just _banner
     @just --list
@@ -18,7 +17,7 @@ default:
 _banner:
     @echo "APS System · OS: {{os()}} · arch: {{arch()}}"
 
-# ─── Docker compose (cross-platform) ───────────────────────────────────
+# ─── Docker compose ────────────────────────────────────────────────────
 
 # Start services. Usage: just up | just up -d | just up -d --build
 up *args:
@@ -28,8 +27,8 @@ up *args:
 down *args:
     {{compose}} down {{args}}
 
-# Stop services AND wipe volumes (DESTROYS DB DATA)
-[confirm("Wipe all volumes? This DELETES Postgres data! [y/N]")]
+# Stop services AND wipe volumes (DESTROYS Postgres + Neo4j DATA)
+[confirm("Wipe all volumes? This DELETES DB data! [y/N]")]
 reset:
     {{compose}} down -v
 
@@ -37,7 +36,7 @@ reset:
 ps:
     {{compose}} ps
 
-# Tail logs. Usage: just logs | just logs backend | just logs frontend | just logs db
+# Tail logs. Usage: just logs | just logs backend | just logs frontend | just logs db | just logs neo4j
 logs *args:
     {{compose}} logs -f {{args}}
 
@@ -50,15 +49,15 @@ restart service:
     {{compose}} restart {{service}}
 
 # Open shell in a service (uses sh — bash may not exist on alpine images).
-# Usage: just sh backend | just sh frontend | just sh db
+# Usage: just sh backend | just sh frontend | just sh db | just sh neo4j
 sh service:
     {{compose}} exec {{service}} sh
 
-# Psql into db. Usage: just psql | just psql postgres another_db
-psql user=env_var_or_default("POSTGRES_USER", "aps") db=env_var_or_default("POSTGRES_DB", "aps"):
+# Psql into APS db. Usage: just psql | just psql <user> <db>
+psql user=env_var_or_default("APS_DB_USER", "aps_user") db=env_var_or_default("APS_DB_NAME", "aps_db"):
     {{compose}} exec db psql -U {{user}} -d {{db}}
 
-# Full fresh start: reset → up → migrate → seed
+# Full fresh start: reset → up → migrate → seed (mock G-System)
 [confirm("Full reset will DROP all DB data. Continue? [y/N]")]
 bootstrap:
     {{compose}} down -v
@@ -66,49 +65,91 @@ bootstrap:
     just migrate
     just seed
 
-# ─── Delegated to subprojects ──────────────────────────────────────────
+# ─── Backend (runs inside `backend` container) ────────────────────────
 
-# Apply migrations (delegates to backend)
+# Apply pending migrations
 migrate:
-    just --justfile {{backend-justfile}} migrate
+    {{be}} alembic upgrade head
 
 # Create new migration. Usage: just migration "add_xxx_table"
 migration name:
-    just --justfile {{backend-justfile}} migration "{{name}}"
+    {{be}} alembic revision --autogenerate -m "{{name}}"
 
 # Roll back one migration step
 downgrade:
-    just --justfile {{backend-justfile}} downgrade
+    {{be}} alembic downgrade -1
 
-# Seed reference data
+# Seed via G-System pipeline (mock mode + wipe existing data)
 seed:
-    just --justfile {{backend-justfile}} seed
+    {{be}} python app/scripts/run_pipeline.py --reset
 
-# Lint backend + frontend
-lint:
-    just --justfile {{backend-justfile}} lint
-    just --justfile {{frontend-justfile}} lint
+# Seed via real G-System (requires VPN + GSYSTEM_DB_* configured)
+seed-real:
+    {{be}} python app/scripts/run_pipeline.py
 
-# Type check backend + frontend
-typecheck:
-    just --justfile {{backend-justfile}} typecheck
-    just --justfile {{frontend-justfile}} typecheck
+# Lint backend (ruff)
+lint-be:
+    {{be}} uv run ruff check app
 
-# Run tests backend + frontend
-test:
-    just --justfile {{backend-justfile}} test
-    just --justfile {{frontend-justfile}} test
+# Type check backend (mypy)
+typecheck-be:
+    {{be}} uv run mypy app
 
-# Format backend + frontend
-fmt:
-    just --justfile {{backend-justfile}} fmt
-    just --justfile {{frontend-justfile}} fmt
+# Test backend (pytest)
+test-be *args:
+    {{be}} uv run pytest {{args}}
+
+# Format backend (ruff format + fix)
+fmt-be:
+    {{be}} uv run ruff format app
+    {{be}} uv run ruff check --fix app
+
+# ─── Frontend (runs inside `frontend` container) ──────────────────────
+
+# Lint frontend
+lint-fe:
+    {{fe}} pnpm lint
+
+# Type check frontend
+typecheck-fe:
+    {{fe}} pnpm typecheck
+
+# Test frontend (Vitest)
+test-fe *args:
+    {{fe}} pnpm test {{args}}
+
+# Format frontend (prettier)
+fmt-fe:
+    {{fe}} pnpm exec prettier --write "src/**/*.{ts,vue,json,css}"
+
+# Build frontend for production
+build-fe:
+    {{fe}} pnpm build
+
+# ─── Combined (backend + frontend) ────────────────────────────────────
+
+lint: lint-be lint-fe
+typecheck: typecheck-be typecheck-fe
+test: test-be test-fe
+fmt: fmt-be fmt-fe
 
 # Full local CI: lint + typecheck + test + FE build
-ci: lint typecheck test
-    just --justfile {{frontend-justfile}} build
+ci: lint typecheck test build-fe
 
-# Dev — chạy local (không Docker) cho hot-reload nhanh
-dev:
-    @echo "Backend dev:  just --justfile {{backend-justfile}} dev"
-    @echo "Frontend dev: just --justfile {{frontend-justfile}} dev"
+# ─── Dependency management (runs on host — needs uv/pnpm installed) ──
+
+# Add backend runtime dep. Usage: just be-add fastapi
+be-add *deps:
+    uv --directory aps-backend add {{deps}}
+
+# Remove backend dep. Usage: just be-remove neo4j
+be-remove *deps:
+    uv --directory aps-backend remove {{deps}}
+
+# Add frontend dep. Usage: just fe-add axios | just fe-add -D vitest
+fe-add *deps:
+    pnpm --dir aps-frontend add {{deps}}
+
+# Remove frontend dep
+fe-remove *deps:
+    pnpm --dir aps-frontend remove {{deps}}
