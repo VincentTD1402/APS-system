@@ -76,7 +76,9 @@ def list_routings(db: Session = Depends(get_db)) -> list[RoutingOut]:
             step_no=r.proc_sno,
             wc_code=wc_no.get(r.workcenter_id) if r.workcenter_id is not None else None,
             process_name_ko=r.proc_name,
-            standard_st_min=float(r.work_time) if r.work_time is not None else None,
+            # work_time is stored as SECONDS per unit (jph = 3600 / work_time per item_routing.py).
+            # FE field standardStMin expects MINUTES → convert.
+            standard_st_min=float(r.work_time) / 60.0 if r.work_time is not None else None,
         ))
     return out
 
@@ -119,7 +121,9 @@ def list_inventory(db: Session = Depends(get_db)) -> list[InventoryRowOut]:
             id=s.id,
             item_code=item_code,
             warehouse_code=s.wh_cd,
-            on_hand=float(s.in_qty) if s.in_qty is not None else None,
+            # able_qty = available stock (tồn kho khả dụng); NOT in_qty (which is inbound in-period).
+            # Scheduler's material shortage detection needs the available balance.
+            on_hand=float(s.able_qty) if s.able_qty is not None else None,
             as_of_date=as_of,
         ))
     return out

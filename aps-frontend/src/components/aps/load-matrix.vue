@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
-import { computed } from 'vue'
+import { useMasterStore } from '@/stores/master-store'
+import { computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
-import { MOCK_WORK_CENTERS } from '@/mocks/master-data'
 import type { LoadCellStatus } from '@/types/enums'
 
 const { t } = useI18n()
 const store = useApsStore()
+const master = useMasterStore()
+
+onMounted(() => master.ensureLoaded())
 
 const dateRange = computed(() => {
   const dates: string[] = []
@@ -95,7 +98,7 @@ function shortDate(d: string): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="wc in MOCK_WORK_CENTERS" :key="wc.code">
+          <tr v-for="wc in master.workCenters" :key="wc.code">
             <td class="wc-name">{{ wc.code }}</td>
             <td v-for="d in dateRange" :key="d" class="cell-td">
               <div

@@ -2,11 +2,13 @@
 import { useI18n } from 'vue-i18n'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import { MOCK_WORK_CENTERS } from '@/mocks/master-data'
-import { ref } from 'vue'
+import { useMasterStore } from '@/stores/master-store'
+import { ref, onMounted } from 'vue'
 
 const { t, locale } = useI18n()
-const rows = ref(MOCK_WORK_CENTERS)
+const master = useMasterStore()
+
+onMounted(() => master.ensureLoaded())
 
 const expandedRows = ref({})
 </script>
@@ -16,16 +18,17 @@ const expandedRows = ref({})
     <h2>{{ t('nav.workCenters') }}</h2>
     <DataTable
       v-model:expanded-rows="expandedRows"
-      :value="rows"
+      :value="master.workCenters"
       data-key="code"
       striped-rows
       size="small"
+      :loading="master.loading"
     >
       <Column expander style="width: 3rem" />
       <Column :header="t('master.wc.code')" field="code" class="mono" />
       <Column :header="t('master.wc.name')">
         <template #body="{ data }">
-          {{ locale === 'ko' ? data.nameKo : data.nameVi }}
+          {{ locale === 'ko' ? data.nameKo : data.nameVi || data.nameKo }}
         </template>
       </Column>
       <Column :header="t('master.wc.defaultRuntime')" field="defaultRuntimeMin" class="mono" />
@@ -46,7 +49,7 @@ const expandedRows = ref({})
             <Column :header="t('master.equipment.code')" field="code" class="mono" />
             <Column :header="t('master.wc.name')">
               <template #body="{ data: eq }">
-                {{ locale === 'ko' ? eq.nameKo : eq.nameVi }}
+                {{ locale === 'ko' ? eq.nameKo : eq.nameVi || eq.nameKo }}
               </template>
             </Column>
             <Column :header="t('master.equipment.stRate')" field="stRate" class="mono" />

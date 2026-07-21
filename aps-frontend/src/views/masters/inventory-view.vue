@@ -2,15 +2,19 @@
 import { useI18n } from 'vue-i18n'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import { MOCK_INVENTORY } from '@/mocks/master-data'
+import { useMasterStore } from '@/stores/master-store'
+import { onMounted } from 'vue'
 
 const { t } = useI18n()
+const master = useMasterStore()
+
+onMounted(() => master.ensureLoaded())
 </script>
 
 <template>
   <div class="page">
     <h2>{{ t('nav.inventory') }}</h2>
-    <DataTable :value="MOCK_INVENTORY" data-key="id" size="small" striped-rows>
+    <DataTable :value="master.inventory" data-key="id" size="small" striped-rows :loading="master.loading">
       <Column :header="t('master.item.code')" field="itemCode" class="mono" />
       <Column :header="t('master.inventory.warehouse')" field="warehouseCode" class="mono" />
       <Column :header="t('master.inventory.onHand')" field="onHand" class="mono" />
