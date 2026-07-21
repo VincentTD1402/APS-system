@@ -42,12 +42,13 @@ export interface WorkPlan {
   runId: string
   sourceType: WorkPlanSourceType
   workOrderNo: string | null
-  tmpPlanNo: string
+  tmpPlanNo: string | null
   orderNo: string
   itemCode: string
   itemNameKo: string
   itemNameVi: string
   wcCode: string
+  wcName: string | null
   processNameKo: string
   processNameVi: string
   planQty: number
@@ -64,6 +65,7 @@ export interface WorkPlan {
 
 export interface LoadCell {
   wcCode: string
+  wcName: string | null
   cellDate: string
   minutesLoaded: number
   minutesCapacity: number

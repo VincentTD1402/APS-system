@@ -83,7 +83,7 @@ const selectedRow = computed(() => rows.value.find((r) => r.id === store.selecte
       </Column>
       <Column :header="t('workPlanList.col.tmpPlanNo')" field="tmpPlanNo" class="mono">
         <template #body="{ data }">
-          <span class="mono">{{ data.tmpPlanNo }}</span>
+          <span class="mono">{{ data.tmpPlanNo ?? '—' }}</span>
         </template>
       </Column>
       <Column :header="t('workPlanList.col.orderNo')" field="orderNo" class="mono" />
@@ -92,7 +92,11 @@ const selectedRow = computed(() => rows.value.find((r) => r.id === store.selecte
           {{ locale === 'ko' ? data.itemNameKo : data.itemNameVi }}
         </template>
       </Column>
-      <Column :header="t('workPlanList.col.wc')" field="wcCode" />
+      <Column :header="t('workPlanList.col.wc')">
+        <template #body="{ data }">
+          {{ data.wcName ?? (data.wcCode || '—') }}
+        </template>
+      </Column>
       <Column :header="t('workPlanList.col.process')">
         <template #body="{ data }">
           {{ locale === 'ko' ? data.processNameKo : data.processNameVi }}

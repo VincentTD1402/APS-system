@@ -66,11 +66,12 @@ class WorkPlan:
     run_id: str
     source_type: str
     work_order_no: str | None
-    tmp_plan_no: str
+    tmp_plan_no: str | None
     order_no: str | None
     item_code: str
     item_name_ko: str
     wc_code: str
+    wc_name: str | None
     process_name_ko: str
     plan_qty: float
     plan_start_date: date
@@ -236,13 +237,15 @@ def assemble(session: Session) -> AssembledResult:
             run_id=run_id,
             source_type=_SOURCE_TYPE_MAP.get(row.source_type, "FROM_MPS"),
             work_order_no=row.work_order_no,
-            # FE's tmpPlanNo is non-null; work_plan_list only sets it for MPS rows
-            # (aps_mps_plan.plan_no) — fall back to this row's own id for WO rows.
-            tmp_plan_no=row.tmp_plan_no or row.id,
+            # work_plan_list only sets this for MPS rows (aps_mps_plan.plan_no) —
+            # null for WO rows (they have no temp plan; workOrderNo already covers
+            # their real identifier). Do not fabricate a value from row.id.
+            tmp_plan_no=row.tmp_plan_no,
             order_no=row.order_no,
             item_code=row.item_no or "",
             item_name_ko=row.item_name or row.item_no or "",
             wc_code=row.workcenter_no or "",
+            wc_name=row.workcenter_name,
             process_name_ko=row.proc_name or "",
             plan_qty=row.planned_qty or 0.0,
             plan_start_date=plan_start,

@@ -1,27 +1,40 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
-import { useMasterStore } from '@/stores/master-store'
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import dayjs from 'dayjs'
 import type { LoadCellStatus } from '@/types/enums'
 
 const { t } = useI18n()
 const store = useApsStore()
-const master = useMasterStore()
 
-onMounted(() => master.ensureLoaded())
-
+// Span the actual loaded schedule (min..max cellDate from /aps/run), not a
+// hardcoded month — aps_daily_plan's real window varies per run/backward-fill
+// anchor and previously missed most of it, making workcenters look empty.
 const dateRange = computed(() => {
+  const cellDates = store.loadCells.map((c) => c.cellDate)
+  const start = cellDates.length ? dayjs(cellDates.reduce((a, b) => (a < b ? a : b))) : dayjs()
+  const end = cellDates.length
+    ? dayjs(cellDates.reduce((a, b) => (a > b ? a : b)))
+    : start.add(30, 'day')
+
   const dates: string[] = []
-  const start = dayjs('2026-08-01')
-  const end = dayjs('2026-08-31')
   let d = start
   while (!d.isAfter(end)) {
     dates.push(d.format('YYYY-MM-DD'))
     d = d.add(1, 'day')
   }
   return dates
+})
+
+// Only workcenters that actually appear in this run's loadCells — a workcenter
+// with zero aps_daily_plan rows has nothing to show and only pads the grid.
+const activeWorkCenters = computed(() => {
+  const byCode = new Map<string, string | null>()
+  for (const c of store.loadCells) if (!byCode.has(c.wcCode)) byCode.set(c.wcCode, c.wcName)
+  return [...byCode.entries()]
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => a.code.localeCompare(b.code))
 })
 
 const cellIndex = computed(() => {
@@ -98,8 +111,8 @@ function shortDate(d: string): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="wc in master.workCenters" :key="wc.code">
-            <td class="wc-name">{{ wc.code }}</td>
+          <tr v-for="wc in activeWorkCenters" :key="wc.code">
+            <td class="wc-name">{{ wc.code }} · {{ wc.name }}</td>
             <td v-for="d in dateRange" :key="d" class="cell-td">
               <div
                 :class="cellClass(wc.code, d)"
@@ -184,7 +197,7 @@ function shortDate(d: string): string {
   text-align: center;
 }
 .matrix .wc-col {
-  min-width: 60px;
+  min-width: 120px;
   text-align: left;
   padding-left: 4px;
   font-family: var(--aps-mono);
@@ -208,6 +221,7 @@ function shortDate(d: string): string {
   font-weight: 700;
   border-right: 1px solid var(--p-content-border-color);
   color: var(--p-text-color);
+  white-space: nowrap;
 }
 .cell-td {
   padding: 2px;

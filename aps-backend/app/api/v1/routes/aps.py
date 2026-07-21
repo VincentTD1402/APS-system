@@ -41,7 +41,7 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
             WorkPlanOut(
                 id=wp.id, run_id=wp.run_id, source_type=wp.source_type, work_order_no=wp.work_order_no,
                 tmp_plan_no=wp.tmp_plan_no, order_no=wp.order_no, item_code=wp.item_code,
-                item_name_ko=wp.item_name_ko, wc_code=wp.wc_code, process_name_ko=wp.process_name_ko,
+                item_name_ko=wp.item_name_ko, wc_code=wp.wc_code, wc_name=wp.wc_name, process_name_ko=wp.process_name_ko,
                 plan_qty=wp.plan_qty, plan_start_date=wp.plan_start_date, plan_end_date=wp.plan_end_date,
                 delivery_date=wp.delivery_date, risk_type=wp.risk_type, shortage_qty=wp.shortage_qty,
                 adjusted=wp.adjusted, original_start=wp.original_start, original_end=wp.original_end,
