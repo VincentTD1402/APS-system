@@ -81,7 +81,7 @@ downgrade:
 
 # Seed via G-System pipeline (mock mode + wipe existing data)
 seed:
-    {{be}} python app/scripts/run_pipeline.py --use-mock --reset
+    {{be}} python app/scripts/run_pipeline.py --reset
 
 # Seed via real G-System (requires VPN + GSYSTEM_DB_* configured)
 seed-real:
