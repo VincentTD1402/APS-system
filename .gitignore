@@ -115,6 +115,9 @@ assets/
 !claude/skills/use-mcp/assets/
 !claude/skills/use-mcp/assets/**
 
+# Ignore Claude init file
+CLAUDE.md
+
 # External repos for study/reference
 external/
 
