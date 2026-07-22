@@ -1,6 +1,6 @@
 """Schemas for the Work Plan List (작업계획 리스트) endpoint."""
 
-from datetime import date
+import datetime
 
 from pydantic import Field
 
@@ -15,7 +15,7 @@ class WorkPlanDailyRow(CamelModel):
     step (work_time is stored as seconds); null when the routing lookup misses.
     """
 
-    date: date = Field(..., description="aps_daily_plan.work_date")
+    date: datetime.date = Field(..., description="aps_daily_plan.work_date")
     qty: float = Field(..., description="aps_daily_plan.planned_qty for the day")
     minutes: float | None = Field(
         None, description="planned_qty × work_time_seconds / 60 (minutes; null if work_time missing)"
@@ -46,9 +46,9 @@ class WorkPlanRow(CamelModel):
     workcenter_name: str | None = Field(None, description="워크센터 명")
     proc_name: str | None = Field(None, description="공정 — process name (aps_item_routing_spec.proc_name)")
     planned_qty: float | None = Field(None, description="계획수량")
-    plan_start: date | None = Field(None, description="계획시작")
-    plan_end: date | None = Field(None, description="계획완료")
-    delivery_date: date | None = Field(None, description="납기일자 (aps_mps_plan.delivery_date)")
+    plan_start: datetime.date | None = Field(None, description="계획시작")
+    plan_end: datetime.date | None = Field(None, description="계획완료")
+    delivery_date: datetime.date | None = Field(None, description="납기일자 (aps_mps_plan.delivery_date)")
     risk_types: list[str] = Field(
         default_factory=list,
         description="리스크유형 — subset of {'overload','material_short'} from aps_daily_plan.status (empty → ['normal'])",
