@@ -218,15 +218,18 @@ def assemble(session: Session, started_at: datetime | None = None) -> AssembledR
     } if item_ids else {}
 
     mps_ids = {mps.id for _dp, _ir, _wc, mps in rows}
-    routing_ids = {ir.id for _dp, ir, _wc, _mps in rows}
     work_orders = session.execute(
-        select(WorkOrder).where(
-            WorkOrder.mps_plan_id.in_(mps_ids), WorkOrder.item_routing_id.in_(routing_ids)
-        )
-    ).scalars().all() if mps_ids and routing_ids else []
+        select(WorkOrder).where(WorkOrder.mps_plan_id.in_(mps_ids))
+    ).scalars().all() if mps_ids else []
+    # Two lookup tiers: PLANNED rows synced from G-System have item_routing_id=NULL
+    # (only mps_plan_id + temp_id populated), so fall back to a per-mps index when
+    # the (mps, routing) key doesn't hit.
     wo_by_group: dict[tuple[int, int], WorkOrder] = {
         (wo.mps_plan_id, wo.item_routing_id): wo for wo in work_orders
         if wo.mps_plan_id is not None and wo.item_routing_id is not None
+    }
+    wo_by_mps: dict[int, WorkOrder] = {
+        wo.mps_plan_id: wo for wo in work_orders if wo.mps_plan_id is not None
     }
 
     groups: dict[tuple[int, int], list[tuple[DailyPlan, ItemRoutingSpec, WorkCenter, MpsPlan]]] = defaultdict(list)
@@ -243,7 +246,7 @@ def assemble(session: Session, started_at: datetime | None = None) -> AssembledR
         _dp0, ir, wc, mps = group_rows[0]
         work_time_minutes = float(ir.work_time) / 60.0 if ir.work_time else 0.0
         item = items_by_id.get(mps.item_id) if mps.item_id is not None else None
-        wo = wo_by_group.get((mps_plan_id, item_routing_id))
+        wo = wo_by_group.get((mps_plan_id, item_routing_id)) or wo_by_mps.get(mps_plan_id)
 
         daily_entries: list[DailyPlanEntry] = []
         shortage_qty = 0.0
@@ -291,10 +294,11 @@ def assemble(session: Session, started_at: datetime | None = None) -> AssembledR
             run_id=run_id,
             source_type="FROM_WORK_ORDER" if wo is not None else "FROM_MPS",
             work_order_no=wo.work_order_no if wo is not None else None,
-            # FE's tmpPlanNo is a non-null per-plan correlation string (never absent in the
-            # mock it replaces) — fall back to this WorkPlan's own id when no WorkOrder is
-            # linked yet (FROM_MPS), instead of leaving it null.
-            tmp_plan_no=(wo.temp_id if wo is not None and wo.temp_id else None) or encode_plan_id(mps_plan_id, item_routing_id),
+            # temp_id only exists for PLANNED rows APS created before G-System issued a
+            # real work_order_no; CONFIRMED rows synced from G-System have temp_id=NULL.
+            # Return null instead of a synthetic id — FE column "Mã KHSX tạm" is only
+            # meaningful before dispatch; blank on CONFIRMED reads naturally.
+            tmp_plan_no=wo.temp_id if wo is not None else None,
             order_no=(wo.work_order_no if wo is not None else None) or mps.plan_no,
             item_code=item.item_no if item is not None else "",
             item_name_ko=(item.item_name if item is not None and item.item_name else (item.item_no if item is not None else "")),

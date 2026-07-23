@@ -196,13 +196,13 @@ def _build_daily_plans_index(
         # work_time stored as SECONDS per unit (jph = 3600 / work_time) → convert to minutes.
         minutes = qty * wt / 60.0 if wt is not None else None
         daily[dp.mps_plan_id].append(
-            WorkPlanDailyRow(date=dp.work_date, qty=qty, minutes=minutes)
+            WorkPlanDailyRow(plan_date=dp.work_date, qty=qty, minutes=minutes)
         )
         if dp.material_shortage_qty is not None:
             shortage[dp.mps_plan_id] += float(dp.material_shortage_qty)
 
     for rows in daily.values():
-        rows.sort(key=lambda r: r.date)
+        rows.sort(key=lambda r: r.plan_date)
     return dict(daily), dict(shortage)
 
 

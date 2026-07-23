@@ -26,9 +26,9 @@ from app.db.database import Base
 
 
 class WorkOrder(Base):
-    __tablename__ = "work_order"
+    __tablename__ = "aps_work_order"
     __table_args__ = (
-        UniqueConstraint("mps_plan_id", "item_routing_id", name="uq_work_order_mps_plan_item_routing"),
+        UniqueConstraint("mps_plan_id", "item_routing_id", name="uq_aps_work_order_mps_plan_item_routing"),
         {"schema": "aps_input"},
     )
 

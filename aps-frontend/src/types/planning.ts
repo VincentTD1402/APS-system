@@ -42,7 +42,7 @@ export interface WorkPlan {
   runId: string
   sourceType: WorkPlanSourceType
   workOrderNo: string | null
-  tmpPlanNo: string
+  tmpPlanNo: string | null
   orderNo: string
   itemCode: string
   itemNameKo: string

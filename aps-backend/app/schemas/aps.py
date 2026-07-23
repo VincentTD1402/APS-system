@@ -36,7 +36,7 @@ class WorkPlanOut(CamelModel):
     run_id: str
     source_type: str
     work_order_no: str | None = None
-    tmp_plan_no: str
+    tmp_plan_no: str | None = None
     order_no: str | None = None
     item_code: str
     item_name_ko: str

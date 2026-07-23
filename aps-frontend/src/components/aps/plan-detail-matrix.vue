@@ -118,8 +118,15 @@ function fmtQty(q: number): string {
   margin-top: 2px;
 }
 .scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 280px; /* cap chiều cao — có nhiều WC/order thì scroll dọc */
   padding: 10px 14px;
+}
+.scroll thead th {
+  position: sticky;
+  top: 0;
+  background: var(--p-content-background);
+  z-index: 1;
 }
 .plan-matrix {
   border-collapse: collapse;
