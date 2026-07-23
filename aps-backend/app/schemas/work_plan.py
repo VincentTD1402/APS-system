@@ -1,6 +1,8 @@
 """Schemas for the Work Plan List (작업계획 리스트) endpoint."""
 
-import datetime
+from __future__ import annotations
+
+from datetime import date
 
 from pydantic import Field
 
@@ -15,7 +17,8 @@ class WorkPlanDailyRow(CamelModel):
     step (work_time is stored as seconds); null when the routing lookup misses.
     """
 
-    date: datetime.date = Field(..., description="aps_daily_plan.work_date")
+    # Python attr renamed to avoid shadowing `datetime.date`; JSON key stays `date`.
+    plan_date: date = Field(..., alias="date", description="aps_daily_plan.work_date")
     qty: float = Field(..., description="aps_daily_plan.planned_qty for the day")
     minutes: float | None = Field(
         None, description="planned_qty × work_time_seconds / 60 (minutes; null if work_time missing)"
