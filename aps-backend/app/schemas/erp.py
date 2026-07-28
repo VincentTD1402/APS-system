@@ -10,10 +10,17 @@ from typing import Any
 from app.schemas.aps import CamelModel
 
 
+class PurchaseRequestLineIn(CamelModel):
+    """One raw-material line — a product/semi-product's BOM can need several."""
+
+    item_no: str
+    qty: float
+
+
 class PurchaseRequestCreateIn(CamelModel):
     plan_id: str
-    qty: float
     note: str | None = None
+    lines: list[PurchaseRequestLineIn]
 
 
 class WorkOrderDispatchIn(CamelModel):

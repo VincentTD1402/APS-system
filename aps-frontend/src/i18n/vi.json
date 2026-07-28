@@ -94,7 +94,11 @@
     "title": "Chi tiết theo loại",
     "selectPlan": "Chọn 1 kế hoạch từ danh sách bên trái",
     "purchaseRequest": "Yêu cầu mua hàng",
+    "purchaseRequestDone": "Đã yêu cầu mua hàng",
+    "cancelPurchaseRequest": "Huỷ yêu cầu mua hàng",
     "scheduleAdjust": "Điều chỉnh lịch",
+    "scheduleAdjustDone": "Đã điều chỉnh lịch",
+    "cancelScheduleAdjust": "Huỷ điều chỉnh lịch",
     "createWorkOrder": "Tạo chỉ thị SX",
     "adjustedBadge": "Đã áp dụng chỉnh",
     "info": {
@@ -115,14 +119,23 @@
     "purchase": {
       "title": "Yêu cầu mua hàng",
       "shortageQty": "SL thiếu",
+      "onHandQty": "Tồn kho hiện có",
       "requestQty": "SL yêu cầu mua",
-      "note": "Ghi chú"
+      "note": "Ghi chú",
+      "stagedNote": "Đã lưu tạm — chỉ gửi khi bấm Apply.",
+      "noShortage": "Không có nguyên liệu nào thiếu cho sản phẩm này."
     },
     "adjust": {
       "title": "Điều chỉnh lịch trình",
       "newStart": "Ngày bắt đầu mới",
       "newEnd": "Ngày kết thúc mới",
       "note": "Sau khi lưu, bấm nút Apply để phản ánh chỉnh sửa vào matrix."
+    },
+    "dispatch": {
+      "title": "Tạo chỉ thị sản xuất",
+      "noPlans": "Không có kế hoạch nào để tạo chỉ thị.",
+      "confirmHeader": "Xác nhận tạo chỉ thị sản xuất",
+      "confirmMessage": "Khi gửi sẽ tạo chỉ thị sản xuất, không thể chỉnh sửa lại nữa. Vui lòng xác nhận."
     }
   },
   "master": {

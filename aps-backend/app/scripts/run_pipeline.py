@@ -75,7 +75,7 @@ def main(use_mock: bool = False, reset: bool = False) -> None:
         logger.info("   Synced entities: %s", {k: v["synced"] for k, v in result.counts.items()})
         logger.info("   Calendar synced: %d entries", result.calendar_synced)
         logger.info("   Stock synced: %d entries", result.stock_synced)
-        logger.info("   Item processes enriched: %d", result.item_processes_enriched)
+        logger.info("   Item routing synced: %d rows", result.item_routing_synced)
 
     # ── Phase 02: Build RDF ABox ───────────────────────────────────────────────
     # logger.info("── Phase 02: Building RDF ABox ───────────────────────────────")

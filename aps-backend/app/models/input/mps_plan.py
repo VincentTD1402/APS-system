@@ -32,11 +32,6 @@ class MpsPlan(Base):
     gsystem_item_id: Mapped[int | None] = mapped_column(Integer, index=True)
     item_rev: Mapped[int | None] = mapped_column(Integer)
 
-    routing_id: Mapped[int | None] = mapped_column(
-        ForeignKey("aps_input.aps_routing.id", ondelete="SET NULL"), index=True
-    )
-    gsystem_routing_id: Mapped[int | None] = mapped_column(Integer)
-
     parea_id: Mapped[int | None] = mapped_column(Integer, index=True)
 
     plan_qty: Mapped[float | None] = mapped_column(Numeric(18, 4))
@@ -61,7 +56,6 @@ class MpsPlan(Base):
     po_no: Mapped[str | None] = mapped_column(String(50))
 
     item: Mapped["Item | None"] = relationship(foreign_keys=[item_id])
-    routing: Mapped["Routing | None"] = relationship(foreign_keys=[routing_id])
 
     def __repr__(self) -> str:
         return f"<MpsPlan {self.plan_no!r} item_rev={self.item_rev}>"

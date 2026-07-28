@@ -4,12 +4,16 @@ import { useApsStore } from '@/stores/aps-store'
 import { useMasterStore } from '@/stores/master-store'
 import Button from 'primevue/button'
 import MultiSelect from 'primevue/multiselect'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useToast } from 'primevue/usetoast'
 import type { RiskType } from '@/types/enums'
+import DispatchWorkOrderDialog from './dialogs/dispatch-work-order-dialog.vue'
 
 const { t, locale } = useI18n()
 const store = useApsStore()
 const master = useMasterStore()
+const toast = useToast()
+const dispatchDialog = ref(false)
 
 onMounted(() => master.ensureLoaded())
 
@@ -40,6 +44,23 @@ async function onRun(): Promise<void> {
 }
 async function onApply(): Promise<void> {
   await store.applyAdjustments()
+}
+async function onDispatchConfirmed(planIds: string[]): Promise<void> {
+  let okCount = 0
+  for (const planId of planIds) {
+    try {
+      await store.dispatchWorkOrder(planId)
+      okCount++
+    } catch {
+      // continue dispatching the rest; failures are surfaced via the toast count below
+    }
+  }
+  toast.add({
+    severity: okCount === planIds.length ? 'success' : 'warn',
+    summary: t('detail.createWorkOrder'),
+    detail: `${okCount}/${planIds.length}`,
+    life: 3000,
+  })
 }
 function onShowAll(): void {
   store.filter.cellSelection = null
@@ -109,10 +130,22 @@ function onShowAll(): void {
       :label="t('common.apply')"
       icon="pi pi-check-square"
       severity="info"
-      :badge="store.pendingCount > 0 ? String(store.pendingCount) : undefined"
+      :badge="
+        store.pendingCount + store.pendingPurchaseCount > 0
+          ? String(store.pendingCount + store.pendingPurchaseCount)
+          : undefined
+      "
       @click="onApply"
     />
+    <Button
+      :label="t('detail.createWorkOrder')"
+      icon="pi pi-check-circle"
+      severity="success"
+      :disabled="store.filteredPlans.length === 0"
+      @click="dispatchDialog = true"
+    />
   </div>
+  <DispatchWorkOrderDialog v-model:visible="dispatchDialog" @confirm="onDispatchConfirmed" />
 </template>
 
 <style scoped>

@@ -156,6 +156,48 @@ def _backward_fill_step(
     return dict(allocations), last_day_used
 
 
+def recompute_daily_plan_status(session: Session) -> int:
+    """Reset every aps_daily_plan row's status to a clean baseline, then flag
+    `overload` for (workcenter, day) slots whose total required minutes (summed
+    across ALL rows sharing the slot, including hand-adjusted ones) exceed real
+    daily capacity.
+
+    Idempotent — safe to call any time aps_daily_plan changes (full rebuild or
+    a single POST /aps/adjust), not just from rebuild_daily_plan. Caller must
+    run apply_daily_material_shortage() afterward to layer material-shortage/
+    urgent back on top of this overload baseline.
+    """
+    capacity_index = build_workcenter_capacity_index(session)
+    work_time_by_routing_id: dict[int, float] = {
+        step.id: float(step.work_time) / 60.0
+        for step in session.execute(select(ItemRoutingSpec)).scalars().all() if step.work_time
+    }
+
+    required_minutes_by_slot: dict[tuple[int, date], float] = defaultdict(float)
+    rows_by_slot: dict[tuple[int, date], list[DailyPlan]] = defaultdict(list)
+    for row in session.execute(select(DailyPlan)).scalars().all():
+        row.status = "normal"
+        if row.workcenter_id is None:
+            continue
+        wtm = work_time_by_routing_id.get(row.item_routing_id, 0.0)
+        if wtm <= 0:
+            continue
+        slot = (row.workcenter_id, row.work_date)
+        required_minutes_by_slot[slot] += float(row.planned_qty) * wtm
+        rows_by_slot[slot].append(row)
+
+    flagged = 0
+    for (wc_id, work_date), required in required_minutes_by_slot.items():
+        capacity = capacity_index.minutes_on(wc_id, work_date)
+        if capacity > 0 and required > capacity:
+            for row in rows_by_slot[(wc_id, work_date)]:
+                row.status = "overload"
+                flagged += 1
+
+    session.flush()
+    return flagged
+
+
 def rebuild_daily_plan(session: Session) -> int:
     """Wipe and rebuild aps_daily_plan from aps_mps_plan × aps_item_routing_spec.
 
@@ -163,8 +205,9 @@ def rebuild_daily_plan(session: Session) -> int:
     wiped — a manual override must survive a G-System resync. Any
     (mps_plan_id, item_routing_id) group with a surviving adjusted row is
     skipped entirely (not regenerated), so the schedule isn't half hand-edited/
-    half backward-filled. Adjusted rows still feed the overload second pass so
-    their capacity usage is accounted for.
+    half backward-filled. recompute_daily_plan_status() (called at the end)
+    still folds adjusted rows into the overload check so their capacity usage
+    is accounted for.
 
     Returns rows inserted (adjusted rows kept from a prior run are not counted).
     Caller owns commit.
@@ -186,20 +229,10 @@ def rebuild_daily_plan(session: Session) -> int:
     session.query(DailyPlan).filter(DailyPlan.adjusted.is_(False)).delete(synchronize_session=False)
     session.flush()
 
-    adjusted_groups: set[tuple[int, int]] = set()
-    required_minutes_by_slot: dict[tuple[int, date], float] = defaultdict(float)
-    rows_by_slot: dict[tuple[int, date], list[DailyPlan]] = defaultdict(list)
-    work_time_by_routing_id: dict[int, float] = {
-        step.id: float(step.work_time) / 60.0
-        for steps in routing_steps_by_item.values() for step in steps if step.work_time
+    adjusted_groups: set[tuple[int, int]] = {
+        (row.mps_plan_id, row.item_routing_id)
+        for row in session.execute(select(DailyPlan).where(DailyPlan.adjusted.is_(True))).scalars().all()
     }
-    for row in session.execute(select(DailyPlan).where(DailyPlan.adjusted.is_(True))).scalars().all():
-        adjusted_groups.add((row.mps_plan_id, row.item_routing_id))
-        wtm = work_time_by_routing_id.get(row.item_routing_id, 0.0)
-        if wtm > 0:
-            slot = (row.workcenter_id, row.work_date)
-            required_minutes_by_slot[slot] += float(row.planned_qty) * wtm
-            rows_by_slot[slot].append(row)
 
     inserted = 0
     for mps in mps_lines:
@@ -209,10 +242,6 @@ def rebuild_daily_plan(session: Session) -> int:
         plan_qty = float(mps.plan_qty)
 
         steps = routing_steps_by_item.get(mps.item_id, [])
-        if mps.routing_id is not None:
-            matching = [s for s in steps if s.routing_id == mps.routing_id]
-            if matching:
-                steps = matching
         if not steps:
             continue
         # Any step already hand-adjusted for this MPS line — skip the whole
@@ -248,22 +277,11 @@ def rebuild_daily_plan(session: Session) -> int:
                     status="normal",
                 )
                 session.add(row)
-                slot = (step.workcenter_id, work_date)
-                required_minutes_by_slot[slot] += persisted_qty * work_time_minutes
-                rows_by_slot[slot].append(row)
                 inserted += 1
 
             window_end = max(today, earliest_day - timedelta(days=1))
 
-    # Second pass: a (workcenter, day) slot is overloaded when the total
-    # required minutes across ALL steps sharing it exceeds real daily
-    # capacity — only knowable after every MPS line has been processed.
-    for (wc_id, work_date), required in required_minutes_by_slot.items():
-        capacity = capacity_index.minutes_on(wc_id, work_date)
-        if capacity > 0 and required > capacity:
-            for row in rows_by_slot[(wc_id, work_date)]:
-                row.status = "overload"
-
     session.flush()
+    recompute_daily_plan_status(session)
     logger.info("rebuild_daily_plan: %d rows across %d MPS lines", inserted, len(mps_lines))
     return inserted

@@ -5,7 +5,10 @@ row is classified and mapped:
 
   - Confirmed (source_type "WO"): work_order_no NOT NULL, status "CONFIRMED",
     sync_status "SUCCESS", temp_id NULL.
-  - Temporary (source_type "MPS"): work_order_no NULL, status "PLANNED".
+  - Temporary (source_type "MPS"): work_order_no NULL, status "PLANNED",
+    tmp_plan_no = work_order.temp_id (APS's own idempotency key for the
+    PLANNED stub — not aps_mps_plan.plan_no, which is G-System's own MPS
+    line number and has no per-work_order meaning here).
   - Any other row (SENT / FAILED / partial) is skipped.
 
 Base tables are ``aps_input.work_order`` + ``aps_input.aps_mps_plan``; enrichment
@@ -32,12 +35,16 @@ Notes / deviations (verified against data):
   3. Risk status literal is 'material-shortage' (the aps_daily_plan CHECK value),
      not workplan.md's 'lack_material'. Exposed to the API as 'material_short'.
 
-Risk (리스크유형): plan-level aggregate over aps_daily_plan.status — 부하초과
-('overload') if ANY of the plan's days is overload/urgent, 자재부족 ('material_short')
-if ANY is material-shortage/urgent, else 'normal'. workplan.md §5's single
-(mps_plan_id, workcenter_id, work_date) key never matches the Backward-filled dates
-(and MPS workcenter is often NULL), so it is realised as this aggregate — see
-_build_risk_sets. Rebuild via POST /kpi-summary/daily-plan/rebuild first.
+Risk (리스크유형): plan-level aggregate over aps_daily_plan.status. Both
+('overload' + 'material_short' together) only when some single day is 'urgent'
+— a genuine same-day collision. Otherwise the plan gets exactly one risk:
+자재부족 ('material_short') if any day is 'material-shortage', else 부하초과
+('overload') if any day is 'overload', else 'normal' — material_short wins over
+overload on different days because it blocks production outright. workplan.md
+§5's single (mps_plan_id, workcenter_id, work_date) key never matches the
+Backward-filled dates (and MPS workcenter is often NULL), so it is realised as
+this aggregate — see _build_risk_sets. Rebuild via POST
+/kpi-summary/daily-plan/rebuild first.
 """
 
 from __future__ import annotations
@@ -145,27 +152,32 @@ def _build_proc_by_item(db: Session) -> dict[int, str]:
     return index
 
 
-def _build_risk_sets(db: Session) -> tuple[set[int], set[int]]:
-    """(overload_mps_ids, material_short_mps_ids) from aps_daily_plan.status.
+def _build_risk_sets(db: Session) -> tuple[set[int], set[int], set[int]]:
+    """(overload_only_mps_ids, material_short_only_mps_ids, both_same_day_mps_ids).
 
-    리스크유형 is a plan-level summary: a work-plan row is 부하초과 if ANY of its plan's
-    aps_daily_plan days is 'overload'/'urgent', 자재부족 if ANY is
-    'material-shortage'/'urgent'. workplan.md §5 keys a single
-    (mps_plan_id, workcenter_id, work_date) row, but that exact date never coincides
-    with the Backward-filled work_date (verified 0/208) and the MPS workcenter is often
-    NULL — so a single-row read is always 'normal'. Aggregating over the plan's days
-    realises §5's intent (surface the plan's risk from aps_daily_plan.status) and is
-    robust to the sparse workcenter/date data. Rebuild via
-    POST /kpi-summary/daily-plan/rebuild first.
+    리스크유형 is a plan-level summary built from aps_daily_plan.status, but "both"
+    only means a genuine same-day collision — status == 'urgent' (set by
+    apply_daily_material_shortage only when a day already flagged 'overload' also
+    goes short). A plan with overload on one day and a shortage on a DIFFERENT day
+    is NOT 'both' — each day only carries the single risk it actually has, so the
+    plan-level union must not merge them into a same-day-looking combo. workplan.md
+    §5 keys a single (mps_plan_id, workcenter_id, work_date) row, but that exact date
+    never coincides with the Backward-filled work_date (verified 0/208) and the MPS
+    workcenter is often NULL — so a single-row read is always 'normal'. Aggregating
+    over the plan's days realises §5's intent and is robust to the sparse
+    workcenter/date data. Rebuild via POST /kpi-summary/daily-plan/rebuild first.
     """
     overload: set[int] = set()
     short: set[int] = set()
+    both: set[int] = set()
     for mps_plan_id, status in db.execute(select(DailyPlan.mps_plan_id, DailyPlan.status)).all():
-        if status in ("overload", "urgent"):
+        if status == "overload":
             overload.add(mps_plan_id)
-        if status in ("material-shortage", "urgent"):
+        elif status == "material-shortage":
             short.add(mps_plan_id)
-    return overload, short
+        elif status == "urgent":
+            both.add(mps_plan_id)
+    return overload, short, both
 
 
 def _build_backward_window_index(db: Session) -> dict[int, tuple[date, date]]:
@@ -261,14 +273,19 @@ def _build_daily_detail_by_mps(
     return out, out_by_wc
 
 
-def _risk_types(overload: bool, material_short: bool) -> list[str]:
-    """리스크유형: 'overload' and/or 'material_short'; else ['normal']."""
-    risks: list[str] = []
-    if overload:
-        risks.append("overload")
+def _risk_types(*, overload: bool, material_short: bool, both_same_day: bool) -> list[str]:
+    """리스크유형: both only for a genuine same-day collision; else the single risk
+    the plan actually has (material_short takes priority over overload when they
+    land on different days — a material shortage blocks production outright,
+    while overload is just a capacity/reschedule concern); else ['normal'].
+    """
+    if both_same_day:
+        return ["overload", "material_short"]
     if material_short:
-        risks.append("material_short")
-    return risks or ["normal"]
+        return ["material_short"]
+    if overload:
+        return ["overload"]
+    return ["normal"]
 
 
 def _risk_rank(row: WorkPlanRow) -> int:
@@ -328,7 +345,7 @@ def build_work_plan_list(
     mps_by_id = {mps.id: mps for mps in db.execute(select(MpsPlan)).scalars().all()}
     wc_repr_index = _build_wc_representative_index(db)
     proc_by_item = _build_proc_by_item(db)
-    overload_ids, short_ids = _build_risk_sets(db)
+    overload_ids, short_ids, both_ids = _build_risk_sets(db)
     backward = _build_backward_window_index(db)
     daily_detail_by_mps, daily_detail_by_mps_wc = _build_daily_detail_by_mps(db)
     _empty_detail = _MpsDailyDetail()
@@ -369,6 +386,7 @@ def build_work_plan_list(
             plan_end = _parse_iso_date(resp.get("endDate")) or (mps.plan_end_date if mps else None)
             # 리스크유형: plan-level — any risky day of this plan's aps_daily_plan (see _build_risk_sets).
             overload, short = (wo.mps_plan_id in overload_ids, wo.mps_plan_id in short_ids)
+            both_same_day = wo.mps_plan_id in both_ids
             # Scoped to THIS work_order's own workcenter — a line backing several
             # work_orders (one per routing step) must not share one step's
             # daily_plans/shortage_qty with another (see _build_daily_detail_by_mps).
@@ -401,7 +419,7 @@ def build_work_plan_list(
                     plan_start=plan_start,  # 계획시작 (WO's own work date)
                     plan_end=plan_end,  # 계획완료 (WO's own end date)
                     delivery_date=mps.delivery_date if mps else None,  # 납기일자
-                    risk_types=_risk_types(overload, short),
+                    risk_types=_risk_types(overload=overload, material_short=short, both_same_day=both_same_day),
                 )
             )
         elif _is_planned(wo) and mps is not None:
@@ -419,6 +437,7 @@ def build_work_plan_list(
                 wc_name = rep[2] if rep else None
             # 리스크유형: plan-level — any risky day of this plan's aps_daily_plan.
             overload, short = (mps.id in overload_ids, mps.id in short_ids)
+            both_same_day = mps.id in both_ids
             detail = daily_detail_by_mps.get(mps.id, _empty_detail)
             rows.append(
                 WorkPlanRow(
@@ -430,7 +449,7 @@ def build_work_plan_list(
                     original_end=detail.original_end,
                     source_type="MPS",
                     work_order_no=None,
-                    tmp_plan_no=mps.plan_no,  # (임시)작업계획번호
+                    tmp_plan_no=wo.temp_id,  # (임시)작업계획번호 — APS's own idempotency key (§docstring)
                     order_no=mps.po_no,  # 오더
                     item_no=item.item_no if item else None,  # 품목
                     item_name=item.item_name if item else None,
@@ -441,7 +460,7 @@ def build_work_plan_list(
                     plan_start=window[0] if window else None,  # 계획시작 (Backward-start)
                     plan_end=(window[1] if window else mps.plan_end_date),  # 계획완료 (Backward-end; fallback 종료일자)
                     delivery_date=mps.delivery_date,  # 납기일자
-                    risk_types=_risk_types(overload, short),
+                    risk_types=_risk_types(overload=overload, material_short=short, both_same_day=both_same_day),
                 )
             )
         # else: SENT / FAILED / partial rows are not part of the work plan list.

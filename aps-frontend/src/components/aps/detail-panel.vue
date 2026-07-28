@@ -4,7 +4,7 @@ import { useApsStore } from '@/stores/aps-store'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import RiskChip from './risk-chip.vue'
-import PurchaseRequestDialog from './dialogs/purchase-request-dialog.vue'
+import PurchaseRequestDialog, { type PurchaseLineDraft } from './dialogs/purchase-request-dialog.vue'
 import ScheduleAdjustDialog from './dialogs/schedule-adjust-dialog.vue'
 import { computed, ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
@@ -25,14 +25,18 @@ const canAdjust = computed(
 const purchaseDialog = ref(false)
 const adjustDialog = ref(false)
 
-async function onPurchaseSubmit(payload: { qty: number; note: string }): Promise<void> {
+function onPurchaseSubmit(payload: { note: string; lines: PurchaseLineDraft[] }): void {
   if (!plan.value) return
-  await store.requestPurchase(plan.value.id, payload.qty, payload.note)
+  store.stagePurchaseRequest(
+    plan.value.id,
+    payload.note,
+    payload.lines.map((l) => ({ itemNo: l.itemNo, itemName: l.itemName, qty: l.qty }))
+  )
   toast.add({
-    severity: 'success',
+    severity: 'info',
     summary: t('dialog.purchase.title'),
-    detail: `qty=${payload.qty}`,
-    life: 3000,
+    detail: t('dialog.purchase.stagedNote'),
+    life: 4000,
   })
 }
 
@@ -47,23 +51,13 @@ function onAdjustSubmit(payload: { newStart: string; newEnd: string }): void {
   })
 }
 
-async function onDispatch(): Promise<void> {
-  if (!plan.value) return
-  await store.dispatchWorkOrder(plan.value.id)
-  toast.add({
-    severity: 'success',
-    summary: t('detail.createWorkOrder'),
-    detail: plan.value.tmpPlanNo,
-    life: 3000,
-  })
-}
 </script>
 
 <template>
   <div class="panel detail">
     <div class="panel-head">
       <div class="panel-title">{{ t('detail.title') }}</div>
-      <Tag v-if="plan" :value="plan.wcCode" severity="secondary" />
+      <Tag v-if="plan" :value="plan.wcName || plan.wcCode" severity="secondary" />
     </div>
     <div v-if="!plan" class="empty">
       <i class="pi pi-hand-pointer" style="font-size: 24px; color: var(--p-text-muted-color)" />
@@ -74,6 +68,13 @@ async function onDispatch(): Promise<void> {
         <div class="tmp-no mono">{{ plan.tmpPlanNo }}</div>
         <RiskChip :risk="plan.riskType" />
       </div>
+      <Tag
+        v-if="store.selectedPendingPurchase"
+        :value="`${t('detail.purchaseRequest')}: ${store.selectedPendingPurchase.lines.length}`"
+        severity="info"
+        icon="pi pi-shopping-cart"
+        class="adj-badge"
+      />
       <Tag
         v-if="store.selectedPending"
         :value="`Pending: ${store.selectedPending.newStart} → ${store.selectedPending.newEnd}`"
@@ -96,7 +97,7 @@ async function onDispatch(): Promise<void> {
         </div>
         <div class="info-item">
           <div class="label">{{ t('detail.info.wc') }}</div>
-          <div class="value mono">{{ plan.wcCode }}</div>
+          <div class="value mono">{{ plan.wcName || plan.wcCode }}</div>
         </div>
         <div class="info-item">
           <div class="label">{{ t('detail.info.planQty') }}</div>
@@ -128,27 +129,44 @@ async function onDispatch(): Promise<void> {
       </div>
 
       <div class="actions">
-        <Button
-          v-if="canRequestPurchase"
-          :label="t('detail.purchaseRequest')"
-          icon="pi pi-shopping-cart"
-          severity="info"
-          @click="purchaseDialog = true"
-        />
-        <Button
-          v-if="canAdjust"
-          :label="t('detail.scheduleAdjust')"
-          icon="pi pi-calendar-plus"
-          severity="warn"
-          @click="adjustDialog = true"
-        />
-        <Button
-          :label="t('detail.createWorkOrder')"
-          icon="pi pi-check-circle"
-          severity="success"
-          class="dispatch-btn"
-          @click="onDispatch"
-        />
+        <div v-if="canRequestPurchase" class="action-row">
+          <Button
+            :label="store.selectedPendingPurchase ? t('detail.purchaseRequestDone') : t('detail.purchaseRequest')"
+            :icon="store.selectedPendingPurchase ? 'pi pi-check' : 'pi pi-shopping-cart'"
+            :severity="store.selectedPendingPurchase ? 'success' : 'info'"
+            :disabled="!!store.selectedPendingPurchase"
+            class="action-btn"
+            @click="purchaseDialog = true"
+          />
+          <Button
+            v-if="store.selectedPendingPurchase"
+            icon="pi pi-times"
+            severity="danger"
+            text
+            :aria-label="t('detail.cancelPurchaseRequest')"
+            :title="t('detail.cancelPurchaseRequest')"
+            @click="store.discardPurchaseRequest(plan!.id)"
+          />
+        </div>
+        <div v-if="canAdjust" class="action-row">
+          <Button
+            :label="store.selectedPending ? t('detail.scheduleAdjustDone') : t('detail.scheduleAdjust')"
+            :icon="store.selectedPending ? 'pi pi-check' : 'pi pi-calendar-plus'"
+            :severity="store.selectedPending ? 'success' : 'warn'"
+            :disabled="!!store.selectedPending"
+            class="action-btn"
+            @click="adjustDialog = true"
+          />
+          <Button
+            v-if="store.selectedPending"
+            icon="pi pi-times"
+            severity="danger"
+            text
+            :aria-label="t('detail.cancelScheduleAdjust')"
+            :title="t('detail.cancelScheduleAdjust')"
+            @click="store.discardPending(plan!.id)"
+          />
+        </div>
       </div>
     </div>
 
@@ -246,9 +264,12 @@ async function onDispatch(): Promise<void> {
   gap: 8px;
   margin-top: 4px;
 }
-.dispatch-btn {
-  margin-top: 4px;
-  border-top: 1px solid var(--p-content-border-color);
-  padding-top: 12px !important;
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.action-btn {
+  flex: 1;
 }
 </style>

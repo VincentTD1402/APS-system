@@ -6,7 +6,7 @@ to avoid redundant LLM calls on page reload. Invalidated when scenario re-runs.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import DateTime, Index, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,11 +31,10 @@ class LlmResponseCache(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    scenario_id: Mapped[str] = mapped_column(
-        ForeignKey("aps_result.plan_scenario.scenario_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    # Plain cache key component — no FK. plan_scenario (the scenario-based
+    # planning subsystem) was dropped as dead code; this cache doesn't require
+    # the referenced scenario to actually exist as a row anywhere.
+    scenario_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     cache_type: Mapped[str] = mapped_column(String(20), nullable=False)
     cache_key: Mapped[str] = mapped_column(String(200), nullable=False)
     response_json: Mapped[dict] = mapped_column(JSONB, nullable=False)

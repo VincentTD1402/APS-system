@@ -36,6 +36,7 @@ from app.services.scheduling.daily_plan_builder import (
     _backward_fill_step,
     build_workcenter_capacity_index,
     rebuild_daily_plan,
+    recompute_daily_plan_status,
 )
 from app.services.scheduling.work_plan_list import build_work_plan_list
 
@@ -70,9 +71,11 @@ class WorkPlan:
     order_no: str | None
     item_code: str
     item_name_ko: str
+    item_name_vi: str
     wc_code: str
     wc_name: str | None
     process_name_ko: str
+    process_name_vi: str
     plan_qty: float
     plan_start_date: date
     plan_end_date: date
@@ -237,16 +240,21 @@ def assemble(session: Session) -> AssembledResult:
             run_id=run_id,
             source_type=_SOURCE_TYPE_MAP.get(row.source_type, "FROM_MPS"),
             work_order_no=row.work_order_no,
-            # work_plan_list only sets this for MPS rows (aps_mps_plan.plan_no) —
+            # work_plan_list only sets this for MPS rows (work_order.temp_id) —
             # null for WO rows (they have no temp plan; workOrderNo already covers
             # their real identifier). Do not fabricate a value from row.id.
             tmp_plan_no=row.tmp_plan_no,
             order_no=row.order_no,
             item_code=row.item_no or "",
+            # aps_item has no separate Vietnamese name column yet (G-System only
+            # supplies one name) — item_name_vi mirrors item_name_ko until a real
+            # translation source exists, so the FE VI column isn't blank.
             item_name_ko=row.item_name or row.item_no or "",
+            item_name_vi=row.item_name or row.item_no or "",
             wc_code=row.workcenter_no or "",
             wc_name=row.workcenter_name,
             process_name_ko=row.proc_name or "",
+            process_name_vi=row.proc_name or "",
             plan_qty=row.planned_qty or 0.0,
             plan_start_date=plan_start,
             plan_end_date=plan_end,
@@ -377,6 +385,7 @@ def adjust_work_plans(session: Session, adjustments: list[tuple[str, date, date]
             ))
         session.flush()
 
+    recompute_daily_plan_status(session)
     apply_daily_material_shortage(session)
     session.flush()
     return assemble(session)

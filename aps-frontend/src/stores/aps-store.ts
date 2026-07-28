@@ -19,6 +19,18 @@ export interface PendingAdjustment {
   newEnd: string
 }
 
+export interface PendingPurchaseLine {
+  itemNo: string
+  itemName: string | null
+  qty: number
+}
+
+export interface PendingPurchaseRequest {
+  planId: string
+  note: string
+  lines: PendingPurchaseLine[]
+}
+
 export const useApsStore = defineStore('aps', () => {
   const runId = ref<string | null>(null)
   const workPlans = ref<WorkPlan[]>([])
@@ -29,6 +41,10 @@ export const useApsStore = defineStore('aps', () => {
   const filter = ref<ApsFilter>({ wcCodes: [], itemCodes: [], risks: [], cellSelection: null })
 
   const pendingAdjustments = ref<Map<string, PendingAdjustment>>(new Map())
+  // Staged, not yet pushed to G-System — POST /erp/purchase-requests only
+  // fires when the "Apply" button runs applyAdjustments(), same as staged
+  // schedule adjustments (not tied to work-order dispatch).
+  const pendingPurchaseRequests = ref<Map<string, PendingPurchaseRequest>>(new Map())
 
   async function runAps(): Promise<void> {
     isRunning.value = true
@@ -56,8 +72,27 @@ export const useApsStore = defineStore('aps', () => {
     pendingAdjustments.value = new Map(pendingAdjustments.value)
   }
 
+  function stagePurchaseRequest(planId: string, note: string, lines: PendingPurchaseLine[]): void {
+    pendingPurchaseRequests.value.set(planId, { planId, note, lines })
+    pendingPurchaseRequests.value = new Map(pendingPurchaseRequests.value)
+  }
+
+  function discardPurchaseRequest(planId: string): void {
+    pendingPurchaseRequests.value.delete(planId)
+    pendingPurchaseRequests.value = new Map(pendingPurchaseRequests.value)
+  }
+
+  // Apply sends every staged purchase request first, then always re-assembles
+  // via /aps/adjust (even with an empty adjustments list) so the load detail
+  // (loadCells/kpi) reflects the latest state either way.
   async function applyAdjustments(): Promise<void> {
-    if (pendingAdjustments.value.size === 0) return
+    if (pendingAdjustments.value.size === 0 && pendingPurchaseRequests.value.size === 0) return
+
+    for (const pending of pendingPurchaseRequests.value.values()) {
+      await requestPurchase(pending.planId, pending.note, pending.lines)
+    }
+    pendingPurchaseRequests.value = new Map()
+
     const drafts = Array.from(pendingAdjustments.value.values())
     const result = await apsApi.adjustAps(runId.value, drafts)
     runId.value = result.run.id
@@ -67,8 +102,9 @@ export const useApsStore = defineStore('aps', () => {
     pendingAdjustments.value.clear()
   }
 
-  async function requestPurchase(planId: string, qty: number, note: string): Promise<void> {
-    await erpApi.createPurchaseRequest(planId, qty, note)
+  // Actually pushes to G-System (POST /erp/purchase-requests).
+  async function requestPurchase(planId: string, note: string, lines: PendingPurchaseLine[]): Promise<void> {
+    await erpApi.createPurchaseRequest(planId, note, lines)
   }
 
   async function dispatchWorkOrder(planId: string): Promise<void> {
@@ -79,6 +115,9 @@ export const useApsStore = defineStore('aps', () => {
   const selectedPending = computed(() =>
     selectedPlanId.value ? pendingAdjustments.value.get(selectedPlanId.value) ?? null : null
   )
+  const selectedPendingPurchase = computed(() =>
+    selectedPlanId.value ? pendingPurchaseRequests.value.get(selectedPlanId.value) ?? null : null
+  )
 
   const filteredPlans = computed(() => {
     const f = filter.value
@@ -88,7 +127,7 @@ export const useApsStore = defineStore('aps', () => {
       if (f.risks.length && !f.risks.includes(p.riskType)) return false
       if (f.cellSelection) {
         if (p.wcCode !== f.cellSelection.wcCode) return false
-        if (p.planStartDate > f.cellSelection.date || p.planEndDate < f.cellSelection.date) return false
+        if (!p.dailyPlans.some((d) => d.date === f.cellSelection!.date)) return false
       }
       return true
     })
@@ -115,6 +154,7 @@ export const useApsStore = defineStore('aps', () => {
   })
   const delayCount = computed(() => filteredPlans.value.filter((p) => p.planEndDate > p.deliveryDate).length)
   const pendingCount = computed(() => pendingAdjustments.value.size)
+  const pendingPurchaseCount = computed(() => pendingPurchaseRequests.value.size)
 
   return {
     runId,
@@ -126,11 +166,16 @@ export const useApsStore = defineStore('aps', () => {
     filter,
     selectedPlan,
     selectedPending,
+    selectedPendingPurchase,
     filteredPlans,
     riskCount,
     delayCount,
     pendingCount,
+    pendingPurchaseCount,
     pendingAdjustments,
+    pendingPurchaseRequests,
+    stagePurchaseRequest,
+    discardPurchaseRequest,
     runAps,
     stageAdjustment,
     discardPending,

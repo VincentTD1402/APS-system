@@ -40,9 +40,11 @@ class WorkPlanOut(CamelModel):
     order_no: str | None = None
     item_code: str
     item_name_ko: str
+    item_name_vi: str
     wc_code: str
     wc_name: str | None = None
     process_name_ko: str
+    process_name_vi: str
     plan_qty: float
     plan_start_date: date
     plan_end_date: date

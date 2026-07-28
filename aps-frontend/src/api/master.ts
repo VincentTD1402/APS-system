@@ -1,5 +1,5 @@
 import { http } from './http'
-import type { WorkCenter, Item, Routing, BomComponent, InventoryRow } from '@/types/master'
+import type { WorkCenter, Item, Routing, BomComponent, InventoryRow, MaterialShortageRow } from '@/types/master'
 
 // BE trả `id` là number cho routing/bom/inventory; FE type yêu cầu string → convert boundary.
 function stringifyId<T extends { id: number | string }>(row: T): T {
@@ -29,4 +29,11 @@ export async function fetchBom(): Promise<BomComponent[]> {
 export async function fetchInventory(): Promise<InventoryRow[]> {
   const { data } = await http.get<InventoryRow[]>('/master/inventory')
   return data.map(stringifyId)
+}
+
+// Raw-material components (BOM children) a product/semi-product needs, with
+// required/available/shortage — one plan can have several materials.
+export async function fetchMaterialShortageByParent(parentItemNo: string): Promise<MaterialShortageRow[]> {
+  const { data } = await http.get<MaterialShortageRow[]>('/material-shortage', { params: { parentItemNo } })
+  return data
 }

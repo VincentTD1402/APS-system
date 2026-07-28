@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     
     ## G-System API
     GSYSTEM_BASE_URL: str = ""
+    # Temporary — POST /pd/WorkOrderProc/aps/save (work order dispatch / "chỉ thị
+    # sản xuất") lives on a different G-System instance than GSYSTEM_BASE_URL.
+    GSYSTEM_WORKORDER_BASE_URL: str = "http://192.168.205.241:12980"
     GSYSTEM_API_KEY: str = ""
     GSYSTEM_TIMEOUT: float = 30.0
     GSYSTEM_RETRIES: int = 3

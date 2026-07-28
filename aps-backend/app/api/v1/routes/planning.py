@@ -1,6 +1,8 @@
 """Planning routes — read-only lists for the FE MPS / Work-order views."""
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -14,12 +16,21 @@ router = APIRouter()
 # aps_mps_plan.status_cd → FE status. Only 'created'/'notCreated' seen in data.
 _MPS_STATUS = {"created": "CONFIRMED", "notCreated": "DRAFT", "cancelled": "CANCELLED"}
 
+# Temporary fixed window — only MPS plan lines dated within this range are returned.
+_MPS_PLAN_DATE_FROM = date(2026, 7, 6)
+_MPS_PLAN_DATE_TO = date(2026, 7, 7)
+
 
 @router.get("/mps", response_model=list[MpsOut], summary="List MPS plan lines")
 def list_mps(db: Session = Depends(get_db)) -> list[MpsOut]:
     item_no = {i.id: i.item_no for i in db.execute(select(Item)).scalars().all()}
     out: list[MpsOut] = []
-    for m in db.execute(select(MpsPlan).order_by(MpsPlan.plan_no)).scalars().all():
+    query = (
+        select(MpsPlan)
+        .where(MpsPlan.plan_date.between(_MPS_PLAN_DATE_FROM, _MPS_PLAN_DATE_TO))
+        .order_by(MpsPlan.plan_no)
+    )
+    for m in db.execute(query).scalars().all():
         out.append(MpsOut(
             id=m.id,
             order_no=m.plan_no,

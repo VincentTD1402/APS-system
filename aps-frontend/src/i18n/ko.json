@@ -94,7 +94,11 @@
     "title": "유형별 상세",
     "selectPlan": "왼쪽 리스트에서 계획을 선택하세요",
     "purchaseRequest": "구매요청",
+    "purchaseRequestDone": "구매요청됨",
+    "cancelPurchaseRequest": "구매요청 취소",
     "scheduleAdjust": "일정조정",
+    "scheduleAdjustDone": "일정조정됨",
+    "cancelScheduleAdjust": "일정조정 취소",
     "createWorkOrder": "작업지시 생성",
     "adjustedBadge": "조정 적용됨",
     "info": {
@@ -115,14 +119,23 @@
     "purchase": {
       "title": "구매요청",
       "shortageQty": "부족 수량",
+      "onHandQty": "현재 재고",
       "requestQty": "요청 수량",
-      "note": "메모"
+      "note": "메모",
+      "stagedNote": "임시 저장됨 — Apply 클릭 시에만 전송됩니다.",
+      "noShortage": "이 제품에 부족한 자재가 없습니다."
     },
     "adjust": {
       "title": "일정조정",
       "newStart": "새 시작일",
       "newEnd": "새 종료일",
       "note": "저장 후 Apply 버튼을 클릭하여 매트릭스에 반영하세요."
+    },
+    "dispatch": {
+      "title": "생산지시 생성",
+      "noPlans": "생산지시를 생성할 계획이 없습니다.",
+      "confirmHeader": "생산지시 생성 확인",
+      "confirmMessage": "전송 시 생산지시가 생성되며 더 이상 수정할 수 없습니다. 확인해 주세요."
     }
   },
   "master": {

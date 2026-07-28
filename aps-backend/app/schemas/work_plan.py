@@ -25,7 +25,7 @@ class WorkPlanRow(BaseModel):
 
     source_type: str = Field(..., description="'WO' (confirmed work order) or 'MPS' (temporary plan)")
     work_order_no: str | None = Field(None, description="작업지시번호 — WO rows only (work_order.work_order_no)")
-    tmp_plan_no: str | None = Field(None, description="(임시)작업계획번호 — MPS rows only (aps_mps_plan.plan_no)")
+    tmp_plan_no: str | None = Field(None, description="(임시)작업계획번호 — MPS rows only (work_order.temp_id)")
     order_no: str | None = Field(None, description="오더 — PO number (aps_mps_plan.po_no)")
     item_no: str | None = Field(None, description="품목 코드")
     item_name: str | None = Field(None, description="품목 명 (aps_item.item_name)")
