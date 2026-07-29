@@ -24,9 +24,11 @@ from app.models.input.item_routing import ItemRoutingSpec
 from app.models.input.mps_plan import MpsPlan
 from app.models.input.work_order import WorkOrder
 from app.models.input.workcenter import WorkCenter
+from app.models.output.daily_plan import DailyPlan
 from app.models.output.purchase_request import PurchaseRequest
 from app.schemas.erp import ErpOutboxRow, PurchaseRequestCreateIn, PurchaseRequestLineIn, WorkOrderDispatchIn
 from app.services.gsystem.api_client import GSystemClient, GSystemConfig
+from app.services.gsystem.db_syncer import _parse_date
 from app.services.scheduling.aps_run_service import PlanIdError, _resolve_item_routing_id, parse_plan_id
 
 logger = get_logger(__name__)
@@ -214,6 +216,88 @@ def _submit_work_order_to_gsystem(payload: list[dict[str, Any]]) -> tuple[str, d
     return "FAILED", response if isinstance(response, dict) else {"raw": response}
 
 
+def _apply_work_order_dispatch_result(wo: WorkOrder, response: dict[str, Any]) -> None:
+    """After a successful dispatch, promote wo straight to CONFIRMED using the
+    G-System response's own result object — same fields sync_work_orders()
+    reads off the GET /pd/workorder feed (id, workOrderNo, workOrderSerl,
+    workDate), just applied immediately instead of waiting for the next
+    periodic sync. Without this, wo.status stayed "SENT" (neither
+    _is_confirmed nor _is_planned in work_plan_list.py), so the row dropped
+    out of the Work Plan List and the FE kept showing the stale tmp_plan_no
+    — verified live: work_order id=3 had sync_status=SUCCESS with a real
+    workOrderNo in response_json.result[0], but work_order_no/status/temp_id
+    were never updated from it.
+
+    Also overwrites wo.response_json with this flat result record (was the
+    raw envelope {"result": [...], "statusCode": ..., ...}) — work_plan_list.py's
+    confirmed branch reads resp.get("procNm")/itemNo/endDate expecting the
+    flat shape sync_work_orders() stores (rec, not the envelope); leaving the
+    envelope in place silently blanks 공정/품목/계획완료 for rows confirmed via
+    direct dispatch instead of the periodic sync.
+    """
+    result = (response.get("result") or [{}])[0] if isinstance(response, dict) else {}
+    if result.get("id") is not None:
+        try:
+            wo.gsystem_work_order_id = int(result["id"])
+        except (TypeError, ValueError):
+            pass
+    wo.work_order_no = result.get("workOrderNo") or wo.work_order_no or wo.temp_id
+    if result.get("workOrderSerl") is not None:
+        try:
+            wo.work_order_serl = int(result["workOrderSerl"])
+        except (TypeError, ValueError):
+            pass
+    if result.get("workDate"):
+        wo.work_date = _parse_date(result["workDate"])
+    wo.temp_id = None
+    wo.status = "CONFIRMED"
+    wo.response_json = result
+
+
+def _push_mps_plan_dates_for_dispatch(db: Session, wo: WorkOrder, item_routing_id: int, mps: MpsPlan) -> None:
+    """After a successful work order dispatch, push this MPS line's current
+    schedule (min/max aps_daily_plan.work_date for this routing step) back to
+    G-System (/pd/prodPlanMpsMng/aps/updateDates) — only dispatch confirms the
+    plan is real, so that's when G-System's MPS record should move.
+
+    Outcome is recorded on wo.mps_dates_sync_status/mps_dates_response_json/
+    mps_dates_sent_at (caller commits). Never raises — a push failure must not
+    block the local dispatch result.
+    """
+    if mps.gsystem_id is None:
+        return
+    work_dates = db.execute(
+        select(DailyPlan.work_date).where(
+            DailyPlan.mps_plan_id == wo.mps_plan_id, DailyPlan.item_routing_id == item_routing_id
+        )
+    ).scalars().all()
+    if not work_dates:
+        return
+    payload = [{
+        "id": mps.gsystem_id,
+        "planStartDate": min(work_dates).isoformat(),
+        "planEndDate": max(work_dates).isoformat(),
+    }]
+    cfg = GSystemConfig(
+        base_url=settings.GSYSTEM_WORKORDER_BASE_URL,
+        api_key=settings.GSYSTEM_API_KEY,
+        timeout=settings.GSYSTEM_TIMEOUT,
+        retries=settings.GSYSTEM_RETRIES,
+    )
+    wo.mps_dates_sent_at = datetime.now(timezone.utc)
+    try:
+        with GSystemClient(cfg) as client:
+            response = client.submit_mps_plan_dates_update(payload)
+    except Exception as exc:
+        logger.exception("mps plan dates update push to G-System failed: payload=%s", payload)
+        wo.mps_dates_sync_status = "FAILED"
+        wo.mps_dates_response_json = {"error": str(exc)}
+        return
+    status_code = response.get("statusCode") if isinstance(response, dict) else None
+    wo.mps_dates_sync_status = "SUCCESS" if status_code == "000" else "FAILED"
+    wo.mps_dates_response_json = response if isinstance(response, dict) else {"raw": response}
+
+
 # FE's ErpOutboxStatus = 'PENDING' | 'PUSHED' | 'FAILED' — map the underlying
 # domain-specific status columns onto it rather than exposing them raw.
 def _purchase_request_outbox_status(row: PurchaseRequest) -> str:
@@ -339,6 +423,12 @@ def create_work_order(body: WorkOrderDispatchIn, db: Session = Depends(get_db)) 
     wc = db.get(WorkCenter, wo.workcenter_id) if wo.workcenter_id is not None else (
         db.get(WorkCenter, routing.workcenter_id) if routing is not None and routing.workcenter_id is not None else None
     )
+    # A confirmed work_order row's Work Plan List workcenter column reads
+    # wo.workcenter_id directly (no routing fallback there, unlike PLANNED
+    # rows) — persist the resolved workcenter now so it doesn't go blank the
+    # moment this row flips from PLANNED/MPS to CONFIRMED/WO below.
+    if wo.workcenter_id is None and wc is not None:
+        wo.workcenter_id = wc.id
     mps = db.get(MpsPlan, wo.mps_plan_id) if wo.mps_plan_id is not None else None
 
     payload = _build_work_order_dispatch_payload(wo, item, wc, routing, mps)
@@ -347,8 +437,15 @@ def create_work_order(body: WorkOrderDispatchIn, db: Session = Depends(get_db)) 
     wo.payload_json = payload[0]
     wo.response_json = response
     wo.sync_status = sync_status
-    wo.status = "SENT" if sync_status == "SUCCESS" else "FAILED"
     wo.sent_at = datetime.now(timezone.utc)
+
+    if sync_status == "SUCCESS":
+        _apply_work_order_dispatch_result(wo, response)
+    else:
+        wo.status = "FAILED"
+
+    if sync_status == "SUCCESS" and mps is not None:
+        _push_mps_plan_dates_for_dispatch(db, wo, item_routing_id, mps)
 
     db.commit()
     db.refresh(wo)

@@ -24,7 +24,8 @@
     "all": "Tất cả",
     "search": "Tìm kiếm",
     "loading": "Đang tải...",
-    "noData": "Không có dữ liệu"
+    "noData": "Không có dữ liệu",
+    "invalidDateRange": "Ngày kết thúc không được nhỏ hơn ngày bắt đầu"
   },
   "filter": {
     "dateRange": "Khoảng ngày",

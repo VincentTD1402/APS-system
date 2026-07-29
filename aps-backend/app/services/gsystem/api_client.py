@@ -181,6 +181,35 @@ class GSystemClient:
                     time.sleep(2 ** (attempt - 1))
         raise RuntimeError(f"All {self._cfg.retries} work order dispatch attempts failed for {path}") from last_exc
 
+    def submit_mps_plan_dates_update(self, payload: list[dict[str, Any]]) -> Any:
+        """Push adjusted MPS plan dates back to G-System (/pd/prodPlanMpsMng/aps/updateDates).
+
+        Body is a JSON array, one element per adjusted MPS line:
+        [{"id": <gsystem MPS plan id>, "planStartDate": "YYYY-MM-DD",
+          "planEndDate": "YYYY-MM-DD"}, ...]. `id` is aps_mps_plan.gsystem_id,
+        not the local aps_mps_plan.id. Same temporary G-System instance as
+        work order dispatch — caller must use GSYSTEM_WORKORDER_BASE_URL.
+        """
+        path = "/pd/prodPlanMpsMng/aps/updateDates"
+        last_exc: Exception | None = None
+        for attempt in range(1, self._cfg.retries + 1):
+            try:
+                r = self._http.post(path, json=payload)
+                r.raise_for_status()
+                return r.json()
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "mps plan dates update attempt %d/%d failed for %s: %s",
+                    attempt,
+                    self._cfg.retries,
+                    path,
+                    exc,
+                )
+                if attempt < self._cfg.retries:
+                    time.sleep(2 ** (attempt - 1))
+        raise RuntimeError(f"All {self._cfg.retries} mps plan dates update attempts failed for {path}") from last_exc
+
     # ── Fetch methods — pending queue (delta sync) ────────────────────────────
 
     def fetch_items(self)            -> list[dict[str, Any]]: return self._post("item")

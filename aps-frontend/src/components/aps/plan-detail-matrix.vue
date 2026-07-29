@@ -9,10 +9,31 @@ import type { WorkPlan } from '@/types/planning'
 const { t, locale } = useI18n()
 const store = useApsStore()
 
+const sortedPlans = computed(() =>
+  [...store.filteredPlans].sort((a, b) => {
+    if (a.wcCode !== b.wcCode) return a.wcCode.localeCompare(b.wcCode)
+    return a.deliveryDate.localeCompare(b.deliveryDate)
+  })
+)
+
+// dateFrom/dateTo (filter-bar) pin the exact column span when both are set —
+// otherwise fall back to the span actually loaded by the filtered plans, same
+// dynamic-range approach load-matrix.vue uses instead of a hardcoded month.
 const dateRange = computed(() => {
+  const { dateFrom, dateTo } = store.filter
+  let start: dayjs.Dayjs
+  let end: dayjs.Dayjs
+  if (dateFrom && dateTo) {
+    start = dayjs(dateFrom)
+    end = dayjs(dateTo)
+  } else {
+    const allDates = sortedPlans.value.flatMap((p) => p.dailyPlans.map((d) => d.date))
+    if (!allDates.length) return []
+    start = dayjs(dateFrom ?? allDates.reduce((a, b) => (a < b ? a : b)))
+    end = dayjs(dateTo ?? allDates.reduce((a, b) => (a > b ? a : b)))
+  }
   const dates: string[] = []
-  let d = dayjs('2026-08-01')
-  const end = dayjs('2026-08-31')
+  let d = start
   while (!d.isAfter(end)) {
     dates.push(d.format('YYYY-MM-DD'))
     d = d.add(1, 'day')
@@ -25,13 +46,6 @@ const cellStatusIndex = computed(() => {
   for (const c of store.loadCells) m.set(`${c.wcCode}|${c.cellDate}`, c.status)
   return m
 })
-
-const sortedPlans = computed(() =>
-  [...store.workPlans].sort((a, b) => {
-    if (a.wcCode !== b.wcCode) return a.wcCode.localeCompare(b.wcCode)
-    return a.deliveryDate.localeCompare(b.deliveryDate)
-  })
-)
 
 function qtyAt(plan: WorkPlan, date: string): number | null {
   const dp = plan.dailyPlans.find((d) => d.date === date)
@@ -76,7 +90,7 @@ function fmtQty(q: number): string {
         </thead>
         <tbody>
           <tr v-for="plan in sortedPlans" :key="plan.id">
-            <td class="wc-name mono">{{ plan.wcCode }}</td>
+            <td class="wc-name mono">{{ plan.wcName || plan.wcCode }}</td>
             <td class="item-name">
               {{ locale === 'ko' ? plan.itemNameKo : plan.itemNameVi }}
               <span class="tmp mono">· {{ plan.tmpPlanNo }}</span>

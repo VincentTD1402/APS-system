@@ -10,6 +10,8 @@ export interface ApsFilter {
   wcCodes: string[]
   itemCodes: string[]
   risks: RiskType[]
+  dateFrom: string | null
+  dateTo: string | null
   cellSelection: { wcCode: string; date: string } | null
 }
 
@@ -38,7 +40,14 @@ export const useApsStore = defineStore('aps', () => {
   const kpi = ref<KpiSnapshot | null>(null)
   const selectedPlanId = ref<string | null>(null)
   const isRunning = ref(false)
-  const filter = ref<ApsFilter>({ wcCodes: [], itemCodes: [], risks: [], cellSelection: null })
+  const filter = ref<ApsFilter>({
+    wcCodes: [],
+    itemCodes: [],
+    risks: [],
+    dateFrom: null,
+    dateTo: null,
+    cellSelection: null,
+  })
 
   const pendingAdjustments = ref<Map<string, PendingAdjustment>>(new Map())
   // Staged, not yet pushed to G-System — POST /erp/purchase-requests only
@@ -125,6 +134,10 @@ export const useApsStore = defineStore('aps', () => {
       if (f.wcCodes.length && !f.wcCodes.includes(p.wcCode)) return false
       if (f.itemCodes.length && !f.itemCodes.includes(p.itemCode)) return false
       if (f.risks.length && !f.risks.includes(p.riskType)) return false
+      // Overlap test against [dateFrom, dateTo] — same semantics as the
+      // backend's _row_matches_filters (work_plan_list.py).
+      if (f.dateFrom && p.planEndDate < f.dateFrom) return false
+      if (f.dateTo && p.planStartDate > f.dateTo) return false
       if (f.cellSelection) {
         if (p.wcCode !== f.cellSelection.wcCode) return false
         if (!p.dailyPlans.some((d) => d.date === f.cellSelection!.date)) return false

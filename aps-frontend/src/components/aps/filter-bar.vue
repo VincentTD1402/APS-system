@@ -4,7 +4,8 @@ import { useApsStore } from '@/stores/aps-store'
 import { useMasterStore } from '@/stores/master-store'
 import Button from 'primevue/button'
 import MultiSelect from 'primevue/multiselect'
-import { computed, onMounted, ref } from 'vue'
+import DatePicker from 'primevue/datepicker'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import type { RiskType } from '@/types/enums'
 import DispatchWorkOrderDialog from './dialogs/dispatch-work-order-dialog.vue'
@@ -14,6 +15,27 @@ const store = useApsStore()
 const master = useMasterStore()
 const toast = useToast()
 const dispatchDialog = ref(false)
+
+// Two separate single-date pickers (start / end) instead of one range picker
+// — the store keeps plain "yyyy-mm-dd" strings (same format the backend
+// filters/WorkPlan dates use), so convert at the edge.
+const dateFromPick = ref<Date | null>(null)
+const dateToPick = ref<Date | null>(null)
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const isDateRangeInvalid = computed(() => {
+  if (!dateFromPick.value || !dateToPick.value) return false
+  return dateToPick.value < dateFromPick.value
+})
+
+// Invalid range (end < start) is never sent to the store filter — keeping the
+// prior valid dateTo out of filteredPlans's overlap test instead of silently
+// filtering against a nonsensical range.
+watch(dateFromPick, (d) => { store.filter.dateFrom = d ? toIsoDate(d) : null })
+watch([dateFromPick, dateToPick], ([, d]) => {
+  store.filter.dateTo = d && !isDateRangeInvalid.value ? toIsoDate(d) : null
+})
 
 onMounted(() => master.ensureLoaded())
 
@@ -67,6 +89,10 @@ function onShowAll(): void {
   store.filter.wcCodes = []
   store.filter.itemCodes = []
   store.filter.risks = []
+  store.filter.dateFrom = null
+  store.filter.dateTo = null
+  dateFromPick.value = null
+  dateToPick.value = null
 }
 </script>
 
@@ -110,6 +136,31 @@ function onShowAll(): void {
         display="chip"
         class="fb-input"
       />
+    </div>
+    <div class="fb-group">
+      <label class="fb-label">{{ t('detail.info.start') }}</label>
+      <DatePicker
+        v-model="dateFromPick"
+        date-format="yy-mm-dd"
+        show-icon
+        show-button-bar
+        :placeholder="t('common.all')"
+        class="fb-input"
+      />
+    </div>
+    <div class="fb-group">
+      <label class="fb-label">{{ t('detail.info.end') }}</label>
+      <DatePicker
+        v-model="dateToPick"
+        date-format="yy-mm-dd"
+        show-icon
+        show-button-bar
+        :min-date="dateFromPick ?? undefined"
+        :placeholder="t('common.all')"
+        class="fb-input"
+        :invalid="isDateRangeInvalid"
+      />
+      <small v-if="isDateRangeInvalid" class="fb-error">{{ t('common.invalidDateRange') }}</small>
     </div>
     <div class="fb-spacer" />
     <Button
@@ -173,6 +224,10 @@ function onShowAll(): void {
 }
 .fb-input {
   min-width: 200px;
+}
+.fb-error {
+  color: var(--p-red-500, #ef4444);
+  font-size: 11px;
 }
 .fb-spacer {
   flex: 1;
