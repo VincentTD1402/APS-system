@@ -49,6 +49,7 @@ class WorkPlanOut(CamelModel):
     plan_start_date: date
     plan_end_date: date
     delivery_date: date
+    mps_completion_date: date | None = None
     risk_type: str
     shortage_qty: float
     adjusted: bool

@@ -201,16 +201,14 @@ def recompute_daily_plan_status(session: Session) -> int:
 def rebuild_daily_plan(session: Session) -> int:
     """Wipe and rebuild aps_daily_plan from aps_mps_plan × aps_item_routing_spec.
 
-    Rows with `adjusted=True` (set by POST /aps/adjust) are preserved instead of
-    wiped — a manual override must survive a G-System resync. Any
-    (mps_plan_id, item_routing_id) group with a surviving adjusted row is
-    skipped entirely (not regenerated), so the schedule isn't half hand-edited/
-    half backward-filled. recompute_daily_plan_status() (called at the end)
-    still folds adjusted rows into the overload check so their capacity usage
-    is accounted for.
+    RUN always recomputes fresh from current G-System-synced data — including
+    rows previously hand-adjusted via POST /aps/adjust. That staged/Apply
+    result is only meant to live between one RUN and the next; a new RUN
+    supersedes it entirely rather than preserving it, so the schedule always
+    reflects G-System, not stale manual overrides (business decision — RUN
+    must be G-System-driven, not a merge with prior Apply state).
 
-    Returns rows inserted (adjusted rows kept from a prior run are not counted).
-    Caller owns commit.
+    Returns rows inserted. Caller owns commit.
     """
     today = date.today()
     capacity_index = build_workcenter_capacity_index(session)
@@ -226,13 +224,8 @@ def rebuild_daily_plan(session: Session) -> int:
     for steps in routing_steps_by_item.values():
         steps.sort(key=lambda s: s.proc_sno if s.proc_sno is not None else 0)
 
-    session.query(DailyPlan).filter(DailyPlan.adjusted.is_(False)).delete(synchronize_session=False)
+    session.query(DailyPlan).delete(synchronize_session=False)
     session.flush()
-
-    adjusted_groups: set[tuple[int, int]] = {
-        (row.mps_plan_id, row.item_routing_id)
-        for row in session.execute(select(DailyPlan).where(DailyPlan.adjusted.is_(True))).scalars().all()
-    }
 
     inserted = 0
     for mps in mps_lines:
@@ -243,10 +236,6 @@ def rebuild_daily_plan(session: Session) -> int:
 
         steps = routing_steps_by_item.get(mps.item_id, [])
         if not steps:
-            continue
-        # Any step already hand-adjusted for this MPS line — skip the whole
-        # line so a partial regeneration doesn't fight the adjustment.
-        if any((mps.id, step.id) in adjusted_groups for step in steps):
             continue
 
         window_end = anchor

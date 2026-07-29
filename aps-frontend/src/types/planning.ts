@@ -55,6 +55,10 @@ export interface WorkPlan {
   planStartDate: string
   planEndDate: string
   deliveryDate: string
+  // MPS completion-date search field — priority 1: actual (prod_end_date),
+  // priority 2: expected (plan_end_date). This is what the date-range filter
+  // matches against, not planStartDate/planEndDate.
+  mpsCompletionDate: string | null
   riskType: RiskType
   shortageQty: number
   adjusted: boolean

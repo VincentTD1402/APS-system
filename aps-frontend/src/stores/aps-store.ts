@@ -65,7 +65,10 @@ export const useApsStore = defineStore('aps', () => {
       kpi.value = result.kpi
       selectedPlanId.value = null
       filter.value.cellSelection = null
+      // RUN is always G-System-driven — any staged-but-not-yet-Apply'd
+      // adjustments/purchase requests are stale against the fresh result.
       pendingAdjustments.value.clear()
+      pendingPurchaseRequests.value.clear()
     } finally {
       isRunning.value = false
     }
@@ -134,10 +137,13 @@ export const useApsStore = defineStore('aps', () => {
       if (f.wcCodes.length && !f.wcCodes.includes(p.wcCode)) return false
       if (f.itemCodes.length && !f.itemCodes.includes(p.itemCode)) return false
       if (f.risks.length && !f.risks.includes(p.riskType)) return false
-      // Overlap test against [dateFrom, dateTo] — same semantics as the
-      // backend's _row_matches_filters (work_plan_list.py).
-      if (f.dateFrom && p.planEndDate < f.dateFrom) return false
-      if (f.dateTo && p.planStartDate > f.dateTo) return false
+      // mpsCompletionDate (prod_end_date priority 1, else plan_end_date) must
+      // fall inside [dateFrom, dateTo] — same semantics as the backend's
+      // _row_matches_filters (work_plan_list.py). Rows with no MPS completion
+      // date are dropped once either bound is set.
+      if ((f.dateFrom || f.dateTo) && !p.mpsCompletionDate) return false
+      if (f.dateFrom && p.mpsCompletionDate! < f.dateFrom) return false
+      if (f.dateTo && p.mpsCompletionDate! > f.dateTo) return false
       if (f.cellSelection) {
         if (p.wcCode !== f.cellSelection.wcCode) return false
         if (!p.dailyPlans.some((d) => d.date === f.cellSelection!.date)) return false

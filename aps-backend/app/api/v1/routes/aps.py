@@ -44,7 +44,8 @@ def _to_response(result: AssembledResult) -> ApsRunResult:
                 item_name_ko=wp.item_name_ko, item_name_vi=wp.item_name_vi, wc_code=wp.wc_code, wc_name=wp.wc_name,
                 process_name_ko=wp.process_name_ko, process_name_vi=wp.process_name_vi,
                 plan_qty=wp.plan_qty, plan_start_date=wp.plan_start_date, plan_end_date=wp.plan_end_date,
-                delivery_date=wp.delivery_date, risk_type=wp.risk_type, shortage_qty=wp.shortage_qty,
+                delivery_date=wp.delivery_date, mps_completion_date=wp.mps_completion_date,
+                risk_type=wp.risk_type, shortage_qty=wp.shortage_qty,
                 adjusted=wp.adjusted, original_start=wp.original_start, original_end=wp.original_end,
                 daily_plans=[DailyPlanEntryOut(date=d.date, qty=d.qty, minutes=d.minutes) for d in wp.daily_plans],
             )

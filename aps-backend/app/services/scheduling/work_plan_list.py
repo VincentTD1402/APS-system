@@ -65,6 +65,7 @@ from app.models import (
     WorkOrder,
 )
 from app.schemas.work_plan import WorkPlanDailyEntry, WorkPlanRow
+from app.services.scheduling.daily_plan_builder import _anchor_end_date
 
 
 def _parse_iso_date(value: object) -> Optional[date]:
@@ -312,10 +313,14 @@ def _row_matches_filters(
         return False
     if plan_no and plan_no not in (row.tmp_plan_no or "", row.work_order_no or "", row.order_no or ""):
         return False
-    # Overlap test against [date_from, date_to]; rows missing the relevant date are dropped.
-    if date_from and (row.plan_end is None or row.plan_end < date_from):
+    # row.mps_completion_date (prod_end_date priority 1, else plan_end_date) must
+    # fall inside [date_from, date_to] — rows with no MPS completion date are
+    # dropped once either bound is set (nothing to match against).
+    if (date_from or date_to) and row.mps_completion_date is None:
         return False
-    if date_to and (row.plan_start is None or row.plan_start > date_to):
+    if date_from and row.mps_completion_date < date_from:
+        return False
+    if date_to and row.mps_completion_date > date_to:
         return False
     return True
 
@@ -419,6 +424,7 @@ def build_work_plan_list(
                     plan_start=plan_start,  # 계획시작 (WO's own work date)
                     plan_end=plan_end,  # 계획완료 (WO's own end date)
                     delivery_date=mps.delivery_date if mps else None,  # 납기일자
+                    mps_completion_date=_anchor_end_date(mps) if mps else None,
                     risk_types=_risk_types(overload=overload, material_short=short, both_same_day=both_same_day),
                 )
             )
@@ -460,6 +466,7 @@ def build_work_plan_list(
                     plan_start=window[0] if window else None,  # 계획시작 (Backward-start)
                     plan_end=(window[1] if window else mps.plan_end_date),  # 계획완료 (Backward-end; fallback 종료일자)
                     delivery_date=mps.delivery_date,  # 납기일자
+                    mps_completion_date=_anchor_end_date(mps),
                     risk_types=_risk_types(overload=overload, material_short=short, both_same_day=both_same_day),
                 )
             )

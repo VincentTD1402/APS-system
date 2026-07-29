@@ -29,6 +29,8 @@
   },
   "filter": {
     "dateRange": "Khoảng ngày",
+    "completionFrom": "Ngày hoàn thành SX (từ)",
+    "completionTo": "Ngày hoàn thành SX (đến)",
     "workCenter": "Work Center",
     "item": "Item",
     "risk": "Rủi ro"

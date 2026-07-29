@@ -29,6 +29,8 @@
   },
   "filter": {
     "dateRange": "기간",
+    "completionFrom": "생산완료일 (시작)",
+    "completionTo": "생산완료일 (종료)",
     "workCenter": "워크센터",
     "item": "품목",
     "risk": "리스크"

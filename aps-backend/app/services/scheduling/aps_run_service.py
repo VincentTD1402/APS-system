@@ -3,8 +3,11 @@
 /aps/run recomputes aps_daily_plan/aps_material_shortage itself (same
 sequence as POST /kpi-summary/daily-plan/rebuild: rebuild_daily_plan →
 apply_daily_material_shortage → rebuild_material_shortage) before assembling —
-FE/KPI2/KPI3/KPI4 need those tables current on every run, and rebuild_daily_plan
-already preserves hand-adjusted rows, so re-running it here is safe.
+FE/KPI2/KPI3/KPI4 need those tables current on every run. rebuild_daily_plan
+now always recomputes fresh from G-System-synced data, discarding any
+prior POST /aps/adjust staging (business decision: RUN must be G-System-
+driven, not a merge with stale manual overrides — see rebuild_daily_plan's
+own docstring).
 /aps/adjust does NOT re-run this — it only re-backward-fills the named plans
 on top of current DB state (see adjust_work_plans).
 
@@ -80,6 +83,7 @@ class WorkPlan:
     plan_start_date: date
     plan_end_date: date
     delivery_date: date
+    mps_completion_date: date | None
     risk_type: str
     shortage_qty: float
     adjusted: bool
@@ -261,6 +265,7 @@ def assemble(session: Session) -> AssembledResult:
             # FE's deliveryDate is non-null — fall back to plan_end when the MPS
             # line genuinely has no delivery_date.
             delivery_date=row.delivery_date or plan_end,
+            mps_completion_date=row.mps_completion_date,
             risk_type=risk_type,
             shortage_qty=row.shortage_qty,
             adjusted=row.adjusted,

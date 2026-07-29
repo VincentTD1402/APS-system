@@ -51,3 +51,13 @@ class WorkPlanRow(BaseModel):
     adjusted: bool = Field(False, description="True if any of this MPS line's daily_plan rows were hand-adjusted")
     original_start: date | None = Field(None, description="Pre-adjustment plan_start snapshot, if adjusted")
     original_end: date | None = Field(None, description="Pre-adjustment plan_end snapshot, if adjusted")
+    mps_completion_date: date | None = Field(
+        None,
+        description=(
+            "The MPS line's completion date search field, priority 1: aps_mps_plan."
+            "prod_end_date (actual 작업종료일자, when status_cd='created'), priority 2: "
+            "aps_mps_plan.plan_end_date (expected 종료일자) — same priority "
+            "daily_plan_builder._anchor_end_date uses for backward-fill. This is what "
+            "GET /work-plan/list's date_from/date_to filter matches against, not plan_start/plan_end."
+        ),
+    )

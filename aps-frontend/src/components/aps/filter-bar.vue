@@ -138,7 +138,7 @@ function onShowAll(): void {
       />
     </div>
     <div class="fb-group">
-      <label class="fb-label">{{ t('detail.info.start') }}</label>
+      <label class="fb-label">{{ t('filter.completionFrom') }}</label>
       <DatePicker
         v-model="dateFromPick"
         date-format="yy-mm-dd"
@@ -149,7 +149,7 @@ function onShowAll(): void {
       />
     </div>
     <div class="fb-group">
-      <label class="fb-label">{{ t('detail.info.end') }}</label>
+      <label class="fb-label">{{ t('filter.completionTo') }}</label>
       <DatePicker
         v-model="dateToPick"
         date-format="yy-mm-dd"
