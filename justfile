@@ -27,7 +27,7 @@ up *args:
 down *args:
     {{compose}} down {{args}}
 
-# Stop services AND wipe volumes (DESTROYS Postgres + Neo4j DATA)
+# Stop services AND wipe volumes (DESTROYS Postgres DATA)
 [confirm("Wipe all volumes? This DELETES DB data! [y/N]")]
 reset:
     {{compose}} down -v
@@ -36,7 +36,7 @@ reset:
 ps:
     {{compose}} ps
 
-# Tail logs. Usage: just logs | just logs backend | just logs frontend | just logs db | just logs neo4j
+# Tail logs. Usage: just logs | just logs backend | just logs frontend | just logs db | just logs nginx
 logs *args:
     {{compose}} logs -f {{args}}
 
@@ -49,7 +49,7 @@ restart service:
     {{compose}} restart {{service}}
 
 # Open shell in a service (uses sh — bash may not exist on alpine images).
-# Usage: just sh backend | just sh frontend | just sh db | just sh neo4j
+# Usage: just sh backend | just sh frontend | just sh db | just sh nginx
 sh service:
     {{compose}} exec {{service}} sh
 
