@@ -125,7 +125,7 @@
       "onHandQty": "현재 재고",
       "requestQty": "요청 수량",
       "note": "메모",
-      "stagedNote": "임시 저장됨 — Apply 클릭 시에만 전송됩니다.",
+      "stagedNote": "임시 저장됨 — 해당 계획의 생산지시 생성 시에만 전송됩니다.",
       "noShortage": "이 제품에 부족한 자재가 없습니다."
     },
     "adjust": {

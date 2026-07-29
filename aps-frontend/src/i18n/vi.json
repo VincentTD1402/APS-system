@@ -125,7 +125,7 @@
       "onHandQty": "Tồn kho hiện có",
       "requestQty": "SL yêu cầu mua",
       "note": "Ghi chú",
-      "stagedNote": "Đã lưu tạm — chỉ gửi khi bấm Apply.",
+      "stagedNote": "Đã lưu tạm — chỉ gửi khi tạo chỉ thị sản xuất cho kế hoạch này.",
       "noShortage": "Không có nguyên liệu nào thiếu cho sản phẩm này."
     },
     "adjust": {

@@ -181,17 +181,14 @@ function onShowAll(): void {
       :label="t('common.apply')"
       icon="pi pi-check-square"
       severity="info"
-      :badge="
-        store.pendingCount + store.pendingPurchaseCount > 0
-          ? String(store.pendingCount + store.pendingPurchaseCount)
-          : undefined
-      "
+      :badge="store.pendingCount > 0 ? String(store.pendingCount) : undefined"
       @click="onApply"
     />
     <Button
       :label="t('detail.createWorkOrder')"
       icon="pi pi-check-circle"
       severity="success"
+      :badge="store.pendingPurchaseCount > 0 ? String(store.pendingPurchaseCount) : undefined"
       :disabled="store.filteredPlans.length === 0"
       @click="dispatchDialog = true"
     />

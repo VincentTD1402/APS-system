@@ -185,8 +185,8 @@ class GSystemClient:
         """Push adjusted MPS plan dates back to G-System (/pd/prodPlanMpsMng/aps/updateDates).
 
         Body is a JSON array, one element per adjusted MPS line:
-        [{"id": <gsystem MPS plan id>, "planStartDate": "YYYY-MM-DD",
-          "planEndDate": "YYYY-MM-DD"}, ...]. `id` is aps_mps_plan.gsystem_id,
+        [{"id": <gsystem MPS plan id>, "prodStartDate": "YYYY-MM-DD",
+          "prodEndDate": "YYYY-MM-DD"}, ...]. `id` is aps_mps_plan.gsystem_id,
         not the local aps_mps_plan.id. Same temporary G-System instance as
         work order dispatch — caller must use GSYSTEM_WORKORDER_BASE_URL.
         """

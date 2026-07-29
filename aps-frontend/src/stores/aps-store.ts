@@ -94,16 +94,11 @@ export const useApsStore = defineStore('aps', () => {
     pendingPurchaseRequests.value = new Map(pendingPurchaseRequests.value)
   }
 
-  // Apply sends every staged purchase request first, then always re-assembles
-  // via /aps/adjust (even with an empty adjustments list) so the load detail
-  // (loadCells/kpi) reflects the latest state either way.
+  // Apply only pushes staged schedule adjustments (/aps/adjust) — staged
+  // purchase requests are NOT sent here anymore. They only fire when the
+  // matching plan is actually dispatched (see dispatchWorkOrder below).
   async function applyAdjustments(): Promise<void> {
-    if (pendingAdjustments.value.size === 0 && pendingPurchaseRequests.value.size === 0) return
-
-    for (const pending of pendingPurchaseRequests.value.values()) {
-      await requestPurchase(pending.planId, pending.note, pending.lines)
-    }
-    pendingPurchaseRequests.value = new Map()
+    if (pendingAdjustments.value.size === 0) return
 
     const drafts = Array.from(pendingAdjustments.value.values())
     const result = await apsApi.adjustAps(runId.value, drafts)
@@ -119,11 +114,38 @@ export const useApsStore = defineStore('aps', () => {
     await erpApi.createPurchaseRequest(planId, note, lines)
   }
 
+  // If this plan has a staged purchase request, send it first — dispatching
+  // the work order is what actually flushes a staged purchase request now,
+  // not Apply (a plan without a shortage that's never dispatched should
+  // never end up pushing a stale purchase request on its own).
   async function dispatchWorkOrder(planId: string): Promise<void> {
+    const pending = pendingPurchaseRequests.value.get(planId)
+    if (pending) {
+      await requestPurchase(pending.planId, pending.note, pending.lines)
+      pendingPurchaseRequests.value.delete(planId)
+      pendingPurchaseRequests.value = new Map(pendingPurchaseRequests.value)
+    }
     await erpApi.createWorkOrder(planId)
   }
 
-  const selectedPlan = computed(() => workPlans.value.find((p) => p.id === selectedPlanId.value) ?? null)
+  // FE-only preview: a plan with a staged (not-yet-sent) purchase request shows
+  // as if the shortage were already resolved — riskType/shortageQty overridden
+  // for display only, nothing pushed to G-System until dispatch actually sends
+  // it (see dispatchWorkOrder). Never touches the WC×day load matrix (loadCells
+  // stay backend-real) — recomputing that grid's material-shortage aggregate
+  // client-side would duplicate shortage_builder.py's backward-fill algorithm.
+  // Resets automatically: RUN clears pendingPurchaseRequests and refetches the
+  // real workPlans, so nothing here can outlive a RUN.
+  const displayPlans = computed(() =>
+    workPlans.value.map((p) => {
+      if (!pendingPurchaseRequests.value.has(p.id)) return p
+      if (p.riskType === 'MATERIAL_SHORT') return { ...p, riskType: 'NORMAL' as RiskType, shortageQty: 0 }
+      if (p.riskType === 'MATERIAL_AND_OVERLOAD') return { ...p, riskType: 'OVERLOAD' as RiskType, shortageQty: 0 }
+      return p
+    })
+  )
+
+  const selectedPlan = computed(() => displayPlans.value.find((p) => p.id === selectedPlanId.value) ?? null)
   const selectedPending = computed(() =>
     selectedPlanId.value ? pendingAdjustments.value.get(selectedPlanId.value) ?? null : null
   )
@@ -133,7 +155,7 @@ export const useApsStore = defineStore('aps', () => {
 
   const filteredPlans = computed(() => {
     const f = filter.value
-    return workPlans.value.filter((p) => {
+    return displayPlans.value.filter((p) => {
       if (f.wcCodes.length && !f.wcCodes.includes(p.wcCode)) return false
       if (f.itemCodes.length && !f.itemCodes.includes(p.itemCode)) return false
       if (f.risks.length && !f.risks.includes(p.riskType)) return false

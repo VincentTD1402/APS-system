@@ -260,6 +260,14 @@ def _push_mps_plan_dates_for_dispatch(db: Session, wo: WorkOrder, item_routing_i
     G-System (/pd/prodPlanMpsMng/aps/updateDates) — only dispatch confirms the
     plan is real, so that's when G-System's MPS record should move.
 
+    On a successful push, also writes mps.prod_end_date/status_cd locally
+    instead of waiting for the next periodic G-System resync (sync_mps_plan) —
+    daily_plan_builder._anchor_end_date() only trusts prod_end_date when
+    status_cd=="created", and without this the very next RUN right after
+    dispatch would still anchor on the old plan_end_date. G-System has no
+    local prod_start_date counterpart to update (backward-fill only needs one
+    end anchor; the start date is a computed output, not an input).
+
     Outcome is recorded on wo.mps_dates_sync_status/mps_dates_response_json/
     mps_dates_sent_at (caller commits). Never raises — a push failure must not
     block the local dispatch result.
@@ -273,10 +281,11 @@ def _push_mps_plan_dates_for_dispatch(db: Session, wo: WorkOrder, item_routing_i
     ).scalars().all()
     if not work_dates:
         return
+    prod_end_date = max(work_dates)
     payload = [{
         "id": mps.gsystem_id,
-        "planStartDate": min(work_dates).isoformat(),
-        "planEndDate": max(work_dates).isoformat(),
+        "prodStartDate": min(work_dates).isoformat(),
+        "prodEndDate": prod_end_date.isoformat(),
     }]
     cfg = GSystemConfig(
         base_url=settings.GSYSTEM_WORKORDER_BASE_URL,
@@ -296,6 +305,9 @@ def _push_mps_plan_dates_for_dispatch(db: Session, wo: WorkOrder, item_routing_i
     status_code = response.get("statusCode") if isinstance(response, dict) else None
     wo.mps_dates_sync_status = "SUCCESS" if status_code == "000" else "FAILED"
     wo.mps_dates_response_json = response if isinstance(response, dict) else {"raw": response}
+    if wo.mps_dates_sync_status == "SUCCESS":
+        mps.prod_end_date = prod_end_date
+        mps.status_cd = "created"
 
 
 # FE's ErpOutboxStatus = 'PENDING' | 'PUSHED' | 'FAILED' — map the underlying

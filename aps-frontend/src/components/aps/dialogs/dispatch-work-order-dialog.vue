@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Checkbox from 'primevue/checkbox'
+import Tag from 'primevue/tag'
 import { useConfirm } from 'primevue/useconfirm'
 import { useApsStore } from '@/stores/aps-store'
 
@@ -88,6 +89,11 @@ function onConfirmClick(): void {
         </Column>
         <Column :header="t('workPlanList.col.workOrderNo')" field="workOrderNo" class="mono">
           <template #body="{ data }">{{ data.workOrderNo ?? '—' }}</template>
+        </Column>
+        <Column style="width: 50px">
+          <template #body="{ data }">
+            <Tag v-if="store.pendingPurchaseRequests.has(data.id)" severity="info" value="po" />
+          </template>
         </Column>
         <Column :header="t('workPlanList.col.item')">
           <template #body="{ data }">{{ locale === 'ko' ? data.itemNameKo : data.itemNameVi }}</template>
