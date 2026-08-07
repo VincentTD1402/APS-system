@@ -28,28 +28,21 @@ _ENDPOINTS: dict[str, tuple[str, str | None]] = {
     "item":             ("/cm/item/aps/pending",                              "item"),
     "workshop":         ("/cm/workPlaceMng/aps/pending",                     "workshop"),
     "bom":              ("/cm/BOMMng/aps/pending",                           "bom"),
-    "routing":          ("/pd/routingMng/aps/pending",                       "routing"),
-    "process":          ("/pd/processMng/aps/pending",                       "process"),
     "prod_plan":        ("/pd/prodplan/aps/pending",                         "prodplan"),
-    "routing_process":  ("/pd/routingMng/aps/routingProcess/pending",        None),
-    "routing_item":     ("/pd/routingMng/aps/routingItem/pending",           None),
-    "item_process":     ("/pd/itemProcess/aps/pending",                      None),
     "calendar":         ("/sy/calendar/aps/pending",                         "calendar"),
     "stock":            ("/lg/lgstock/aps/pending",                          None),
     "customer":         ("/cm/customerMng/aps/pending",                      "customer"),
     # skipped: equipment (/pd/equipmentMasterInfo) — not in APS
+    # routing/routing_item/routing_process/item_process/process removed — the
+    # only routing/process-step source APS uses is itemRoutingMng (per-item,
+    # see fetch_item_routing), not these pending feeds.
 }
 
 _PUSH_ENDPOINTS: dict[str, str] = {
     "item":             "/cm/item/aps/pushItemInterface",
     "workshop":         "/cm/workPlaceMng/aps/pushWorkshopInterface",
-    "routing":          "/pd/routingMng/aps/pushRoutingInterface",
     "bom":              "/cm/BOMMng/aps/pushBomInterface",
-    "process":          "/pd/processMng/aps/pushProcessInterface",
     "prod_plan":        "/pd/prodplan/aps/pushProdPlanInterface",
-    "routing_process":  "/pd/routingMng/aps/routingProcess/pushRoutingProcessInterface",
-    "routing_item":     "/pd/routingMng/aps/routingItem/pushRoutingItemInterface",
-    "item_process":     "/pd/itemProcess/aps/pushItemProcessInterface",
     "calendar":         "/sy/calendar/aps/pushCalendarInterface",
     "stock":            "/lg/lgstock/aps/pushStockInterface",
     "customer":         "/cm/customerMng/aps/pushCustomerInterface",
@@ -160,85 +153,78 @@ class GSystemClient:
                     time.sleep(2 ** (attempt - 1))
         raise RuntimeError(f"All {self._cfg.retries} purchase order attempts failed for {path}") from last_exc
 
+    def submit_work_order_dispatch(self, payload: list[dict[str, Any]]) -> Any:
+        """Submit work order dispatch(es) — "chỉ thị sản xuất" (/pd/WorkOrderProc/aps/save).
+
+        Body is a JSON array (one element per work order), unlike the other
+        save endpoints here. Caller must construct this client with a config
+        pointed at GSYSTEM_WORKORDER_BASE_URL, not GSYSTEM_BASE_URL — this is
+        a different G-System instance (temporary, per business direction).
+        """
+        path = "/pd/WorkOrderProc/aps/save"
+        last_exc: Exception | None = None
+        for attempt in range(1, self._cfg.retries + 1):
+            try:
+                r = self._http.post(path, json=payload)
+                r.raise_for_status()
+                return r.json()
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "work order dispatch attempt %d/%d failed for %s: %s",
+                    attempt,
+                    self._cfg.retries,
+                    path,
+                    exc,
+                )
+                if attempt < self._cfg.retries:
+                    time.sleep(2 ** (attempt - 1))
+        raise RuntimeError(f"All {self._cfg.retries} work order dispatch attempts failed for {path}") from last_exc
+
+    def submit_mps_plan_dates_update(self, payload: list[dict[str, Any]]) -> Any:
+        """Push adjusted MPS plan dates back to G-System (/pd/prodPlanMpsMng/aps/updateDates).
+
+        Body is a JSON array, one element per adjusted MPS line:
+        [{"id": <gsystem MPS plan id>, "prodStartDate": "YYYY-MM-DD",
+          "prodEndDate": "YYYY-MM-DD"}, ...]. `id` is aps_mps_plan.gsystem_id,
+        not the local aps_mps_plan.id. Same temporary G-System instance as
+        work order dispatch — caller must use GSYSTEM_WORKORDER_BASE_URL.
+        """
+        path = "/pd/prodPlanMpsMng/aps/updateDates"
+        last_exc: Exception | None = None
+        for attempt in range(1, self._cfg.retries + 1):
+            try:
+                r = self._http.post(path, json=payload)
+                r.raise_for_status()
+                return r.json()
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "mps plan dates update attempt %d/%d failed for %s: %s",
+                    attempt,
+                    self._cfg.retries,
+                    path,
+                    exc,
+                )
+                if attempt < self._cfg.retries:
+                    time.sleep(2 ** (attempt - 1))
+        raise RuntimeError(f"All {self._cfg.retries} mps plan dates update attempts failed for {path}") from last_exc
+
     # ── Fetch methods — pending queue (delta sync) ────────────────────────────
 
     def fetch_items(self)            -> list[dict[str, Any]]: return self._post("item")
     def fetch_workcenters(self)      -> list[dict[str, Any]]: return self._post("workshop")
     def fetch_bom(self)              -> list[dict[str, Any]]: return self._post("bom")
-    def fetch_routings(self)         -> list[dict[str, Any]]: return self._post("routing")
-    def fetch_processes(self)        -> list[dict[str, Any]]: return self._post("process")
     def fetch_demands(self)          -> list[dict[str, Any]]: return self._post("prod_plan")
-    def fetch_routing_processes(self)-> list[dict[str, Any]]: return self._post("routing_process")
-    def fetch_routing_items(self)    -> list[dict[str, Any]]: return self._post("routing_item")
-    def fetch_item_processes(self)   -> list[dict[str, Any]]: return self._post("item_process")
 
     def fetch_calendar(self)  -> list[dict[str, Any]]: return self._post("calendar")
     def fetch_stock(self)     -> list[dict[str, Any]]: return self._post("stock")
     def fetch_customers(self) -> list[dict[str, Any]]: return self._post("customer")
 
     # ── Fetch methods — by-routing lookup (full load, not pending-based) ──────
-
-    def fetch_routing_process_list(self, routing_id: int) -> list[dict[str, Any]]:
-        """Fetch all process steps for a routing (pd_if_aps_routing_process).
-
-        Returns full list regardless of ifRecvYn status.
-        Fields: routingId, processId, processSeq, workcenterId, procNm, useYn
-        Note: no workTime at this level — use fetch_item_process_list_by_routing for item-level times.
-        """
-        path = "/pd/routingMng/aps/routingProcessList"
-        last_exc: Exception | None = None
-        for attempt in range(1, self._cfg.retries + 1):
-            try:
-                r = self._http.post(path, json={"routingId": routing_id})
-                r.raise_for_status()
-                return _parse_envelope(r.json(), path)
-            except Exception as exc:
-                last_exc = exc
-                logger.warning("attempt %d/%d failed for %s routingId=%s: %s", attempt, self._cfg.retries, path, routing_id, exc)
-                if attempt < self._cfg.retries:
-                    time.sleep(2 ** (attempt - 1))
-        raise RuntimeError(f"All {self._cfg.retries} attempts failed for {path} routingId={routing_id}") from last_exc
-
-    def fetch_routing_item_list(self, routing_id: int) -> list[dict[str, Any]]:
-        """Fetch all items assigned to a routing (pd_if_aps_routing_item).
-
-        Returns full list regardless of ifRecvYn status.
-        Fields: routingId, itemId, itemNo, itemNm, whId, whNm, useYn
-        """
-        path = "/pd/routingMng/aps/routingItemList"
-        last_exc: Exception | None = None
-        for attempt in range(1, self._cfg.retries + 1):
-            try:
-                r = self._http.post(path, json={"routingId": routing_id})
-                r.raise_for_status()
-                return _parse_envelope(r.json(), path)
-            except Exception as exc:
-                last_exc = exc
-                logger.warning("attempt %d/%d failed for %s routingId=%s: %s", attempt, self._cfg.retries, path, routing_id, exc)
-                if attempt < self._cfg.retries:
-                    time.sleep(2 ** (attempt - 1))
-        raise RuntimeError(f"All {self._cfg.retries} attempts failed for {path} routingId={routing_id}") from last_exc
-
-    def fetch_item_process_list_by_routing(self, routing_id: int, item_id: int) -> list[dict[str, Any]]:
-        """Fetch item-specific process steps for a routing×item pair (pd_if_aps_item_process).
-
-        itemId must come from fetch_routing_item_list response.
-        Fields: routingId, itemId, procId, procSno, procNm, makingGb, workTime (minutes), revNo
-        Key value: workTime — item-level work duration, not available from pending endpoint.
-        """
-        path = "/pd/routingMng/aps/itemProcessListByRouting"
-        last_exc: Exception | None = None
-        for attempt in range(1, self._cfg.retries + 1):
-            try:
-                r = self._http.post(path, json={"routingId": routing_id, "itemId": item_id})
-                r.raise_for_status()
-                return _parse_envelope(r.json(), path)
-            except Exception as exc:
-                last_exc = exc
-                logger.warning("attempt %d/%d failed for %s routingId=%s itemId=%s: %s", attempt, self._cfg.retries, path, routing_id, item_id, exc)
-                if attempt < self._cfg.retries:
-                    time.sleep(2 ** (attempt - 1))
-        raise RuntimeError(f"All {self._cfg.retries} attempts failed for {path} routingId={routing_id} itemId={item_id}") from last_exc
+    # routingProcessList/routingItemList/itemProcessListByRouting removed —
+    # itemRoutingMng (fetch_item_routing, below) is the only routing/process-step
+    # source APS uses.
 
     def fetch_equipment_by_workshop(self, workshop_id: int) -> list[dict[str, Any]]:
         """Fetch equipment for a workshop (GET /cm/workPlaceEquipmentMng?workshopId=).
@@ -264,12 +250,19 @@ class GSystemClient:
                     time.sleep(2 ** (attempt - 1))
         raise RuntimeError(f"All {self._cfg.retries} attempts failed for {path} workshopId={workshop_id}") from last_exc
 
+    # Temporary fixed window — only MPS plan records dated within this range are
+    # returned by fetch_mps_plan (matches the GET /mps read endpoint's filter).
+    _PLAN_DATE_FROM = "2026-07-06"
+    _PLAN_DATE_TO = "2026-07-07"
+
     def fetch_mps_plan(self, parea_id: int) -> list[dict[str, Any]]:
         """Fetch the master production schedule (GET /pd/prodPlanMpsMng?pareaId=).
 
         Richer than the pd/prodplan/aps/pending pending-queue feed synced into
         aps_demand — includes planStartDate/planEndDate, routingId, itemRev.
-        Full list for the production area, not delta/pending-based.
+        Full list for the production area, not delta/pending-based — G-System
+        has no date-range param for this endpoint, so planDate is filtered
+        client-side after fetch.
         """
         path = "/pd/prodPlanMpsMng"
         last_exc: Exception | None = None
@@ -277,7 +270,11 @@ class GSystemClient:
             try:
                 r = self._http.get(path, params={"pareaId": parea_id})
                 r.raise_for_status()
-                return _parse_envelope(r.json(), path)
+                records = _parse_envelope(r.json(), path)
+                return [
+                    rec for rec in records
+                    if rec.get("planDate") and self._PLAN_DATE_FROM <= str(rec["planDate"])[:10] <= self._PLAN_DATE_TO
+                ]
             except Exception as exc:
                 last_exc = exc
                 logger.warning("attempt %d/%d failed for %s pareaId=%s: %s", attempt, self._cfg.retries, path, parea_id, exc)
@@ -297,7 +294,9 @@ class GSystemClient:
         `statusCd`/`workStatus` ("notcompleted" | "complete" | other codes —
         matches FE 미완료/완료), `prodStatus` ("created" | "notCreated").
         Full list for the production area, not delta/pending-based (mirrors
-        fetch_mps_plan).
+        fetch_mps_plan). G-System has no date-range param for this endpoint
+        either, so workOrderDate is filtered client-side after fetch, same
+        fixed window as fetch_mps_plan.
         """
         path = "/pd/workorder"
         last_exc: Exception | None = None
@@ -305,7 +304,12 @@ class GSystemClient:
             try:
                 r = self._http.get(path, params={"pareaId": parea_id})
                 r.raise_for_status()
-                return _parse_envelope(r.json(), path)
+                records = _parse_envelope(r.json(), path)
+                return [
+                    rec for rec in records
+                    if rec.get("workOrderDate")
+                    and self._PLAN_DATE_FROM <= str(rec["workOrderDate"])[:10] <= self._PLAN_DATE_TO
+                ]
             except Exception as exc:
                 last_exc = exc
                 logger.warning("attempt %d/%d failed for %s pareaId=%s: %s", attempt, self._cfg.retries, path, parea_id, exc)
@@ -341,13 +345,8 @@ class GSystemClient:
         return {
             "items":             self.fetch_items(),
             "workcenters":       self.fetch_workcenters(),
-            "processes":         self.fetch_processes(),
-            "routings":          self.fetch_routings(),
-            "routing_items":     self.fetch_routing_items(),
-            "routing_processes": self.fetch_routing_processes(),
             "bom":               self.fetch_bom(),
             "prod_plans":        self.fetch_demands(),
-            "item_processes":    self.fetch_item_processes(),
             "calendar":          self.fetch_calendar(),
             "stock":             self.fetch_stock(),
             "customers":         self.fetch_customers(),
@@ -385,7 +384,6 @@ def build_item_id_to_no(items: list[dict[str, Any]]) -> dict[int, str]:
     """Map G-System integer itemId → itemNo string.
 
     Key is `itemId` (G-System business ID), NOT `id` (pending record ID).
-    Used by abox_builder for BOM and Demand FK resolution.
     """
     index: dict[int, str] = {}
     for rec in items:

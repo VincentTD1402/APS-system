@@ -48,12 +48,17 @@ export interface WorkPlan {
   itemNameKo: string
   itemNameVi: string
   wcCode: string
+  wcName: string | null
   processNameKo: string
   processNameVi: string
   planQty: number
   planStartDate: string
   planEndDate: string
   deliveryDate: string
+  // MPS completion-date search field — priority 1: actual (prod_end_date),
+  // priority 2: expected (plan_end_date). This is what the date-range filter
+  // matches against, not planStartDate/planEndDate.
+  mpsCompletionDate: string | null
   riskType: RiskType
   shortageQty: number
   adjusted: boolean
@@ -64,6 +69,7 @@ export interface WorkPlan {
 
 export interface LoadCell {
   wcCode: string
+  wcName: string | null
   cellDate: string
   minutesLoaded: number
   minutesCapacity: number

@@ -1,12 +1,17 @@
 import { http } from './http'
 import type { ErpOutboxRow } from '@/types/planning'
+import type { PendingPurchaseLine } from '@/stores/aps-store'
 
 export async function createPurchaseRequest(
   planId: string,
-  qty: number,
-  note: string
+  note: string,
+  lines: PendingPurchaseLine[]
 ): Promise<ErpOutboxRow> {
-  const { data } = await http.post<ErpOutboxRow>('/erp/purchase-requests', { planId, qty, note })
+  const { data } = await http.post<ErpOutboxRow>('/erp/purchase-requests', {
+    planId,
+    note,
+    lines: lines.map((l) => ({ itemNo: l.itemNo, qty: l.qty })),
+  })
   return data
 }
 

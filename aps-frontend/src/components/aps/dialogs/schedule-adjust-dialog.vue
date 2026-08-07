@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
@@ -33,12 +33,17 @@ function fmt(d: Date | null): string {
   return `${y}-${m}-${day}`
 }
 
+const isDateRangeInvalid = computed(() => {
+  if (!newStart.value || !newEnd.value) return false
+  return newEnd.value < newStart.value
+})
+
 function onCancel(): void {
   emit('update:visible', false)
 }
 
 function onSubmit(): void {
-  if (!newStart.value || !newEnd.value) return
+  if (!newStart.value || !newEnd.value || isDateRangeInvalid.value) return
   emit('submit', { newStart: fmt(newStart.value), newEnd: fmt(newEnd.value) })
   emit('update:visible', false)
 }
@@ -63,13 +68,14 @@ function onSubmit(): void {
       </div>
       <div class="row">
         <label>{{ t('dialog.adjust.newEnd') }}</label>
-        <DatePicker v-model="newEnd" date-format="yy-mm-dd" show-icon />
+        <DatePicker v-model="newEnd" date-format="yy-mm-dd" show-icon :min-date="newStart ?? undefined" />
       </div>
+      <Message v-if="isDateRangeInvalid" severity="error" :closable="false">{{ t('common.invalidDateRange') }}</Message>
       <Message severity="warn" :closable="false">{{ t('dialog.adjust.note') }}</Message>
     </div>
     <template #footer>
       <Button :label="t('common.cancel')" severity="secondary" text @click="onCancel" />
-      <Button :label="t('common.confirm')" icon="pi pi-check" @click="onSubmit" />
+      <Button :label="t('common.confirm')" icon="pi pi-check" :disabled="isDateRangeInvalid" @click="onSubmit" />
     </template>
   </Dialog>
 </template>

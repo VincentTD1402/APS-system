@@ -26,9 +26,6 @@ class WorkCenter(Base):
     # is this value scaled by the sum of its equipment cycle_factor (ST conversion).
     std_capa: Mapped[float | None] = mapped_column(Numeric(10, 2), default=480, server_default="480")
 
-    routing_steps: Mapped[List["RoutingStep"]] = relationship(back_populates="workcenter")
-    # Plan operations referencing this workcenter
-    plan_operations: Mapped[List["PlanOperation"]] = relationship(back_populates="workcenter")
     equipment: Mapped[List["Equipment"]] = relationship(
         back_populates="workcenter", cascade="all, delete-orphan"
     )

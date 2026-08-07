@@ -117,13 +117,14 @@ def list_inventory(db: Session = Depends(get_db)) -> list[InventoryRowOut]:
             except (TypeError, ValueError):
                 item_code = None
         as_of = f"{s.stk_ym[:4]}-{s.stk_ym[4:6]}-01" if s.stk_ym and len(s.stk_ym) >= 6 else None
+        on_hand = None
+        if s.in_qty is not None or s.out_qty is not None:
+            on_hand = float(s.in_qty or 0) - float(s.out_qty or 0)
         out.append(InventoryRowOut(
             id=s.id,
             item_code=item_code,
             warehouse_code=s.wh_cd,
-            # able_qty = available stock (tồn kho khả dụng); NOT in_qty (which is inbound in-period).
-            # Scheduler's material shortage detection needs the available balance.
-            on_hand=float(s.able_qty) if s.able_qty is not None else None,
+            on_hand=on_hand,
             as_of_date=as_of,
         ))
     return out

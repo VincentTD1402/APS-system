@@ -48,3 +48,18 @@ export interface InventoryRow {
   onHand: number
   asOfDate: string
 }
+
+// One (parent product/semi-product → raw-material component) BOM requirement
+// vs stock row — a product can need several raw materials, hence a list per plan.
+export interface MaterialShortageRow {
+  parentItemId: number | null
+  parentItemNo: string | null
+  parentItemName: string | null
+  itemId: number
+  itemNo: string | null
+  itemName: string | null
+  requiredQty: number
+  availableQty: number
+  shortageQty: number
+  isShort: boolean
+}

@@ -1,21 +1,32 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
-import { useMasterStore } from '@/stores/master-store'
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import dayjs from 'dayjs'
 import type { LoadCellStatus } from '@/types/enums'
 
 const { t } = useI18n()
 const store = useApsStore()
-const master = useMasterStore()
 
-onMounted(() => master.ensureLoaded())
-
+// dateFrom/dateTo (filter-bar) pin the exact column span when set — this is
+// a WC×day calendar view, so "chosen date window" is the natural read,
+// unlike plan-detail-matrix (per-plan schedule, which must NOT be pinned to
+// the completion-date filter — see that component). Falls back to the actual
+// loaded schedule (min..max cellDate from /aps/run) when no filter is set,
+// not a hardcoded month — aps_daily_plan's real window varies per run/
+// backward-fill anchor and previously missed most of it, making workcenters
+// look empty.
 const dateRange = computed(() => {
+  const { dateFrom, dateTo } = store.filter
+  const cellDates = store.loadCells.map((c) => c.cellDate)
+  const start = dateFrom
+    ? dayjs(dateFrom)
+    : cellDates.length ? dayjs(cellDates.reduce((a, b) => (a < b ? a : b))) : dayjs()
+  const end = dateTo
+    ? dayjs(dateTo)
+    : cellDates.length ? dayjs(cellDates.reduce((a, b) => (a > b ? a : b))) : start.add(30, 'day')
+
   const dates: string[] = []
-  const start = dayjs('2026-08-01')
-  const end = dayjs('2026-08-31')
   let d = start
   while (!d.isAfter(end)) {
     dates.push(d.format('YYYY-MM-DD'))
@@ -23,6 +34,26 @@ const dateRange = computed(() => {
   }
   return dates
 })
+
+// Only workcenters that actually appear in this run's loadCells — a workcenter
+// with zero aps_daily_plan rows has nothing to show and only pads the grid.
+const activeWorkCenters = computed(() => {
+  const byCode = new Map<string, string | null>()
+  for (const c of store.loadCells) if (!byCode.has(c.wcCode)) byCode.set(c.wcCode, c.wcName)
+  return [...byCode.entries()]
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+})
+
+// CSS Grid instead of an HTML table — a table's row/cell layout (baseline
+// alignment, inline-block whitespace gaps between elements) is a classic
+// source of uneven-looking grids; a real grid keeps every cell an identical
+// size with no such quirks, at any column count.
+// wc-name column wide enough for "WS71 · WC-001"-style labels (was 88px —
+// too narrow, clipped the text). Date columns always fill the remaining
+// 100% of the panel width evenly (1fr each, min 24px) — by explicit choice,
+// accepting that with few date columns each cell will be wider than tall.
+const gridTemplateColumns = computed(() => `140px repeat(${dateRange.value.length}, minmax(24px, 1fr))`)
 
 const cellIndex = computed(() => {
   const idx = new Map<string, LoadCellStatus>()
@@ -90,26 +121,24 @@ function shortDate(d: string): string {
       </div>
     </div>
     <div class="matrix-scroll">
-      <table class="matrix">
-        <thead>
-          <tr>
-            <th class="wc-col">WC</th>
-            <th v-for="d in dateRange" :key="d" class="date-col">{{ shortDate(d) }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="wc in master.workCenters" :key="wc.code">
-            <td class="wc-name">{{ wc.code }}</td>
-            <td v-for="d in dateRange" :key="d" class="cell-td">
-              <div
-                :class="cellClass(wc.code, d)"
-                :title="cellTitle(wc.code, d)"
-                @click="onCellClick(wc.code, d)"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="matrix-grid" :style="{ gridTemplateColumns }">
+        <div class="grid-cell wc-col-head">WC</div>
+        <div v-for="d in dateRange" :key="`h-${d}`" class="grid-cell date-col-head">{{ shortDate(d) }}</div>
+        <template v-for="wc in activeWorkCenters" :key="wc.code">
+          <div class="grid-cell wc-name">{{ wc.code }} · {{ wc.name }}</div>
+          <div
+            v-for="d in dateRange"
+            :key="`${wc.code}-${d}`"
+            class="grid-cell cell-slot"
+          >
+            <div
+              :class="cellClass(wc.code, d)"
+              :title="cellTitle(wc.code, d)"
+              @click="onCellClick(wc.code, d)"
+            />
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>
@@ -182,42 +211,47 @@ function shortDate(d: string): string {
   background: var(--p-content-background);
   z-index: 1;
 }
-.matrix {
-  border-collapse: collapse;
-  min-width: 100%;
+/* CSS Grid: every column is an explicit track — 140px for the WC name
+   column, then a 1fr (min 24px) track per date column (see
+   gridTemplateColumns above), so date columns always share 100% of the
+   panel's width evenly — by explicit choice, few columns means each is
+   wider than tall. display:grid (not inline-grid) is required for the 1fr
+   tracks to resolve against the full container width instead of shrinking
+   to content. overflow-x above scrolls once min-width (24px/col) is hit
+   with many columns. */
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+  grid-auto-rows: 24px;
 }
-.matrix th,
-.matrix td {
-  padding: 3px;
-  text-align: center;
+.grid-cell {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
-.matrix .wc-col {
-  min-width: 60px;
-  text-align: left;
-  padding-left: 4px;
-  font-family: var(--aps-mono);
-  color: var(--p-text-muted-color);
-  font-size: 11px;
-  font-weight: 600;
-}
-.matrix .date-col {
+.wc-col-head,
+.date-col-head {
   font-family: var(--aps-mono);
   color: var(--p-text-muted-color);
   font-size: 10px;
   font-weight: 500;
-  border-bottom: 1px solid var(--p-content-border-color);
-  min-width: 26px;
+  justify-content: center;
 }
-.matrix .wc-name {
-  text-align: left;
-  padding-left: 4px;
+.wc-col-head {
+  justify-content: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+}
+.wc-name {
   font-family: var(--aps-mono);
   font-size: 12px;
   font-weight: 700;
-  border-right: 1px solid var(--p-content-border-color);
   color: var(--p-text-color);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding-right: 8px;
 }
-.cell-td {
-  padding: 2px;
+.cell-slot {
+  justify-content: center;
 }
 </style>

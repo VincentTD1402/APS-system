@@ -44,8 +44,12 @@ def rebuild_material_shortage_endpoint(db: Session = Depends(get_db)) -> Materia
     description="Rows from aps_result.aps_material_shortage (call POST .../rebuild first).",
 )
 def list_material_shortage(
-    shortage_only: bool = Query(False, description="Return only components with shortage_qty > 0"),
-    item_id: Optional[int] = Query(None, description="Filter by component item id"),
+    shortage_only: bool = Query(False, alias="shortageOnly", description="Return only components with shortage_qty > 0"),
+    item_id: Optional[int] = Query(None, alias="itemId", description="Filter by component (raw material) item id"),
+    parent_item_no: Optional[str] = Query(
+        None, alias="parentItemNo",
+        description="Filter by parent product/semi-product item_no — one product can need several raw materials",
+    ),
     db: Session = Depends(get_db),
 ) -> List[MaterialShortageRow]:
     stmt = select(MaterialShortage).order_by(
@@ -55,6 +59,8 @@ def list_material_shortage(
         stmt = stmt.where(MaterialShortage.shortage_qty > 0)
     if item_id is not None:
         stmt = stmt.where(MaterialShortage.item_id == item_id)
+    if parent_item_no is not None:
+        stmt = stmt.where(MaterialShortage.parent_item_no == parent_item_no)
 
     rows = db.execute(stmt).scalars().all()
     return [

@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
+    # CORS — comma-separated origins. The frontend calls the API cross-origin
+    # (separate host/port), so every origin serving the UI must be listed here.
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174"
+
     # LLM — lazy init; reads LLM_* env vars independently
     LLM: LLMSettings = Field(default_factory=LLMSettings)
 
@@ -76,6 +80,9 @@ class Settings(BaseSettings):
     
     ## G-System API
     GSYSTEM_BASE_URL: str = ""
+    # Temporary — POST /pd/WorkOrderProc/aps/save (work order dispatch / "chỉ thị
+    # sản xuất") lives on a different G-System instance than GSYSTEM_BASE_URL.
+    GSYSTEM_WORKORDER_BASE_URL: str = "https://mes-dev.gsystem.ai/api/"
     GSYSTEM_API_KEY: str = ""
     GSYSTEM_TIMEOUT: float = 30.0
     GSYSTEM_RETRIES: int = 3
@@ -128,10 +135,23 @@ class Settings(BaseSettings):
     APS_NEO4J_SILENCE_NOTIFICATIONS: bool = True
 
     model_config = SettingsConfigDict(
-        env_file=".env", 
+        env_file=".env",
         extra="ignore",
         case_sensitive=True
     )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """CORS_ORIGINS split into a list, trailing slashes stripped.
+
+        Browsers send Origin without a trailing slash, so an entry written as
+        ``https://example.com/`` would otherwise never match.
+        """
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.CORS_ORIGINS.split(",")
+            if origin.strip()
+        ]
 
 
 settings = Settings()

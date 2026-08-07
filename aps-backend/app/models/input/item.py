@@ -1,7 +1,7 @@
 """APS Local DB — Item model."""
 
 from typing import List
-from sqlalchemy import CheckConstraint, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -31,6 +31,15 @@ class Item(Base):
     # Unit of measure shown in FE master views. G-System item sync does not
     # provide it yet — defaults to 'EA', backfilled later.
     uom: Mapped[str | None] = mapped_column(String(20), server_default="EA")
+    # G-System stock unit code (stkUnitCd) from cm_item — the item's own unit-of-
+    # measure code, used as stkUnitCd/stockUnitCd when building purchase orders.
+    unit_cd: Mapped[str | None] = mapped_column(String(20))
+    # Raw G-System asset type code (assetTypeCd) — distinct from the normalized
+    # `asset_type` string above; needed verbatim for puOrderReq.detail.assetTypeCd.
+    asset_type_cd: Mapped[str | None] = mapped_column(String(20))
+    lot_yn: Mapped[bool | None] = mapped_column(Boolean)
+    material: Mapped[str | None] = mapped_column(String(200))
+    purchase_price_vat_yn: Mapped[bool | None] = mapped_column(Boolean)
 
     demands: Mapped[List["Demand"]] = relationship(back_populates="item")
     bom_parent_links: Mapped[List["BOM"]] = relationship(
@@ -39,9 +48,6 @@ class Item(Base):
     bom_component_links: Mapped[List["BOM"]] = relationship(
         back_populates="component_item", foreign_keys="BOM.component_item_id"
     )
-    plan_shortages: Mapped[List["PlanShortage"]] = relationship(back_populates="item")
-    routing_items: Mapped[list["RoutingItem"]] = relationship(back_populates="item")
-    item_process_steps: Mapped[list["ItemProcessStep"]] = relationship(back_populates="item")
 
     def __repr__(self) -> str:
         return f"<Item {self.item_no!r} {self.item_name!r}>"

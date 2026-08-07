@@ -4,12 +4,21 @@ Direct 1-level BOM explosion (multi-level BOM nesting intentionally ignored):
 each MPS plan line's parent item maps straight to its BOM components.
 
   required(component)  = Σ over MPS lines using it ( plan_qty × qty1 / qty2 )
-  available(component) = Σ aps_stock.in_qty for that component (기초 재고 / on-hand)
+  available(component) = Σ (aps_stock.in_qty - aps_stock.out_qty) for that component (기초 재고 / on-hand)
+                          + Σ purchase_request.shortage_qty where sync_status='SUCCESS' (đã đặt mua, chưa về kho)
   shortage(component)  = max(0, required − available)
 
 Single-version: wipes and rewrites aps_material_shortage on every run. Caller
 owns commit. Live output depends on aps_stock being populated — when stock is
 empty, available is 0 so shortage == required (surfaced, not hidden).
+
+Successfully-pushed purchase requests count as available immediately (not
+just once G-System syncs the real goods-receipt back into aps_stock) — by
+explicit business decision. Caveat: once the real stock sync eventually
+reflects the received goods, that quantity will be counted in aps_stock too;
+nothing here deduplicates against the purchase_request row that "predicted"
+it, so a brief double-count window exists between receipt and this row being
+reconciled/removed. Accepted trade-off, not a bug.
 """
 from __future__ import annotations
 
@@ -19,7 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_logger
-from app.models import BOM, DailyPlan, Item, ItemRoutingSpec, MaterialShortage, MpsPlan, Stock
+from app.models import BOM, DailyPlan, Item, ItemRoutingSpec, MaterialShortage, MpsPlan, PurchaseRequest, Stock
 
 logger = get_logger(__name__)
 
@@ -34,10 +43,12 @@ def _item_id_by_gsys(session: Session) -> dict[int, int]:
 
 
 def _available_by_item(session: Session, item_id_by_gsys: dict[int, int]) -> dict[int, float]:
-    """Sum aps_stock.in_qty per local item id (기초 재고 / on-hand).
+    """Sum aps_stock.in_qty - aps_stock.out_qty, plus successfully-pushed
+    purchase request quantities, per local item id.
 
     aps_stock.gsystem_item_id is the G-System business item id (string) →
-    resolved to the local aps_item via aps_item.gsystem_id.
+    resolved to the local aps_item via aps_item.gsystem_id. purchase_request.
+    item_id is already a local aps_item.id FK — no resolution needed.
     """
     available: dict[int, float] = defaultdict(float)
     for stk in session.execute(select(Stock)).scalars().all():
@@ -51,7 +62,13 @@ def _available_by_item(session: Session, item_id_by_gsys: dict[int, int]) -> dic
         local_id = item_id_by_gsys.get(gsys_id)
         if local_id is None:
             continue
-        available[local_id] += float(stk.in_qty)
+        available[local_id] += float(stk.in_qty) - float(stk.out_qty or 0)
+
+    for pr in session.execute(
+        select(PurchaseRequest).where(PurchaseRequest.sync_status == "SUCCESS")
+    ).scalars().all():
+        available[pr.item_id] += float(pr.shortage_qty or 0)
+
     return available
 
 
@@ -156,7 +173,9 @@ def apply_daily_material_shortage(session: Session) -> int:
     on the LATEST production days (backward). The day's shortfall is split across
     the first-step rows consuming that material that day, proportional to each
     row's draw, and summed onto material_shortage_qty. Returns rows flagged (>0).
-    Caller owns commit. Run AFTER rebuild_daily_plan, in the same transaction.
+    Caller owns commit. Run AFTER rebuild_daily_plan/recompute_daily_plan_status,
+    in the same transaction — this function only layers onto the overload
+    baseline those set, it never resets status itself.
     """
     item_id_by_gsys = _item_id_by_gsys(session)
     raw_material_ids = {i.id for i in session.execute(select(Item)).scalars().all() if i.asset_type == "RawMaterial"}
@@ -217,8 +236,9 @@ def apply_daily_material_shortage(session: Session) -> int:
                 dp.material_shortage_qty = float(dp.material_shortage_qty or 0) + round(short_day * amount / day_total, 4)
                 flagged.add(dp.id)
 
-    # Fold material shortage into the combined status flag:
-    #   overload + short → 'urgent' | short only → 'material-shortage' | else keep.
+    # Fold material shortage onto the overload baseline recompute_daily_plan_status
+    # just set (caller runs that first): overload + short → 'urgent', short only →
+    # 'material-shortage', no shortage → leave the overload/normal baseline as-is.
     for dp, _proc in rows:
         if float(dp.material_shortage_qty or 0) <= 0:
             continue

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import SelectButton from 'primevue/selectbutton'
 import FilterBar from '@/components/aps/filter-bar.vue'
 import KpiRow from '@/components/aps/kpi-row.vue'
@@ -28,6 +29,7 @@ onMounted(async () => {
 
 <template>
   <Toast position="top-right" />
+  <ConfirmDialog />
   <FilterBar />
   <KpiRow :kpi="store.kpi" />
   <div class="matrix-toolbar">

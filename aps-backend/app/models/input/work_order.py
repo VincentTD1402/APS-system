@@ -73,6 +73,15 @@ class WorkOrder(Base):
     response_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Outcome of pushing this dispatch's MPS line dates to G-System
+    # (/pd/prodPlanMpsMng/aps/updateDates), triggered right after a successful
+    # work order dispatch — see erp.py::_push_mps_plan_dates_for_dispatch.
+    # Separate from sync_status/response_json/sent_at above, which track the
+    # work order dispatch itself, not this follow-up call.
+    mps_dates_sync_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    mps_dates_response_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    mps_dates_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

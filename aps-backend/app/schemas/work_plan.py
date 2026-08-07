@@ -1,31 +1,19 @@
 """Schemas for the Work Plan List (작업계획 리스트) endpoint."""
 
-from __future__ import annotations
-
 from datetime import date
 
-from pydantic import Field
-
-from app.schemas.master import CamelModel
+from pydantic import BaseModel, Field
 
 
-class WorkPlanDailyRow(CamelModel):
-    """One daily-plan entry inside `WorkPlanRow.daily_plans`.
+class WorkPlanDailyEntry(BaseModel):
+    """One aps_daily_plan row nested under a WorkPlanRow."""
 
-    Sourced from `aps_result.aps_daily_plan` (backward-fill breakdown per day).
-    `minutes = planned_qty × (item_routing_spec.work_time / 60)` for the row's routing
-    step (work_time is stored as seconds); null when the routing lookup misses.
-    """
-
-    # Python attr renamed to avoid shadowing `datetime.date`; JSON key stays `date`.
-    plan_date: date = Field(..., alias="date", description="aps_daily_plan.work_date")
-    qty: float = Field(..., description="aps_daily_plan.planned_qty for the day")
-    minutes: float | None = Field(
-        None, description="planned_qty × work_time_seconds / 60 (minutes; null if work_time missing)"
-    )
+    date: date
+    qty: float
+    minutes: float
 
 
-class WorkPlanRow(CamelModel):
+class WorkPlanRow(BaseModel):
     """One row of the Work Plan List.
 
     Driven by ``aps_input.work_order`` (see docs/workplan.md): a row is either a
@@ -33,15 +21,11 @@ class WorkPlanRow(CamelModel):
     CONFIRMED, sync_status SUCCESS, temp_id NULL) or a temporary plan
     (``source_type='MPS'``: work_order_no NULL, status PLANNED). Missing source
     data is returned as null (no fallback).
-
-    Serialised as camelCase to match the FE `WorkPlan` contract
-    (aps-frontend/src/types/planning.ts).
     """
 
-    id: str = Field(..., description="Work order id, stringified — FE reference for adjust/action")
     source_type: str = Field(..., description="'WO' (confirmed work order) or 'MPS' (temporary plan)")
     work_order_no: str | None = Field(None, description="작업지시번호 — WO rows only (work_order.work_order_no)")
-    tmp_plan_no: str | None = Field(None, description="(임시)작업계획번호 — MPS rows only (aps_mps_plan.plan_no)")
+    tmp_plan_no: str | None = Field(None, description="(임시)작업계획번호 — MPS rows only (work_order.temp_id)")
     order_no: str | None = Field(None, description="오더 — PO number (aps_mps_plan.po_no)")
     item_no: str | None = Field(None, description="품목 코드")
     item_name: str | None = Field(None, description="품목 명 (aps_item.item_name)")
@@ -49,18 +33,31 @@ class WorkPlanRow(CamelModel):
     workcenter_name: str | None = Field(None, description="워크센터 명")
     proc_name: str | None = Field(None, description="공정 — process name (aps_item_routing_spec.proc_name)")
     planned_qty: float | None = Field(None, description="계획수량")
-    plan_start: datetime.date | None = Field(None, description="계획시작")
-    plan_end: datetime.date | None = Field(None, description="계획완료")
-    delivery_date: datetime.date | None = Field(None, description="납기일자 (aps_mps_plan.delivery_date)")
+    plan_start: date | None = Field(None, description="계획시작")
+    plan_end: date | None = Field(None, description="계획완료")
+    delivery_date: date | None = Field(None, description="납기일자 (aps_mps_plan.delivery_date)")
     risk_types: list[str] = Field(
         default_factory=list,
         description="리스크유형 — subset of {'overload','material_short'} from aps_daily_plan.status (empty → ['normal'])",
     )
-    shortage_qty: float = Field(
-        0.0,
-        description="Total material shortage qty aggregated over the plan's aps_daily_plan days (0 = no shortage)",
-    )
-    daily_plans: list[WorkPlanDailyRow] = Field(
+    # Added for POST /aps/run (fe-be-gap-vi-detail mapping report §4bis) — GET
+    # /work-plan/list gets these for free too, all additive/optional.
+    id: str = Field(..., description="work_order.id (stringified) — stable per-row reference for actions/adjust")
+    shortage_qty: float = Field(0.0, description="Σ aps_daily_plan.material_shortage_qty for this MPS line")
+    daily_plans: list[WorkPlanDailyEntry] = Field(
         default_factory=list,
-        description="Backward-fill daily breakdown from aps_daily_plan for this plan (sorted by date)",
+        description="aps_daily_plan rows for this MPS line (all routing steps), date-sorted",
+    )
+    adjusted: bool = Field(False, description="True if any of this MPS line's daily_plan rows were hand-adjusted")
+    original_start: date | None = Field(None, description="Pre-adjustment plan_start snapshot, if adjusted")
+    original_end: date | None = Field(None, description="Pre-adjustment plan_end snapshot, if adjusted")
+    mps_completion_date: date | None = Field(
+        None,
+        description=(
+            "The MPS line's completion date search field, priority 1: aps_mps_plan."
+            "prod_end_date (actual 작업종료일자, when status_cd='created'), priority 2: "
+            "aps_mps_plan.plan_end_date (expected 종료일자) — same priority "
+            "daily_plan_builder._anchor_end_date uses for backward-fill. This is what "
+            "GET /work-plan/list's date_from/date_to filter matches against, not plan_start/plan_end."
+        ),
     )

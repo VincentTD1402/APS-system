@@ -1,6 +1,11 @@
-"""Pydantic schemas for the material shortage (자재부족) API."""
+"""Pydantic schemas for the material shortage (자재부족) API.
+
+camelCase like app/schemas/aps.py — see that file's docstring for why.
+"""
 
 from pydantic import BaseModel, Field
+
+from app.schemas.aps import CamelModel
 
 
 class MaterialShortageRebuildResponse(BaseModel):
@@ -9,7 +14,7 @@ class MaterialShortageRebuildResponse(BaseModel):
     rows_inserted: int = Field(..., description="Component rows written to aps_material_shortage")
 
 
-class MaterialShortageRow(BaseModel):
+class MaterialShortageRow(CamelModel):
     """One (parent product/semiproduct → component) material requirement vs stock."""
 
     parent_item_id: int | None = Field(None, description="Product/semiproduct (BOM parent) — FK aps_item.id, clickable")

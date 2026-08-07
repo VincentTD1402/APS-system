@@ -40,12 +40,16 @@ class WorkPlanOut(CamelModel):
     order_no: str | None = None
     item_code: str
     item_name_ko: str
+    item_name_vi: str
     wc_code: str
+    wc_name: str | None = None
     process_name_ko: str
+    process_name_vi: str
     plan_qty: float
     plan_start_date: date
     plan_end_date: date
     delivery_date: date
+    mps_completion_date: date | None = None
     risk_type: str
     shortage_qty: float
     adjusted: bool
@@ -56,6 +60,7 @@ class WorkPlanOut(CamelModel):
 
 class LoadCellOut(CamelModel):
     wc_code: str
+    wc_name: str | None = None
     cell_date: date
     minutes_loaded: float
     minutes_capacity: float
