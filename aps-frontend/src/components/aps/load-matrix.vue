@@ -200,8 +200,16 @@ function shortDate(d: string): string {
   border: 1px dashed rgba(128, 128, 128, 0.6);
 }
 .matrix-scroll {
-  overflow-x: auto;
-  padding: 10px 14px;
+  overflow: auto;
+  max-height: 280px; /* cap chiều cao — nhiều WC thì scroll dọc, giữ header sticky */
+  padding: 0px 14px 10px;
+  margin-top: 10px;
+}
+.matrix-scroll thead th {
+  position: sticky;
+  top: 0;
+  background: var(--p-content-background);
+  z-index: 1;
 }
 /* CSS Grid: every column is an explicit track — 140px for the WC name
    column, then a 1fr (min 24px) track per date column (see
