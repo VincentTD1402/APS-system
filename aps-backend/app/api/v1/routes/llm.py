@@ -1,7 +1,6 @@
-"""LLM routes — AI suggestions and the AI제안 (work-plan risk summary) panel."""
+"""LLM routes — the AI제안 (work-plan risk summary) panel."""
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 from datetime import date as date_cls
@@ -12,19 +11,13 @@ from sqlalchemy.orm import Session
 
 from app.config import get_logger
 from app.db.database import get_db
-from app.schemas.llm import SuggestionRequest, SuggestionResponse
 from app.schemas.work_plan_recommendation import RiskRecommendation
-from app.services.llm import build_risk_summary_facts, get_cached_chat_service, SuggestionService
+from app.services.llm import build_risk_summary_facts, get_cached_chat_service
 from app.services.llm.llm_cache import (
     CACHE_RISK_SUMMARY,
-    CACHE_SUGGESTION,
     LIVE_SCENARIO,
     get_cached_response,
     set_cached_response,
-)
-from app.services.llm.concurrency import (
-    LLM_PLAN_DETAIL_TIMEOUT_S,
-    llm_plan_detail_semaphore,
 )
 from app.services.llm.risk_narrative import generate_narrative
 
@@ -50,46 +43,6 @@ def _parse_date(value: str | None, field: str) -> date_cls | None:
         return date_cls.fromisoformat(value)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"{field} must be YYYY-MM-DD") from e
-
-
-@router.post("/suggestions", response_model=SuggestionResponse)
-async def generate_suggestions(
-    payload: SuggestionRequest,
-    db: Session = Depends(get_db),
-) -> SuggestionResponse:
-    """Generate AI action suggestions from schedule/KPI context. Cached per scenario_id."""
-    rid = None
-    if payload.scenario_id:
-        cached = get_cached_response(db, payload.scenario_id, CACHE_SUGGESTION, payload.scenario_id)
-        if cached:
-            return SuggestionResponse(**cached)
-
-    try:
-        service = SuggestionService()
-        sem = llm_plan_detail_semaphore()
-        async with sem:
-            alerts = await asyncio.wait_for(
-                service.generate(payload, db),
-                timeout=LLM_PLAN_DETAIL_TIMEOUT_S,
-            )
-        response = SuggestionResponse(
-            alerts=alerts,
-            context_type=payload.context_type,
-        )
-
-        if payload.scenario_id:
-            set_cached_response(
-                db, payload.scenario_id, CACHE_SUGGESTION,
-                payload.scenario_id, response.model_dump(mode="json"),
-            )
-
-        return response
-    except asyncio.TimeoutError as e:
-        logger.warning("generate_suggestions timeout scenario=%s", payload.scenario_id)
-        raise HTTPException(status_code=503, detail="LLM timeout") from e
-    except Exception as e:
-        logger.exception("generate_suggestions error: %s", e)
-        raise HTTPException(status_code=503, detail="LLM unavailable") from e
 
 
 @router.get(
