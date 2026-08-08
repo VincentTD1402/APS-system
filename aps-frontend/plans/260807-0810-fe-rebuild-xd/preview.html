@@ -13,78 +13,122 @@
     --text: #222222;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--page-bg); font-family: var(--font); color: var(--text); font-size: 13px; }
+  html, body { margin: 0; padding: 0; background: var(--page-bg); font-family: var(--font); color: var(--text); font-size: 13px; height: 100%; }
 
-  /* APS canvas — the area FROM `APS 작업계획` header downward.
-     Full XD artboard = 1920×910. Minus icon rail (~64px left) and top module tabs (~52px)
-     the APS working area ≈ 1856 × 858. Adjust when we confirm exact geometry. */
+  /* APS canvas — fills viewport; content flexes to fit, work-plan-list scrolls internally */
   .aps-canvas {
-    position: relative;
-    width: 1856px;
-    height: 858px;
-    margin: 24px auto;
+    height: 100vh;
+    padding: 16px;
     background: var(--panel-bg);
-    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
   }
 </style>
 </head>
 <body>
+  <!-- Icon sprite — reused via <svg><use href="#ic-..."/></svg> -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="ic-clock" viewBox="0 0 24 24">
+      <g transform="translate(-92 -217)">
+        <circle cx="12" cy="12" r="12" transform="translate(92 217)" fill="#e9f4ff"/>
+        <g transform="translate(68 71)">
+          <path d="M83.171-882.949a.859.859,0,0,1-.259-.631.859.859,0,0,1,.259-.631.859.859,0,0,1,.631-.26.86.86,0,0,1,.631.26.859.859,0,0,1,.259.631.859.859,0,0,1-.259.631.859.859,0,0,1-.631.26A.859.859,0,0,1,83.171-882.949Zm0,10.591a.859.859,0,0,1-.259-.631.859.859,0,0,1,.259-.631.859.859,0,0,1,.631-.26.859.859,0,0,1,.631.26.859.859,0,0,1,.259.631.859.859,0,0,1-.259.631.859.859,0,0,1-.631.259A.859.859,0,0,1,83.171-872.358Zm2.568-8.345a.859.859,0,0,1-.259-.631.86.86,0,0,1,.259-.631.86.86,0,0,1,.631-.259.86.86,0,0,1,.631.259.86.86,0,0,1,.259.631A.859.859,0,0,1,87-880.7a.86.86,0,0,1-.631.26A.86.86,0,0,1,85.738-880.7Zm0,6.1a.86.86,0,0,1-.259-.631.859.859,0,0,1,.259-.631.859.859,0,0,1,.631-.259.859.859,0,0,1,.631.26.859.859,0,0,1,.259.631A.86.86,0,0,1,87-874.6a.86.86,0,0,1-.631.259A.86.86,0,0,1,85.738-874.6Zm.963-3.049a.86.86,0,0,1-.259-.631.859.859,0,0,1,.259-.631.859.859,0,0,1,.631-.26.859.859,0,0,1,.631.26.859.859,0,0,1,.259.631.86.86,0,0,1-.259.631.859.859,0,0,1-.631.259A.859.859,0,0,1,86.7-877.653Zm-4.985,5.865a6.322,6.322,0,0,1-2.532-.511,6.56,6.56,0,0,1-2.063-1.389,6.559,6.559,0,0,1-1.389-2.063,6.323,6.323,0,0,1-.511-2.532,6.322,6.322,0,0,1,.511-2.532,6.559,6.559,0,0,1,1.389-2.063,6.56,6.56,0,0,1,2.063-1.389,6.322,6.322,0,0,1,2.532-.511v1.46a4.859,4.859,0,0,0-3.57,1.465,4.859,4.859,0,0,0-1.465,3.57,4.859,4.859,0,0,0,1.465,3.57,4.859,4.859,0,0,0,3.57,1.465Zm-.97-5.526a1.322,1.322,0,0,1-.4-.97q0-.072.006-.153a.529.529,0,0,1,.034-.153l-1.363-1.363,1.025-1.021,1.363,1.359a2.9,2.9,0,0,1,.306-.04,1.322,1.322,0,0,1,.97.4,1.322,1.322,0,0,1,.4.97,1.322,1.322,0,0,1-.4.97,1.322,1.322,0,0,1-.97.4A1.322,1.322,0,0,1,80.746-877.314Z" transform="translate(-45.722 1036.284)" fill="#0052AF"/>
+        </g>
+      </g>
+    </symbol>
+    <symbol id="ic-list" viewBox="0 0 24 24">
+      <g transform="translate(-1294 -293)">
+        <circle cx="12" cy="12" r="12" transform="translate(1294 293)" fill="#e9f4ff"/>
+        <path d="M122.667-830.667h4.667V-832h-4.667Zm0-2.667h6.667v-1.333h-6.667Zm0-2.667h6.667v-1.333h-6.667Zm-1.333,8a1.284,1.284,0,0,1-.942-.392,1.284,1.284,0,0,1-.392-.942v-9.333a1.284,1.284,0,0,1,.392-.942,1.284,1.284,0,0,1,.942-.392h9.333a1.284,1.284,0,0,1,.942.392,1.284,1.284,0,0,1,.392.942v9.333a1.284,1.284,0,0,1-.392.942,1.284,1.284,0,0,1-.942.392Zm0-1.333h9.333v-9.333h-9.333Zm0-9.333v0Z" transform="translate(1180 1139)" fill="#0052AF"/>
+      </g>
+    </symbol>
+    <symbol id="ic-bulb" viewBox="0 0 24 24">
+      <g transform="translate(-1424 -372)">
+        <circle cx="12" cy="12" r="12" transform="translate(1424 372)" fill="#dbebfe"/>
+        <path d="M90-863a1.446,1.446,0,0,0,1.063-.437A1.447,1.447,0,0,0,91.5-864.5h-3a1.447,1.447,0,0,0,.438,1.063A1.446,1.446,0,0,0,90-863Zm-3-2.5h6V-867H87Zm.025-2.5h5.95a4.97,4.97,0,0,0,1.475-1.713A4.807,4.807,0,0,0,95-872a4.819,4.819,0,0,0-1.462-3.538A4.819,4.819,0,0,0,90-877a4.819,4.819,0,0,0-3.538,1.462A4.819,4.819,0,0,0,85-872a4.807,4.807,0,0,0,.55,2.287A4.97,4.97,0,0,0,87.025-868Zm.55-1.5a3.815,3.815,0,0,1-.787-1.138A3.276,3.276,0,0,1,86.5-872a3.372,3.372,0,0,1,1.025-2.475A3.372,3.372,0,0,1,90-875.5a3.372,3.372,0,0,1,2.475,1.025A3.372,3.372,0,0,1,93.5-872a3.276,3.276,0,0,1-.287,1.362,3.815,3.815,0,0,1-.788,1.138Z" transform="translate(1346 1254)" fill="#0052AF"/>
+      </g>
+    </symbol>
+    <symbol id="ic-tool" viewBox="0 0 24 24">
+      <g transform="translate(-1424 -372)">
+        <circle cx="12" cy="12" r="12" transform="translate(1424 372)" fill="#dbebfe"/>
+        <path d="M98.864-863.271v-1.752h1.857v-2.648h1.752v2.648h1.857v1.752Zm1.857,7.6v-6.683h1.752v6.683Zm-6.534,0v-2.648H92.33v-1.752H97.8v1.752H95.939v2.648Zm0-5.317v-6.683h1.752v6.683Z" transform="translate(1337.67 1245.67)" fill="#0052AF"/>
+      </g>
+    </symbol>
+    <symbol id="ic-gear" viewBox="0 0 20 20">
+      <path d="M79.826-882.548H77.437a.732.732,0,0,1-.481-.175.675.675,0,0,1-.246-.445l-.231-1.543a2.739,2.739,0,0,1-.462-.218,3.7,3.7,0,0,1-.431-.288l-1.422.646a.715.715,0,0,1-.524.027.7.7,0,0,1-.4-.34L72.037-887a.662.662,0,0,1-.083-.511.747.747,0,0,1,.28-.435l1.289-.952a1.877,1.877,0,0,1-.024-.236q-.005-.13-.005-.236t.005-.236a1.879,1.879,0,0,1,.024-.236l-1.289-.958a.761.761,0,0,1-.28-.438.635.635,0,0,1,.083-.5l1.2-2.119a.734.734,0,0,1,.409-.329.69.69,0,0,1,.517.025l1.441.64a3.574,3.574,0,0,1,.419-.277,2.526,2.526,0,0,1,.455-.208l.231-1.572a.673.673,0,0,1,.245-.447.733.733,0,0,1,.482-.173h2.389a.733.733,0,0,1,.482.173.673.673,0,0,1,.245.447l.231,1.561a4.055,4.055,0,0,1,.464.214,2.517,2.517,0,0,1,.428.282l1.422-.64a.7.7,0,0,1,.519-.026.706.706,0,0,1,.407.331l1.21,2.108a.68.68,0,0,1,.086.517.693.693,0,0,1-.292.434l-1.3.936q.018.117.027.247t.009.247q0,.117-.01.242t-.031.242l1.3.941a.747.747,0,0,1,.28.435.677.677,0,0,1-.077.511l-1.217,2.117a.7.7,0,0,1-.4.341.706.706,0,0,1-.522-.025l-1.424-.646a4.489,4.489,0,0,1-.42.29,2.085,2.085,0,0,1-.46.216l-.231,1.543a.677.677,0,0,1-.245.445.73.73,0,0,1-.482.175Zm-1.2-4.636a2.109,2.109,0,0,0,1.548-.64,2.109,2.109,0,0,0,.64-1.548,2.109,2.109,0,0,0-.64-1.548,2.109,2.109,0,0,0-1.548-.64,2.108,2.108,0,0,0-1.549.64,2.111,2.111,0,0,0-.639,1.548,2.111,2.111,0,0,0,.639,1.548A2.108,2.108,0,0,0,78.621-887.185Z" transform="translate(-68.469 899.653)" fill="none" stroke="#5e6c7a" stroke-width="1"/>
+    </symbol>
+    <symbol id="ic-search" viewBox="0 0 12.991 13.562">
+      <g transform="translate(-933 -98)">
+        <g transform="translate(933 98)" fill="none" stroke="#ced4da" stroke-width="1.4">
+          <circle cx="5.146" cy="5.146" r="5.146" stroke="none"/>
+          <circle cx="5.146" cy="5.146" r="4.446" fill="none"/>
+        </g>
+        <path d="M8643.394,7490.719l3.773,3.927" transform="translate(-7702.167 -7384.075)" fill="none" stroke="#ced4da" stroke-linecap="round" stroke-width="1.4"/>
+      </g>
+    </symbol>
+  </svg>
+
   <div class="aps-canvas">
     <div class="aps-title">APS 작업계획</div>
 
-    <!-- Filter card (사각형 2306): 1592×42, border #eeeef2, radius 6, bg #f9fbff -->
+    <!-- Filter row: card + RUN button -->
+    <div class="filter-row">
     <div class="filter-card">
-      <!-- 사업부 -->
-      <span class="lbl" style="left:20px">사업부</span>
-      <div class="ctl select" style="left:68px;width:140px">
-        <select><option>전체</option><option>선택</option></select>
+      <div class="f-field">
+        <span class="lbl">사업부</span>
+        <div class="ctl select" style="width:120px">
+          <select><option>전체</option><option>선택</option></select>
+        </div>
       </div>
-
-      <!-- 계획구분 -->
-      <span class="lbl" style="left:230px">계획구분</span>
-      <div class="ctl select" style="left:291px;width:90px">
-        <select><option value="" selected>선택</option><option>MPS</option><option>WO</option></select>
+      <div class="f-field">
+        <span class="lbl">계획구분</span>
+        <div class="ctl select" style="width:90px">
+          <select><option value="" selected>선택</option><option>MPS</option><option>WO</option></select>
+        </div>
       </div>
-
-      <!-- 요청일 (date range) -->
-      <span class="lbl" style="left:393px">요청일</span>
-      <div class="ctl date" style="left:443px;width:80px">
-        <input type="date" value="2026-08-01" />
+      <div class="f-field">
+        <span class="lbl">요청일</span>
+        <div class="ctl date" style="width:100px">
+          <input type="date" value="2026-08-01" />
+        </div>
+        <span class="range-sep">~</span>
+        <div class="ctl date" style="width:100px">
+          <input type="date" value="2026-08-31" class="ctl-date-end" />
+        </div>
       </div>
-      <span class="range-sep" style="left:527px">~</span>
-      <div class="ctl date" style="left:540px;width:80px">
-        <input type="date" value="2026-08-31" />
+      <div class="f-field">
+        <span class="lbl">APS전표번호</span>
+        <div class="ctl search" style="width:130px">
+          <input type="search" placeholder="" />
+          <svg class="ic-search" width="13" height="14" viewBox="0 0 12.991 13.562" aria-hidden="true"><use href="#ic-search"/></svg>
+        </div>
       </div>
-
-      <!-- APS전표번호 (search input) -->
-      <span class="lbl" style="left:648px">APS전표번호</span>
-      <div class="ctl search" style="left:735px;width:130px">
-        <input type="search" placeholder="" />
+      <div class="f-field">
+        <span class="lbl">Rev.</span>
+        <div class="ctl select" style="width:80px">
+          <select><option value="" selected>선택</option></select>
+        </div>
       </div>
-
-      <!-- Rev. -->
-      <span class="lbl" style="left:894px">Rev.</span>
-      <div class="ctl select" style="left:929px;width:70px">
-        <select><option value="" selected>선택</option></select>
+      <div class="f-field">
+        <span class="lbl">처리상태</span>
+        <div class="ctl select" style="width:90px">
+          <select><option value="" selected>선택</option></select>
+        </div>
       </div>
-
-      <!-- 처리상태 -->
-      <span class="lbl" style="left:1031px">처리상태</span>
-      <div class="ctl select" style="left:1092px;width:90px">
-        <select><option value="" selected>선택</option></select>
+      <div class="f-field">
+        <span class="lbl">담당자</span>
+        <div class="ctl search" style="width:130px">
+          <input type="search" placeholder="" />
+          <svg class="ic-search" width="13" height="14" viewBox="0 0 12.991 13.562" aria-hidden="true"><use href="#ic-search"/></svg>
+        </div>
       </div>
-
-      <!-- 담당자 (search input) -->
-      <span class="lbl" style="left:1204px">담당자</span>
-      <div class="ctl search" style="left:1256px;width:130px">
-        <input type="search" placeholder="" />
-      </div>
-
-      <!-- 부서 (search input) -->
-      <span class="lbl" style="left:1414px">부서</span>
-      <div class="ctl search" style="left:1451px;width:130px">
-        <input type="search" placeholder="" />
+      <div class="f-field">
+        <span class="lbl">부서</span>
+        <div class="ctl search" style="width:130px">
+          <input type="search" placeholder="" />
+          <svg class="ic-search" width="13" height="14" viewBox="0 0 12.991 13.562" aria-hidden="true"><use href="#ic-search"/></svg>
+        </div>
       </div>
     </div>
 
@@ -92,43 +136,843 @@
     <button class="btn-run-aps" type="button">
       ▶ 데이터 불러오기
     </button>
+    </div>
 
-    <!-- KPI row — 4 cards, each 315.5×60, radius 6, left border + value in #2356CE -->
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">계획납기 준수율</div>
-        <div class="kpi-value">100.0<span class="kpi-unit">%</span></div>
+    <!-- Content: 2 cols nested flex. AI panel height synced with (KPI + matrix) via JS. -->
+    <div class="content-grid">
+      <div class="col-left">
+        <!-- KPI row -->
+        <div class="kpi-row area-kpi">
+          <div class="kpi-card">
+            <div class="kpi-label">계획납기 준수율</div>
+            <div class="kpi-value">100.0<span class="kpi-unit">%</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">공정 부하율 초과</div>
+            <div class="kpi-value">2<span class="kpi-unit">건</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">공정 투입 자재 부족</div>
+            <div class="kpi-value">13.3<span class="kpi-unit">%</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">계획수립 예상 리스크</div>
+            <div class="kpi-value">3<span class="kpi-unit">건</span></div>
+          </div>
+        </div>
+
+        <!-- Load matrix panel (부하내역) -->
+        <div class="lm-panel area-lm">
+          <div class="lm-header">
+            <div class="lm-title">
+              <svg class="ic-clock" aria-hidden="true"><use href="#ic-clock"/></svg>
+              부하내역
+            </div>
+            <div class="lm-legend">
+              <span class="lg-item"><i class="sw sw-normal"></i>정상</span>
+              <span class="lg-item"><i class="sw sw-shortage"></i>자재부족</span>
+              <span class="lg-item"><i class="sw sw-overload"></i>부하초과</span>
+              <span class="lg-item"><i class="sw sw-both"></i>자재부족+부하초과</span>
+              <span class="lg-item"><i class="sw sw-unassigned"></i>미배정</span>
+            </div>
+          </div>
+          <div class="lm-body">
+            <!-- Left: 3 fixed cols (no tfoot; sum row moved outside body) -->
+            <div class="lm-fixed-side">
+              <table class="lm-table lm-t-fixed">
+                <thead>
+                  <tr>
+                    <th class="col-wc">워크센터</th>
+                    <th class="col-count col-num">지시건수</th>
+                    <th class="col-sum col-num">지시량계</th>
+                  </tr>
+                </thead>
+                <tbody id="lm-body-fixed"></tbody>
+              </table>
+            </div>
+            <!-- Right: date cols; both native scrollbars hidden -->
+            <div class="lm-scroll-side">
+              <div class="lm-scroll-cap"></div>
+              <table class="lm-table lm-t-dates">
+                <thead>
+                  <tr id="lm-thead-row"><!-- date <th> injected by JS --></tr>
+                </thead>
+                <tbody id="lm-body-dates"></tbody>
+              </table>
+            </div>
+            <!-- Custom vertical scrollbar (drives .lm-scroll-side.scrollTop) -->
+            <div class="lm-vscroll">
+              <div class="lm-vscroll-track">
+                <div class="lm-vscroll-thumb"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Footer row: 합계 (left) + custom horizontal scrollbar (right) on same line -->
+          <div class="lm-footer-row">
+            <div class="lm-footer-fixed">
+              <span class="ff-wc">합계</span>
+              <span class="ff-count">40</span>
+              <span class="ff-sum">20,000</span>
+            </div>
+            <div class="lm-hscroll">
+              <div class="lm-hscroll-track">
+                <div class="lm-hscroll-thumb"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work plan list panel (작업계획 리스트) -->
+        <div class="wp-panel area-wp">
+          <div class="wp-header">
+            <div class="wp-title">
+              <svg class="ic-list" aria-hidden="true"><use href="#ic-list"/></svg>
+              작업계획 리스트
+            </div>
+          </div>
+          <div class="wp-subheader"><b id="wp-count">12</b> 건</div>
+          <div class="wp-body">
+            <table class="wp-table">
+              <thead>
+                <tr>
+                  <th class="col-gear"><svg class="ic-gear" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><use href="#ic-gear"/></svg></th>
+                  <th>작업지시번호</th>
+                  <th>(임시)작업계획번호</th>
+                  <th class="col-num">오더</th>
+                  <th>품목</th>
+                  <th>워크센터</th>
+                  <th>공정</th>
+                  <th class="col-num">계획수량</th>
+                  <th>계획시작</th>
+                  <th>계획완료</th>
+                  <th>납기일자</th>
+                  <th>리스트유형</th>
+                  <th>리스크유형</th>
+                </tr>
+              </thead>
+              <tbody id="wp-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">공정 부하율 초과</div>
-        <div class="kpi-value">2<span class="kpi-unit">건</span></div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">공정 투입 자재 부족</div>
-        <div class="kpi-value">13.3<span class="kpi-unit">%</span></div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">계획수립 예상 리스크</div>
-        <div class="kpi-value">3<span class="kpi-unit">건</span></div>
+
+      <div class="col-right">
+        <!-- AI제안 panel (JS syncs height with KPI + gap + matrix) -->
+        <div class="ai-panel area-ai">
+          <div class="ai-header">
+            <svg class="ic-bulb" aria-hidden="true"><use href="#ic-bulb"/></svg>
+            AI제안
+          </div>
+          <div class="ai-body">
+            <div class="ai-content">
+              <div class="ai-doc-title">계획 리스크 및 권고 사항</div>
+              <p class="ai-num"><b>1. 영향(Impact)의 근본 원인</b></p>
+              <p><span class="ai-crit">[CRITICAL]</span> Workcenter Overload 작업장(WC001, WC002, WC003)의 과도한 작업 부하가 진행중인 문제로 확인되었습니다.</p>
+              <p>근본 원인은 작업장의 계획된 작업량이 허용량을 초과하여 발생한 과부하로, 2일 내에 작업량이 200%에 달하고 있습니다.</p>
+              <p class="ai-num"><b>2. 영향받는 오더 및 작업장(WO) 및 심각도</b></p>
+              <p>영향받는 작업장: WC001, WC002, WC003</p>
+              <p>영향받는 오더: 총 11개의 작업이 영향을 받고 있으며, 작업량이 5% 이상 증가하고 있습니다.</p>
+              <p>심각도: HIGH IMPACT (긴급도: DUE TODAY)</p>
+              <p class="ai-num"><b>3. 해결 및 완화 권고</b></p>
+              <p>우선순위 1: 작업장 과부하를 해소하기 위해 작업 일정을 조정하거나 작업을 다른 작업장으로 분배해야 합니다. 특히 8/5~8/7 기간의 배정 물량 일부를 WC-004, WC-005 등 여유 캐파가 있는 작업장으로 이동해야 합니다.</p>
+              <p>우선순위 2: 작업량이 많은 11개의 작업을 우선순위에 따라 재조정하여, 향후 일정에 영향을 최소화해야 합니다. 납기일자가 가장 임박한 오더부터 순차적으로 처리하며, 필요 시 야간조 편성을 검토합니다.</p>
+              <p>우선순위 3: 작업장의 활용량을 정기적으로 점검하여, 향후 과부하를 방지할 수 있도록 관리합니다. 실시간 부하 모니터링 대시보드를 통해 임계치 80%를 초과하는 경우 자동으로 경고를 발생시키는 시스템을 도입할 것을 권장합니다.</p>
+
+              <p class="ai-num"><b>4. 자재 부족 리스크 분석</b></p>
+              <p>현재 NGOC-1707 원자재의 재고가 부족한 상태로, 336개의 추가 발주가 필요합니다. 부족한 자재로 인해 최소 3개의 작업 오더가 지연될 위험이 있으며, 이는 전체 계획 납기 준수율에 영향을 미칠 수 있습니다.</p>
+              <p>공급업체 리드타임: 평균 5일. 즉시 발주 시 8/12까지 입고 예상.</p>
+              <p>대체 자재: NGOC-1708 (호환성 검증 필요), NGOC-1710 (재고 800개 보유).</p>
+
+              <p class="ai-num"><b>5. 캐파 재분배 시뮬레이션</b></p>
+              <p>WC-001 → WC-004 재분배 시나리오: 예상 부하 감소율 24%, 납기 준수율 유지 가능. 추가 이동 비용 발생 없음.</p>
+              <p>WC-002 → WC-005 재분배 시나리오: 예상 부하 감소율 18%, 세팅 시간 30분 추가 발생. 총 처리 시간 +2%.</p>
+              <p>WC-003 부분 야간조 편성 시나리오: 인력 비용 15% 증가, 부하 해소율 40%. ROI 긍정적.</p>
+
+              <p class="ai-num"><b>6. 예상 KPI 변화</b></p>
+              <p>조치 전: 납기 준수율 100.0%, 부하율 초과 2건, 자재 부족 13.3%, 리스크 3건.</p>
+              <p>조치 후: 납기 준수율 99.8%, 부하율 초과 0건, 자재 부족 0.0%, 리스크 1건.</p>
+              <p>총 리스크 감소율: <span class="ai-crit">66.7%</span> — 즉시 조치 권고.</p>
+
+              <p class="ai-num"><b>7. 액션 아이템 요약</b></p>
+              <p>① 8/8 09:00까지 WC-001, WC-002, WC-003 재분배 계획 승인 필요.</p>
+              <p>② 8/8 12:00까지 NGOC-1707 336개 구매요청 승인 필요.</p>
+              <p>③ 8/9 이후 일일 부하 리포트 자동 발송 설정 권고.</p>
+              <p>④ 이번 주 내에 캐파 확대 검토 회의 소집 필요.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action [일정조정] panel -->
+        <div class="action-panel area-action">
+          <div class="action-header">
+            <svg class="ic-tool" aria-hidden="true"><use href="#ic-tool"/></svg>
+            Action [일정조정]
+          </div>
+          <div class="action-body">
+            <div class="action-content">
+              <!-- Row 1: 작업지시번호 + chip on right -->
+              <span class="act-label">작업지시번호 :</span>
+              <span class="act-value">PP260603003-018</span>
+              <span class="risk-chip r-overload">부하초과</span>
+
+              <!-- Row 2: 품목 -->
+              <span class="act-label">품목 :</span>
+              <span class="act-value">NGOC-1707</span>
+              <span></span>
+
+              <!-- Row 3: 워크센터 -->
+              <span class="act-label">워크센터 :</span>
+              <span class="act-value">WC-003</span>
+              <span></span>
+
+              <!-- Row 4: 요청일 (date range) -->
+              <span class="act-label">요청일 :</span>
+              <span class="act-value act-range-inline">
+                <input type="date" value="2026-08-01" class="act-inline-input" />
+                <span class="act-sep">~</span>
+                <input type="date" value="2026-08-18" class="act-inline-input act-inline-input-end" />
+              </span>
+              <span></span>
+
+              <!-- Row 5: 메모 — textarea spans value + chip columns -->
+              <span class="act-label act-label-top">메모 :</span>
+              <span class="act-value act-memo-value">
+                <textarea placeholder="메모를 입력하세요" class="act-inline-textarea"></textarea>
+              </span>
+
+            </div>
+          </div>
+          <div class="action-footer">
+            <button class="btn-cancel"  type="button">✕ 취소</button>
+            <button class="btn-confirm" type="button">✓ 확인</button>
+          </div>
+        </div>
+
+        <!-- Bottom actions: 시뮬레이션 + 작업지시 생성 -->
+        <div class="action-btn-row">
+          <button class="btn-sim" type="button">
+            시뮬레이션 <span class="btn-badge">1</span>
+          </button>
+          <button class="btn-wo" type="button" disabled>작업지시 생성</button>
+        </div>
       </div>
     </div>
   </div>
 
   <style>
-    /* KPI row — 4 cards under filter row (filter bottom 85 + 11 gap = 96) */
-    .kpi-row {
+    /* Content: 7fr | 3fr flex cols. Fills remaining viewport; wp-panel scrolls internally. */
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+      gap: 16px;
+      align-items: stretch;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .col-left, .col-right {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      min-width: 0;
+      min-height: 0;
+    }
+    /* Only work-plan-list may shrink; KPI + 부하내역 keep intrinsic size */
+    .col-left > .kpi-row,
+    .col-left > .lm-panel { flex: 0 0 auto; }
+    .area-ai { overflow: hidden; min-height: 0; flex-shrink: 0; }   /* height set by JS, don't shrink in flex */
+    .col-right > .action-panel { flex: 1 1 auto; }  /* action panel takes remaining */
+
+    /* Action [일정조정] panel — same visual style as AI제안 */
+    .action-panel {
+      background: #ffffff;
+      border: 1px solid #eeeef2;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    }
+    .action-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: #EEF6FF;
+      font-size: 14px;
+      font-weight: 700;
+      color: #2356CE;
+    }
+    .ic-tool { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+    .action-body {
+      padding: 16px 14px;
+      overflow: auto;                /* scroll only when content actually overflows */
+      min-height: 0;
+      flex: 1 1 auto;
+      font-size: 13px;
+      color: #222222;
+    }
+    /* 3-column grid: label (right-aligned) | value | chip (rightmost).
+       Labels share the same right edge so all ":" align vertically. */
+    .action-content {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      column-gap: 8px;
+      row-gap: 18px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .act-label {
+      text-align: right;
+      color: #48494d;
+      white-space: nowrap;
+    }
+    .act-label-top { align-self: start; padding-top: 4px; }
+    .act-value {
+      color: #222222;
+      min-width: 0;
+    }
+    .act-range-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .act-submit { grid-column: 1 / -1; margin-top: 4px; }
+    .act-inline-input {
+      border: none;
+      background: transparent;
+      padding: 2px 0;
+      font-family: inherit;
+      font-size: 13px;
+      color: #222222;
+      outline: none;
+      border-bottom: 1px solid #ced4da;
+    }
+    .act-inline-input::-webkit-calendar-picker-indicator {
+      opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+    .act-inline-input-end { color: #0052AF; }
+    .act-sep { color: #48494d; }
+    .act-inline-textarea {
+      width: 100%;
+      height: 28px;                  /* fits ~1 line; no scroll from textarea */
+      border: none;
+      background: transparent;
+      padding: 2px 0;
+      font-family: inherit;
+      font-size: 13px;
+      color: #222222;
+      resize: none;
+      outline: none;
+      overflow: hidden;
+    }
+    .act-memo-value { grid-column: 2 / -1; }
+    .act-inline-textarea::placeholder { color: #ced4da; }
+    .act-field {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      align-items: center;
+      gap: 10px;
+    }
+    .act-field label { color: #48494d; font-size: 13px; }
+    .act-field input[type="text"],
+    .act-field input[type="date"] {
+      height: 30px;
+      border: 1px solid #d0d5dd;
+      border-radius: 4px;
+      padding: 0 10px;
+      font-family: inherit;
+      font-size: 13px;
+      color: #222222;
+      background: #ffffff;
+      outline: none;
+      width: 100%;
+    }
+    .act-field input[readonly] { background: #f7f8fa; color: #48494d; }
+    .act-range { display: flex; align-items: center; gap: 6px; }
+    .act-range input { flex: 1 1 auto; }
+    .act-range .sep { color: #48494d; }
+    .act-field-block { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+    .act-field-block textarea {
+      min-height: 80px;
+      border: 1px solid #d0d5dd;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: 13px;
+      color: #222222;
+      resize: vertical;
+      outline: none;
+    }
+    /* Footer with 취소 + 확인 buttons — top divider only spans middle 80% */
+    .action-footer {
+      position: relative;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #ffffff;
+    }
+    .action-footer::before {
+      content: '';
       position: absolute;
-      left: 8px;
-      top: 96px;
+      top: 0;
+      left: 3%;
+      right: 3%;
+      height: 1px;
+      background: #eeeef2;
+    }
+    .btn-cancel, .btn-confirm {
+      height: 26px;
+      padding: 0 16px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-cancel {
+      background: #ffffff;
+      color: #0052AF;
+      border: 1px solid #d0d5dd;
+    }
+    .btn-cancel:hover  { background: #f5f6f8; }
+    .btn-confirm {
+      background: #0052AF;
+      color: #ffffff;
+      border: 1px solid #0052AF;
+    }
+    .btn-confirm:hover { background: #024796; border-color: #024796; }
+
+    /* Bottom action row (below action panel) — 시뮬레이션 + 작업지시 생성 */
+    .action-btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 0 0 auto;
+    }
+    .btn-sim, .btn-wo {
+      height: 44px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+    }
+    .btn-sim {
+      background: #0052AF;
+      color: #ffffff;
+    }
+    .btn-sim:hover  { background: #024796; }
+    .btn-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #0052AF;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .btn-wo {
+      background: #ffffff;
+      color: #D3D3D3;
+      border: 1px solid #e0e2e6;
+      cursor: not-allowed;
+    }
+
+    /* AI제안 panel */
+    .ai-panel {
+      background: #ffffff;
+      border: 1px solid #eeeef2;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    }
+    .ai-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: #EEF6FF;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .ic-bulb { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+    .ai-body {
+      padding: 0 11px 11px;
+      overflow: auto;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+    .ai-content {
+      background: #ffffff;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #222222;
+      line-height: 1.6;
+    }
+    .ai-doc-title {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .ai-content p { margin: 0 0 8px; }
+    .ai-content .ai-num { margin-top: 6px; }
+    .ai-crit { color: #DC3044; font-weight: 700; }
+
+    /* Work plan list panel (작업계획 리스트) */
+    .wp-panel {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #eeeef2;
+      border-radius: 6px;
+      overflow: hidden;
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+    .wp-header {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px 0;
+      background: #ffffff;
+    }
+    .wp-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0052AF;
+    }
+    .wp-title .ic-list { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+
+    .wp-subheader {
+      padding: 4px 14px 10px;
+      font-size: 13px;
+      color: #48494d;
+    }
+    .wp-subheader b { color: #0052AF; font-weight: 700; }
+
+    .wp-body {
+      overflow: auto;
+      min-height: 0;
+      padding: 0px 11px 11px 11px;
+      scrollbar-width: thin;
+      scrollbar-color: #c8ccd4 transparent;
+    }
+    .wp-body::-webkit-scrollbar { width: 8px; height: 8px; }
+    .wp-body::-webkit-scrollbar-track { background: transparent; }
+    .wp-body::-webkit-scrollbar-thumb { background: #c8ccd4; border-radius: 4px; }
+
+    .wp-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      color: #222222;
+    }
+    .wp-table thead th {
+      background: #ffffff;
+      color: #222222;
+      font-weight: 700;
+      padding: 3px 10px;
+      text-align: center;
+      border-top: 1px solid #EEEEEE;        /* keep top edge visible */
+      border-right: 1px solid #EEEEEE;
+      border-bottom: 1px solid #C3C5C9;     /* darker separator under header */
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .wp-table thead th:last-child { border-right: none; }
+    .wp-table tbody td {
+      padding: 4px 10px;
+      text-align: center;
+      white-space: nowrap;
+      border-right: 1px solid #EEEEEE;
+      border-bottom: 1px solid #EEEEEE;
+    }
+    .wp-table tbody td:last-child { border-right: none; }
+    /* Left-aligned body cells: 작업지시번호(2), (임시)작업계획번호(3), 워크센터(6), 공정(7), 리스크유형(13) */
+    .wp-table tbody td:nth-child(2),
+    .wp-table tbody td:nth-child(3),
+    .wp-table tbody td:nth-child(6),
+    .wp-table tbody td:nth-child(7),
+    .wp-table tbody td:nth-child(13) { text-align: left; }
+    .wp-table .col-gear { width: 44px; text-align: center; }
+    .wp-table .col-num  { text-align: right; }
+    .wp-table tbody td.col-num { text-align: right; }
+    .wp-table tbody tr:hover { background: #f9fbff; }
+    .wp-table tbody tr.selected td {
+      box-shadow: inset 0 1px 0 #0052AF, inset 0 -1px 0 #0052AF;
+
+    }
+    .wp-table tbody tr.selected td:first-child { box-shadow: inset 1px 0 0 #0052AF, inset 0 1px 0 #0052AF, inset 0 -1px 0 #0052AF; }
+    .wp-table tbody tr.selected td:last-child  { box-shadow: inset -1px 0 0 #0052AF, inset 0 1px 0 #0052AF, inset 0 -1px 0 #0052AF; }
+
+    /* Gear icon in first header col */
+    .ic-gear { display: inline-block; vertical-align: middle; }
+
+    /* Risk chip inside work plan list */
+    .risk-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 90px;
+      height: 22px;
+      padding: 0 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .risk-chip.r-overload  { color: #FF7D00; background: #FFFBF6; border-color: #FFCFA1; }
+    .risk-chip.r-normal    { color: #18A566; background: #ECFFF6; border-color: #2FD188; }
+    .risk-chip.r-shortage  { color: #4F8CFF; background: #EEF4FF; border-color: #9BBEFF; }
+    .risk-chip.r-both      { color: #DC3044; background: #FFE9EC; border-color: #FFAEB8; }
+    .risk-chip.r-unassign  { color: #48494D; background: #FFFFFF; border: 1px dashed #CCCCCC; }
+
+    /* Load matrix panel (부하내역) */
+    .lm-panel {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #eeeef2;
+      border-radius: 6px;
+      overflow: hidden;
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    }
+    .lm-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid #ffffff;
+      background: #ffffff;
+    }
+    .lm-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0052AF;
+    }
+    .lm-title .ic-clock { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+
+    .lm-legend { display: inline-flex; gap: 18px; }
+    .lg-item {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: #48494d;
+    }
+    .sw {
+      display: inline-block; width: 12px; height: 12px;
+      border: 1px solid transparent; border-radius: 2px;
+    }
+    .sw-normal     { background: #a8e6c8; border-color: #2FD188; }
+    .sw-shortage   { background: #c9d9f5; border-color: #4F8CFF; }
+    .sw-overload   { background: #f5c68b; border-color: #FF9F43; }
+    .sw-both       { background: #f5a6b8; border-color: #FF7283; }
+    .sw-unassigned { background: transparent; border: 1px dashed #dcdcdc; }
+
+    /* Body — flex row: fixed-cols side + scrollable dates side */
+    .lm-body {
+      display: flex;
+      height: 300px;                 /* ~9 WC rows visible, rest scrolls */
+      overflow: hidden;
+    }
+    .lm-fixed-side {
+      flex: 0 0 auto;
+      overflow: hidden;              /* no scrollbars; y-scroll synced via JS */
+      border-right: 1px solid #eeeef2;
+      background: #ffffff;
+    }
+    .lm-scroll-side {
+      flex: 1 1 auto;
+      overflow-x: hidden;
+      overflow-y: auto;
+      position: relative;
+      /* Hide native scrollbars entirely (both axes) */
+      scrollbar-width: none;         /* Firefox */
+    }
+    /* Sticky strip fills the 4px left gap in the header area so it matches thead bg */
+    .lm-scroll-cap {
+      position: sticky;
+      top: 0; left: 0;
+      width: 8px;
+      height: 32px;
+      border-bottom: 1px solid white;
+      background: #f6f7fa;
+      margin-bottom: -32px;          /* don't push table content down */
+      z-index: 3;                    /* above sticky header th (z:2) */
+    }
+    .lm-scroll-side::-webkit-scrollbar { width: 0; height: 0; }
+
+    /* Custom vertical scrollbar — sits to the right of .lm-scroll-side */
+    :root { --vscroll-w: 20px; }
+    .lm-vscroll {
+      flex: 0 0 var(--vscroll-w);
+      background: #ffffff;
+    }
+    .lm-vscroll-track {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    .lm-vscroll-thumb {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+      width: 10px;
+      height: 60px;                  /* computed by JS */
+      background: #D3D3D3;
+      border-radius: 4px;
+      cursor: grab;
+    }
+    .lm-vscroll-thumb:hover  { background: #a8adb5; }
+    .lm-vscroll-thumb:active { background: #8f949c; cursor: grabbing; }
+
+    /* Custom horizontal scrollbar — sits in the footer row, right of 합계 */
+    :root { --hscroll-h: 34px; }
+    .lm-hscroll {
+      flex: 1 1 auto;
+      height: var(--hscroll-h);
+      background: #ffffff;
+    }
+    .lm-hscroll-track {
+      position: relative;
+      height: 100%;
+      padding: 0 8px;
+    }
+    .lm-hscroll-thumb {
+      position: absolute;
+      top: 50%;                      /* center vertically inside 34px track */
+      transform: translateY(-50%);
+      left: 0;
+      height: 10px;                   /* slim thumb */
+      background: #D3D3D3;
+      border-radius: 4px;
+      cursor: grab;
+    }
+    .lm-hscroll-thumb:hover  { background: #a8adb5; }
+    .lm-hscroll-thumb:active { background: #8f949c; cursor: grabbing; }
+    .lm-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: max-content;
+      font-size: 13px;
+      color: #222222;
+    }
+    .lm-table thead th {
+      height: 32px;
+      background: #F7F8FA;
+      color: #222222;
+      font-weight: 700;
+      padding: 0 8px;
+      border-bottom: 1px solid white;
+      text-align: center;
+      white-space: nowrap;
+      position: sticky;              /* sticky top within its scroll ancestor */
+      top: 0;
+      z-index: 2;
+    }
+    .lm-table th.col-wc, .lm-table td.col-wc {
+      width: 100px; text-align: left; padding-left: 14px;
+    }
+    .lm-table th.col-count, .lm-table td.col-count {
+      width: 80px; text-align: right; padding-right: 14px;
+    }
+    .lm-table th.col-sum, .lm-table td.col-sum {
+      width: 80px; text-align: right; padding-right: 14px;
+    }
+    /* Date column width */
+    .lm-table thead th.col-date { width: 64px; min-width: 64px; }
+    .lm-table td.cell { width: 64px; min-width: 64px; }
+    /* Push the whole dates table right 8px — cell widths unchanged */
+    .lm-t-dates { margin-left: 8px; }
+    .lm-table tbody td {
+      height: 28px;
+      padding: 2px 4px;              /* tighter vertical gap between rows */
+      text-align: center;
+      white-space: nowrap;
+    }
+    .lm-table tbody td.col-wc { font-weight: 400; }
+    .lm-table tbody td.cell {
+      padding: 1px;                /* 1px each side → 2px gap between neighbors */
+      vertical-align: middle;
+    }
+    .lm-table tbody td.cell .chip-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 26px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .cell-normal     .chip-cell { background: #CFF5E4; color: #222222; }
+    .cell-shortage   .chip-cell { background: #C1D6FF; color: #222222; }
+    .cell-overload   .chip-cell { background: #FFDBB9; color: #222222; }
+    .cell-both       .chip-cell { background: #FFC8CF; color: #222222; }
+    .cell-empty      .chip-cell {
+      background: transparent; color: transparent;
+      border: 1px dashed #dcdcdc;
+    }
+    .cell-selected .chip-cell {
+      box-shadow: 0 0 0 1.5px #0052AF;
+    }
+    /* Footer row: 합계 on left, custom h-scrollbar on right */
+    .lm-footer-row {
+      display: flex;
+      height: 34px;
+      background: #ffffff;
+    }
+    .lm-footer-fixed {
+      flex: 0 0 261px;              /* fixed side width (100+80+80) + 1px border */
+      border-top: 1px solid #eeeef2;
+      border-right: 1px solid #eeeef2;
+      background: #F7F8FA;          /* 합계 row background */
+      display: grid;
+      grid-template-columns: 100px 80px 80px;
+      align-items: center;
+      font-weight: 700;
+      color: #0052AF;
+      font-size: 13px;
+    }
+    .lm-footer-fixed .ff-wc    { text-align: center; }
+    .lm-footer-fixed .ff-count { text-align: right; padding-right: 14px; }
+    .lm-footer-fixed .ff-sum   { text-align: right; padding-right: 14px; }
+
+    /* KPI row — inside left column, cards fill available width */
+    .kpi-row {
       display: flex;
       gap: 12px;
     }
     .kpi-card {
-      width: 315.5px;
+      flex: 1;
       height: 60px;
       background: #ffffff;
       border: 1px solid #eeeef2;
-      border-left: 4px solid #2356CE;
+      border-left: 4px solid #0052AF;
       border-radius: 6px;
       display: flex;
       align-items: center;
@@ -145,25 +989,22 @@
     .kpi-value {
       font-size: 20px;
       font-weight: 700;            /* XD spec: Bold */
-      color: #2356CE;
+      color: #0052AF;
       line-height: 1;
       letter-spacing: -0.4px;
     }
     .kpi-unit {
       font-size: 13px;
       font-weight: 700;
-      color: #2356CE;
+      color: #0052AF;
       margin-left: 2px;
     }
 
     /* RUN button — geometry from XD (176×42, same height as filter card) */
     .btn-run-aps {
-      position: absolute;
-      left: 1640px;                /* filter-card left(8) + width(1592) + gap(40) */
-      top: 43px;
-      width: 176px;
+      flex: 0 0 176px;
       height: 42px;
-      background: #00d97e;
+      background: #1AB56F;
       color: #ffffff;
       border: none;
       border-radius: 8px;
@@ -180,39 +1021,41 @@
     .btn-run-aps:hover  { background: #00c26f; }
     .btn-run-aps:active { background: #00a961; }
 
-    /* Filter card — geometry copied from XD (사각형 2306) */
+    /* Filter card — flex row of fields evenly spaced */
     .filter-card {
-      position: absolute;
-      left: 8px;
-      top: 43px;                   /* title bottom (16 + 16px) + 11px gap */
-      width: 1592px;
+      flex: 1 1 auto;
+      min-width: 0;
       height: 42px;
       border: 1px solid #eeeef2;
       border-radius: 6px;
       background: #f9fbff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      gap: 12px;
     }
-    .filter-card .lbl,
-    .filter-card .val {
-      position: absolute;
-      top: 16px;                   /* baseline y=27 in card, 13px font ⇒ top≈16 */
+    .f-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .filter-card .lbl {
       font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
       font-size: 13px;
       line-height: 1;
       white-space: nowrap;
-    }
-    .filter-card .lbl {
       font-weight: 700;
       color: #222222;
     }
-    /* Controls sit inside the card, flush (no visible border, transparent bg).
-       Native <select>/<input> reset so they match XD flat style. */
+    /* Controls: borderless, flush inside field row */
     .filter-card .ctl {
-      position: absolute;
-      top: 11px;                   /* control height 20 → (42-20)/2 ≈ 11 */
       height: 20px;
       display: flex;
       align-items: center;
-      border-bottom: 1px solid #ced4da;   /* underline under each control */
+      border-bottom: 1px solid #ced4da;
+      position: relative;
     }
     .filter-card .ctl select,
     .filter-card .ctl input {
@@ -248,58 +1091,265 @@
     }
 
     /* Search icon ⌕ (right side of search input) */
-    .filter-card .ctl.search::after {
-      content: '';
+    .filter-card .ctl.search .ic-search {
       position: absolute;
       right: 2px;
       top: 50%;
-      width: 10px;
-      height: 10px;
-      border: 1.4px solid #6b7280;
-      border-radius: 50%;
-      transform: translateY(-60%);
+      transform: translateY(-50%);
       pointer-events: none;
     }
-    .filter-card .ctl.search::before {
-      content: '';
-      position: absolute;
-      right: 0px;
-      top: 50%;
-      width: 4px;
-      height: 1.4px;
-      background: #6b7280;
-      transform: translate(0, 5px) rotate(45deg);
-      pointer-events: none;
-    }
+    .filter-card .ctl.search input { padding-right: 18px; }
 
-    /* Date input — native picker; whole ctl area opens the picker */
+    /* Date input — native picker with visible calendar icon */
     .filter-card .ctl.date { cursor: pointer; }
-    .filter-card .ctl.date input { color: #48494d; cursor: pointer; }
+    .filter-card .ctl.date input { color: #48494d; cursor: pointer; padding-right: 2px; }
     .filter-card .ctl.date input::-webkit-calendar-picker-indicator {
-      opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;
+      opacity: 0.7; cursor: pointer; filter: invert(0.4);
     }
     .filter-card .range-sep {
-      position: absolute;
-      top: 16px;
       font-size: 13px;
-      color: #222222;
+      color: #48494d;
     }
   </style>
 
   <style>
     /* Title `APS 작업계획` — Malgun Gothic Bold 16px, #222 (from XD) */
     .aps-title {
-      position: absolute;
-      left: 20px;
-      top: 16px;
       font-size: 16px;
       font-weight: bold;
-      font-style: normal;
-      text-align: left;
       color: #222222;
       line-height: 1;
       letter-spacing: -0.2px;
+      margin-bottom: 11px;
+    }
+
+    /* Filter row: card + RUN button in flex row */
+    .filter-row {
+      display: flex;
+      align-items: stretch;
+      gap: 40px;
+      margin-bottom: 11px;
     }
   </style>
+<script>
+  // ---- Load matrix mock data ----
+  // Cell codes: n=normal, o=overload, b=shortage, p=both, _=empty, s=selected (normal+outline)
+  const DAYS = 31;                                            // full August
+  const ROWS = [
+    { name: 'WC name 001', count: 3,  sum: '2,000', cells: '______nnnnnnnn__nnnn_ooo___nnnn' },
+    { name: 'WC name 002', count: 6,  sum: '2,000', cells: 'nnnooponn_nbnn___nnnnn__nnnnooo' },
+    { name: 'WC name 003', count: 2,  sum: '2,000', cells: '____nnnnnnnn_____nnnnnnnnnnn___' },
+    { name: 'WC name 004', count: 1,  sum: '2,000', cells: '__nnnnnnnnnnnnn___nnnn___nnnnnn' },
+    { name: 'WC name 005', count: 10, sum: '2,000', cells: 'nnnnnnnnnnnn_____nnnooponnnn___' },
+    { name: 'WC name 006', count: 2,  sum: '2,000', cells: 'nnn__________________nnnnnnnnn_' },
+    { name: 'WC name 007', count: 5,  sum: '2,000', cells: 'nnnnnnnnsnnn_____nnnnnnnnnnn_o_' },
+    { name: 'WC name 008', count: 6,  sum: '2,000', cells: 'onbnnnnnnnnnnnnn_nnnnnnp__nnnnn' },
+    { name: 'WC name 009', count: 4,  sum: '2,000', cells: '___nnnnn___nnnnn___nnnnn___nnnn' },
+    { name: 'WC name 010', count: 7,  sum: '2,000', cells: 'nnbnnnnnnnnn_ooonnnnn__nnppp___' },
+  ];
+  const CLASS = { n:'cell-normal', o:'cell-overload', b:'cell-shortage', p:'cell-both', s:'cell-selected cell-normal', _:'cell-empty' };
+  const VALUE = { n:'55', o:'60', b:'50', p:'53', s:'55', _:'' };
+  const OVERRIDES = {
+    1: { 3:'60', 4:'60', 5:'53', 8:'10' },
+    7: { 0:'70', 2:'50' },
+  };
+
+  // Inject date <th> header (dates side has no tfoot — scrollbar sits at its bottom)
+  const theadRow = document.getElementById('lm-thead-row');
+  for (let d = 1; d <= DAYS; d++) {
+    theadRow.insertAdjacentHTML('beforeend', `<th class="col-date">8/${d}</th>`);
+  }
+
+  // Inject rows into split tbodies (left: 3 cols / right: date cols)
+  const tbodyFixed = document.getElementById('lm-body-fixed');
+  const tbodyDates = document.getElementById('lm-body-dates');
+  ROWS.forEach((r, ri) => {
+    tbodyFixed.insertAdjacentHTML('beforeend',
+      `<tr><td class="col-wc">${r.name}</td>` +
+      `<td class="col-count col-num">${r.count}</td>` +
+      `<td class="col-sum col-num">${r.sum}</td></tr>`);
+    let cells = '';
+    for (let i = 0; i < DAYS; i++) {
+      const ch = r.cells[i] || '_';
+      const cls = CLASS[ch] || 'cell-empty';
+      const val = (OVERRIDES[ri] && OVERRIDES[ri][i]) || VALUE[ch] || '';
+      cells += `<td class="cell ${cls}"><span class="chip-cell">${val}</span></td>`;
+    }
+    tbodyDates.insertAdjacentHTML('beforeend', `<tr>${cells}</tr>`);
+  });
+
+  // ---- Vertical scroll sync (right → left) + thumb updates ----
+  const fixedSide  = document.querySelector('.lm-fixed-side');
+  const scrollSide = document.querySelector('.lm-scroll-side');
+  scrollSide.addEventListener('scroll', () => {
+    fixedSide.scrollTop = scrollSide.scrollTop;
+    updateHThumb();
+    updateVThumb();
+  });
+
+  // ---- Custom horizontal scrollbar ----
+  const H_PAD = 8;    // left/right gutter — thumb never enters this area
+  const hTrack = document.querySelector('.lm-hscroll-track');
+  const hThumb = document.querySelector('.lm-hscroll-thumb');
+  function updateHThumb() {
+    const view = scrollSide.clientWidth;
+    const cont = scrollSide.scrollWidth;
+    const trackW = hTrack.clientWidth - H_PAD * 2;
+    if (cont <= view) { hThumb.style.display = 'none'; return; }
+    hThumb.style.display = 'block';
+    const w = Math.max(24, trackW * (view / cont));
+    hThumb.style.width = w + 'px';
+    const scrollable = cont - view;
+    const trackable  = trackW - w;
+    hThumb.style.left = (H_PAD + (scrollable > 0 ? (scrollSide.scrollLeft / scrollable) * trackable : 0)) + 'px';
+  }
+  makeThumbDraggable(hThumb, hTrack, 'x', H_PAD);
+  makeTrackPageJump(hTrack, hThumb, 'x');
+
+  // ---- Custom vertical scrollbar ----
+  const vTrack = document.querySelector('.lm-vscroll-track');
+  const vThumb = document.querySelector('.lm-vscroll-thumb');
+  function updateVThumb() {
+    const view = scrollSide.clientHeight;
+    const cont = scrollSide.scrollHeight;
+    const trackH = vTrack.clientHeight;
+    if (cont <= view) { vThumb.style.display = 'none'; return; }
+    vThumb.style.display = 'block';
+    const h = Math.max(24, trackH * (view / cont));
+    vThumb.style.height = h + 'px';
+    const scrollable = cont - view;
+    const trackable  = trackH - h;
+    vThumb.style.top = (scrollable > 0 ? (scrollSide.scrollTop / scrollable) * trackable : 0) + 'px';
+  }
+  makeThumbDraggable(vThumb, vTrack, 'y');
+  makeTrackPageJump(vTrack, vThumb, 'y');
+
+  // Wheel scrolling — listen on the whole body so hovering the fixed cols also scrolls
+  document.querySelector('.lm-body').addEventListener('wheel', e => {
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+    const dy = e.shiftKey ? 0 : e.deltaY;
+    let handled = false;
+    if (dx) { scrollSide.scrollLeft += dx; handled = true; }
+    if (dy) { scrollSide.scrollTop  += dy; handled = true; }
+    if (handled) e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('resize', () => { updateHThumb(); updateVThumb(); });
+  updateHThumb();
+  updateVThumb();
+
+  // ---- Sync AI panel height with (KPI + gap + 부하내역) ----
+  {
+    const kpi = document.querySelector('.area-kpi');
+    const lm  = document.querySelector('.area-lm');
+    const ai  = document.querySelector('.area-ai');
+    const ROW_GAP = 11;
+    const sync = () => {
+      if (!kpi || !lm || !ai) return;
+      // Use bounding rect for accurate measurement after all layouts settle
+      const kpiH = kpi.getBoundingClientRect().height;
+      const lmH  = lm.getBoundingClientRect().height;
+      ai.style.height = (kpiH + ROW_GAP + lmH) + 'px';
+    };
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(sync);
+      ro.observe(kpi); ro.observe(lm);
+    }
+    window.addEventListener('resize', sync);
+    window.addEventListener('load', sync);
+    // Multiple sync attempts to catch late layouts (fonts, images, etc.)
+    sync();
+    requestAnimationFrame(sync);
+    setTimeout(sync, 100);
+    setTimeout(sync, 500);
+  }
+
+  // ---- Work plan list ----
+  const WP_RISKS = [
+    { code:'overload', label:'부하초과' },
+    { code:'normal',   label:'정상' },
+    { code:'shortage', label:'자재부족' },
+    { code:'both',     label:'자재부족+부하초과' },
+    { code:'unassign', label:'미배정' },
+  ];
+  const WP_ROWS = Array.from({length: 12}, (_, i) => {
+    const isMps = i % 2 === 0;
+    return {
+      wo:  isMps ? '-' : 'PP260603003-018',
+      tmp: isMps ? 'WO-20260801-82846884' : '-',
+      order: 3,
+      item: 'NGOC-1707',
+      wc: 'WC-003',
+      op: 'test_공정2-1',
+      qty: 800,
+      s: '2026-08-01',
+      e: '2026-08-18',
+      due: '2026-08-31',
+      listType: isMps ? 'MPS' : 'WO',
+      risk: WP_RISKS[i % WP_RISKS.length],
+    };
+  });
+  const SELECTED_ROW = 5; // 0-indexed → row #6 selected
+  const wpBody = document.getElementById('wp-body');
+  WP_ROWS.forEach((r, i) => {
+    const cls = i === SELECTED_ROW ? ' class="selected"' : '';
+    wpBody.insertAdjacentHTML('beforeend', `
+      <tr${cls}>
+        <td class="col-gear">${i+1}</td>
+        <td>${r.wo}</td>
+        <td>${r.tmp}</td>
+        <td class="col-num">${r.order}</td>
+        <td>${r.item}</td>
+        <td>${r.wc}</td>
+        <td>${r.op}</td>
+        <td class="col-num">${r.qty}</td>
+        <td>${r.s}</td>
+        <td>${r.e}</td>
+        <td>${r.due}</td>
+        <td>${r.listType}</td>
+        <td><span class="risk-chip r-${r.risk.code}">${r.risk.label}</span></td>
+      </tr>`);
+  });
+  document.getElementById('wp-count').textContent = WP_ROWS.length;
+
+  // Helpers ----------------------------------------------------
+  function makeThumbDraggable(thumb, track, axis, pad = 0) {
+    let dragging = false, start = 0, startScroll = 0;
+    thumb.addEventListener('mousedown', e => {
+      dragging = true;
+      start = axis === 'x' ? e.clientX : e.clientY;
+      startScroll = axis === 'x' ? scrollSide.scrollLeft : scrollSide.scrollTop;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const trackSize = (axis === 'x' ? track.clientWidth  : track.clientHeight) - pad * 2;
+      const thumbSize = axis === 'x' ? thumb.clientWidth  : thumb.clientHeight;
+      const contSize  = axis === 'x' ? scrollSide.scrollWidth  : scrollSide.scrollHeight;
+      const viewSize  = axis === 'x' ? scrollSide.clientWidth  : scrollSide.clientHeight;
+      const scrollable = contSize - viewSize;
+      const trackable  = trackSize - thumbSize;
+      if (trackable <= 0) return;
+      const delta = (axis === 'x' ? e.clientX : e.clientY) - start;
+      const newScroll = startScroll + (delta / trackable) * scrollable;
+      if (axis === 'x') scrollSide.scrollLeft = newScroll;
+      else              scrollSide.scrollTop  = newScroll;
+    });
+    document.addEventListener('mouseup', () => { dragging = false; });
+  }
+  function makeTrackPageJump(track, thumb, axis) {
+    track.addEventListener('mousedown', e => {
+      if (e.target === thumb) return;
+      const rect = track.getBoundingClientRect();
+      const click = axis === 'x' ? (e.clientX - rect.left) : (e.clientY - rect.top);
+      const thumbStart = axis === 'x' ? thumb.offsetLeft : thumb.offsetTop;
+      const thumbLen   = axis === 'x' ? thumb.clientWidth : thumb.clientHeight;
+      const dir = click < thumbStart + thumbLen / 2 ? -1 : 1;
+      const page = (axis === 'x' ? scrollSide.clientWidth : scrollSide.clientHeight) * 0.8;
+      if (axis === 'x') scrollSide.scrollLeft += dir * page;
+      else              scrollSide.scrollTop  += dir * page;
+    });
+  }
+</script>
 </body>
 </html>
