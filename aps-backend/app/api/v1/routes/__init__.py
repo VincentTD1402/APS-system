@@ -23,8 +23,7 @@ from app.api.v1.routes import (
 api_router = APIRouter()
 
 api_router.include_router(gsystem_sync.router, prefix="/gsystem", tags=["gsystem"])
-# Hidden from Swagger (not used by FE yet) — routes still active, just excluded from OpenAPI schema.
-api_router.include_router(llm.router, prefix="/llm", tags=["LLM"], include_in_schema=False)
+api_router.include_router(llm.router, prefix="/llm", tags=["LLM"])
 api_router.include_router(kpi_summary.router, prefix="/kpi-summary", tags=["kpi_summary"])
 api_router.include_router(master.router, prefix="/master", tags=["master"])
 api_router.include_router(planning.router, prefix="/planning", tags=["planning"])
