@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>APS 작업계획 — Preview</title>
+<style>
+  :root {
+    /* From XD tokens */
+    --font: "Malgun Gothic", "맑은 고딕", sans-serif;
+    --page-bg: #eef1f5;
+    --panel-bg: #ffffff;
+    --border: #dedede;
+    --text: #222222;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--page-bg); font-family: var(--font); color: var(--text); font-size: 13px; }
+
+  /* APS canvas — the area FROM `APS 작업계획` header downward.
+     Full XD artboard = 1920×910. Minus icon rail (~64px left) and top module tabs (~52px)
+     the APS working area ≈ 1856 × 858. Adjust when we confirm exact geometry. */
+  .aps-canvas {
+    position: relative;
+    width: 1856px;
+    height: 858px;
+    margin: 24px auto;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+</style>
+</head>
+<body>
+  <div class="aps-canvas">
+    <div class="aps-title">APS 작업계획</div>
+
+    <!-- Filter card (사각형 2306): 1592×42, border #eeeef2, radius 6, bg #f9fbff -->
+    <div class="filter-card">
+      <!-- 사업부 -->
+      <span class="lbl" style="left:20px">사업부</span>
+      <div class="ctl select" style="left:68px;width:140px">
+        <select><option>전체</option><option>선택</option></select>
+      </div>
+
+      <!-- 계획구분 -->
+      <span class="lbl" style="left:230px">계획구분</span>
+      <div class="ctl select" style="left:291px;width:90px">
+        <select><option value="" selected>선택</option><option>MPS</option><option>WO</option></select>
+      </div>
+
+      <!-- 요청일 (date range) -->
+      <span class="lbl" style="left:393px">요청일</span>
+      <div class="ctl date" style="left:443px;width:80px">
+        <input type="date" value="2026-08-01" />
+      </div>
+      <span class="range-sep" style="left:527px">~</span>
+      <div class="ctl date" style="left:540px;width:80px">
+        <input type="date" value="2026-08-31" />
+      </div>
+
+      <!-- APS전표번호 (search input) -->
+      <span class="lbl" style="left:648px">APS전표번호</span>
+      <div class="ctl search" style="left:735px;width:130px">
+        <input type="search" placeholder="" />
+      </div>
+
+      <!-- Rev. -->
+      <span class="lbl" style="left:894px">Rev.</span>
+      <div class="ctl select" style="left:929px;width:70px">
+        <select><option value="" selected>선택</option></select>
+      </div>
+
+      <!-- 처리상태 -->
+      <span class="lbl" style="left:1031px">처리상태</span>
+      <div class="ctl select" style="left:1092px;width:90px">
+        <select><option value="" selected>선택</option></select>
+      </div>
+
+      <!-- 담당자 (search input) -->
+      <span class="lbl" style="left:1204px">담당자</span>
+      <div class="ctl search" style="left:1256px;width:130px">
+        <input type="search" placeholder="" />
+      </div>
+
+      <!-- 부서 (search input) -->
+      <span class="lbl" style="left:1414px">부서</span>
+      <div class="ctl search" style="left:1451px;width:130px">
+        <input type="search" placeholder="" />
+      </div>
+    </div>
+
+    <!-- RUN APS button -->
+    <button class="btn-run-aps" type="button">
+      ▶ 데이터 불러오기
+    </button>
+
+    <!-- KPI row — 4 cards, each 315.5×60, radius 6, left border + value in #2356CE -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">계획납기 준수율</div>
+        <div class="kpi-value">100.0<span class="kpi-unit">%</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">공정 부하율 초과</div>
+        <div class="kpi-value">2<span class="kpi-unit">건</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">공정 투입 자재 부족</div>
+        <div class="kpi-value">13.3<span class="kpi-unit">%</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">계획수립 예상 리스크</div>
+        <div class="kpi-value">3<span class="kpi-unit">건</span></div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* KPI row — 4 cards under filter row (filter bottom 85 + 11 gap = 96) */
+    .kpi-row {
+      position: absolute;
+      left: 8px;
+      top: 96px;
+      display: flex;
+      gap: 12px;
+    }
+    .kpi-card {
+      width: 315.5px;
+      height: 60px;
+      background: #ffffff;
+      border: 1px solid #eeeef2;
+      border-left: 4px solid #2356CE;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px 0 18px;
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    }
+    .kpi-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #222222;
+      line-height: 1;
+    }
+    .kpi-value {
+      font-size: 20px;
+      font-weight: 700;            /* XD spec: Bold */
+      color: #2356CE;
+      line-height: 1;
+      letter-spacing: -0.4px;
+    }
+    .kpi-unit {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2356CE;
+      margin-left: 2px;
+    }
+
+    /* RUN button — geometry from XD (176×42, same height as filter card) */
+    .btn-run-aps {
+      position: absolute;
+      left: 1640px;                /* filter-card left(8) + width(1592) + gap(40) */
+      top: 43px;
+      width: 176px;
+      height: 42px;
+      background: #00d97e;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1;
+    }
+    .btn-run-aps:hover  { background: #00c26f; }
+    .btn-run-aps:active { background: #00a961; }
+
+    /* Filter card — geometry copied from XD (사각형 2306) */
+    .filter-card {
+      position: absolute;
+      left: 8px;
+      top: 43px;                   /* title bottom (16 + 16px) + 11px gap */
+      width: 1592px;
+      height: 42px;
+      border: 1px solid #eeeef2;
+      border-radius: 6px;
+      background: #f9fbff;
+    }
+    .filter-card .lbl,
+    .filter-card .val {
+      position: absolute;
+      top: 16px;                   /* baseline y=27 in card, 13px font ⇒ top≈16 */
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+      font-size: 13px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .filter-card .lbl {
+      font-weight: 700;
+      color: #222222;
+    }
+    /* Controls sit inside the card, flush (no visible border, transparent bg).
+       Native <select>/<input> reset so they match XD flat style. */
+    .filter-card .ctl {
+      position: absolute;
+      top: 11px;                   /* control height 20 → (42-20)/2 ≈ 11 */
+      height: 20px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #ced4da;   /* underline under each control */
+    }
+    .filter-card .ctl select,
+    .filter-card .ctl input {
+      width: 100%;
+      height: 20px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      font-family: inherit;
+      font-size: 13px;
+      color: #48494d;              /* muted vs label #222 */
+      outline: none;
+      -webkit-appearance: none;
+         -moz-appearance: none;
+              appearance: none;
+    }
+    .filter-card .ctl input::-webkit-search-cancel-button { display: none; }
+    .filter-card .ctl input::placeholder { color: #ced4da; }
+    .filter-card .ctl select { padding-right: 14px; cursor: pointer; }
+
+    /* Dropdown caret ᐯ (right side of select) */
+    .filter-card .ctl.select::after {
+      content: '';
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      width: 6px;
+      height: 6px;
+      border-right: 1px solid #6b7280;
+      border-bottom: 1px solid #6b7280;
+      transform: translateY(-70%) rotate(45deg);
+      pointer-events: none;
+    }
+
+    /* Search icon ⌕ (right side of search input) */
+    .filter-card .ctl.search::after {
+      content: '';
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border: 1.4px solid #6b7280;
+      border-radius: 50%;
+      transform: translateY(-60%);
+      pointer-events: none;
+    }
+    .filter-card .ctl.search::before {
+      content: '';
+      position: absolute;
+      right: 0px;
+      top: 50%;
+      width: 4px;
+      height: 1.4px;
+      background: #6b7280;
+      transform: translate(0, 5px) rotate(45deg);
+      pointer-events: none;
+    }
+
+    /* Date input — native picker; whole ctl area opens the picker */
+    .filter-card .ctl.date { cursor: pointer; }
+    .filter-card .ctl.date input { color: #48494d; cursor: pointer; }
+    .filter-card .ctl.date input::-webkit-calendar-picker-indicator {
+      opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+    .filter-card .range-sep {
+      position: absolute;
+      top: 16px;
+      font-size: 13px;
+      color: #222222;
+    }
+  </style>
+
+  <style>
+    /* Title `APS 작업계획` — Malgun Gothic Bold 16px, #222 (from XD) */
+    .aps-title {
+      position: absolute;
+      left: 20px;
+      top: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      font-style: normal;
+      text-align: left;
+      color: #222222;
+      line-height: 1;
+      letter-spacing: -0.2px;
+    }
+  </style>
+</body>
+</html>
