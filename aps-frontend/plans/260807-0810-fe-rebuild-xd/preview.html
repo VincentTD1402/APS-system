@@ -2,6 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="APS 작업계획 — 부하내역, 작업계획 리스트, AI제안, Action panel" />
 <title>APS 작업계획 — Preview</title>
 <style>
   :root {
@@ -14,6 +16,16 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--page-bg); font-family: var(--font); color: var(--text); font-size: 13px; height: 100%; }
+  /* Accessible focus outline (keyboard) */
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid #2356CE;
+    outline-offset: 1px;
+  }
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
 
   /* APS canvas — fills viewport; content flexes to fit, work-plan-list scrolls internally */
   .aps-canvas {
@@ -69,8 +81,8 @@
     </symbol>
   </svg>
 
-  <div class="aps-canvas">
-    <div class="aps-title">APS 작업계획</div>
+  <main class="aps-canvas" aria-label="APS 작업계획 대시보드">
+    <h1 class="aps-title">APS 작업계획</h1>
 
     <!-- Filter row: card + RUN button -->
     <div class="filter-row">
@@ -78,62 +90,62 @@
       <div class="f-field">
         <span class="lbl">사업부</span>
         <div class="ctl select" style="width:120px">
-          <select><option>전체</option><option>선택</option></select>
+          <select aria-label="사업부"><option>전체</option><option>선택</option></select>
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">계획구분</span>
         <div class="ctl select" style="width:90px">
-          <select><option value="" selected>선택</option><option>MPS</option><option>WO</option></select>
+          <select aria-label="계획구분"><option value="" selected>선택</option><option>MPS</option><option>WO</option></select>
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">요청일</span>
         <div class="ctl date" style="width:100px">
-          <input type="date" value="2026-08-01" />
+          <input type="date" value="2026-08-01" aria-label="요청일 시작" />
         </div>
         <span class="range-sep">~</span>
         <div class="ctl date" style="width:100px">
-          <input type="date" value="2026-08-31" class="ctl-date-end" />
+          <input type="date" value="2026-08-31" class="ctl-date-end" aria-label="요청일 종료" />
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">APS전표번호</span>
         <div class="ctl search" style="width:130px">
-          <input type="search" placeholder="" />
+          <input type="search" placeholder="" aria-label="APS전표번호 검색" />
           <svg class="ic-search" width="13" height="14" viewBox="0 0 12.991 13.562" aria-hidden="true"><use href="#ic-search"/></svg>
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">Rev.</span>
         <div class="ctl select" style="width:80px">
-          <select><option value="" selected>선택</option></select>
+          <select aria-label="Rev."><option value="" selected>선택</option></select>
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">처리상태</span>
         <div class="ctl select" style="width:90px">
-          <select><option value="" selected>선택</option></select>
+          <select aria-label="처리상태"><option value="" selected>선택</option></select>
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">담당자</span>
         <div class="ctl search" style="width:130px">
-          <input type="search" placeholder="" />
+          <input type="search" placeholder="" aria-label="담당자 검색" />
           <svg class="ic-search" width="13" height="14" viewBox="0 0 12.991 13.562" aria-hidden="true"><use href="#ic-search"/></svg>
         </div>
       </div>
       <div class="f-field">
         <span class="lbl">부서</span>
         <div class="ctl search" style="width:130px">
-          <input type="search" placeholder="" />
+          <input type="search" placeholder="" aria-label="부서 검색" />
           <svg class="ic-search" width="13" height="14" viewBox="0 0 12.991 13.562" aria-hidden="true"><use href="#ic-search"/></svg>
         </div>
       </div>
     </div>
 
     <!-- RUN APS button -->
-    <button class="btn-run-aps" type="button">
+    <button class="btn-run-aps" type="button" aria-label="데이터 불러오기">
       ▶ 데이터 불러오기
     </button>
     </div>
@@ -232,6 +244,7 @@
           </div>
           <div class="wp-subheader"><b id="wp-count">12</b> 건</div>
           <div class="wp-body">
+            <div class="wp-scroll-inner">
             <table class="wp-table">
               <thead>
                 <tr>
@@ -252,6 +265,12 @@
               </thead>
               <tbody id="wp-body"></tbody>
             </table>
+            </div>
+            <div class="wp-vscroll">
+              <div class="wp-vscroll-track">
+                <div class="wp-vscroll-thumb"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -330,7 +349,7 @@
               <span class="act-value act-range-inline">
                 <input type="date" value="2026-08-01" class="act-inline-input" />
                 <span class="act-sep">~</span>
-                <input type="date" value="2026-08-18" class="act-inline-input act-inline-input-end" />
+                <input type="date" value="2026-08-31" class="act-inline-input act-inline-input-end" />
               </span>
               <span></span>
 
@@ -357,7 +376,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </main>
 
   <style>
     /* Content: 7fr | 3fr flex cols. Fills remaining viewport; wp-panel scrolls internally. */
@@ -438,11 +457,11 @@
       align-items: center;
       gap: 6px;
     }
-    .act-submit { grid-column: 1 / -1; margin-top: 4px; }
     .act-inline-input {
       border: none;
       background: transparent;
       padding: 2px 0;
+      text-align: center;
       font-family: inherit;
       font-size: 13px;
       color: #222222;
@@ -450,7 +469,7 @@
       border-bottom: 1px solid #ced4da;
     }
     .act-inline-input::-webkit-calendar-picker-indicator {
-      opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;
+      opacity: 0.7; cursor: pointer; filter: invert(0.4);
     }
     .act-inline-input-end { color: #0052AF; }
     .act-sep { color: #48494d; }
@@ -469,42 +488,6 @@
     }
     .act-memo-value { grid-column: 2 / -1; }
     .act-inline-textarea::placeholder { color: #ced4da; }
-    .act-field {
-      display: grid;
-      grid-template-columns: 100px 1fr;
-      align-items: center;
-      gap: 10px;
-    }
-    .act-field label { color: #48494d; font-size: 13px; }
-    .act-field input[type="text"],
-    .act-field input[type="date"] {
-      height: 30px;
-      border: 1px solid #d0d5dd;
-      border-radius: 4px;
-      padding: 0 10px;
-      font-family: inherit;
-      font-size: 13px;
-      color: #222222;
-      background: #ffffff;
-      outline: none;
-      width: 100%;
-    }
-    .act-field input[readonly] { background: #f7f8fa; color: #48494d; }
-    .act-range { display: flex; align-items: center; gap: 6px; }
-    .act-range input { flex: 1 1 auto; }
-    .act-range .sep { color: #48494d; }
-    .act-field-block { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
-    .act-field-block textarea {
-      min-height: 80px;
-      border: 1px solid #d0d5dd;
-      border-radius: 4px;
-      padding: 8px 10px;
-      font-family: inherit;
-      font-size: 13px;
-      color: #222222;
-      resize: vertical;
-      outline: none;
-    }
     /* Footer with 취소 + 확인 buttons — top divider only spans middle 80% */
     .action-footer {
       position: relative;
@@ -670,16 +653,36 @@
     }
     .wp-subheader b { color: #0052AF; font-weight: 700; }
 
+    /* Body uses same custom-scroll pattern as 부하내역 (native hidden + custom thumb) */
     .wp-body {
-      overflow: auto;
+      display: flex;
+      flex: 1 1 auto;
       min-height: 0;
-      padding: 0px 11px 11px 11px;
-      scrollbar-width: thin;
-      scrollbar-color: #c8ccd4 transparent;
+      padding: 0px 0px 11px 11px;
+      overflow: hidden;
     }
-    .wp-body::-webkit-scrollbar { width: 8px; height: 8px; }
-    .wp-body::-webkit-scrollbar-track { background: transparent; }
-    .wp-body::-webkit-scrollbar-thumb { background: #c8ccd4; border-radius: 4px; }
+    .wp-scroll-inner {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: auto;
+      scrollbar-width: none;              /* Firefox */
+    }
+    .wp-scroll-inner::-webkit-scrollbar { width: 0; height: 0; }
+    .wp-vscroll { flex: 0 0 var(--vscroll-w); }
+    .wp-vscroll-track { position: relative; width: 100%; height: 100%; }
+    .wp-vscroll-thumb {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+      width: 10px;
+      height: 60px;                       /* computed by JS */
+      background: #D3D3D3;
+      border-radius: 4px;
+      cursor: grab;
+    }
+    .wp-vscroll-thumb:hover  { background: #a8adb5; }
+    .wp-vscroll-thumb:active { background: #8f949c; cursor: grabbing; }
 
     .wp-table {
       width: 100%;
@@ -1120,7 +1123,7 @@
       color: #222222;
       line-height: 1;
       letter-spacing: -0.2px;
-      margin-bottom: 11px;
+      margin: 0 0 11px;              /* reset default h1 margin */
     }
 
     /* Filter row: card + RUN button in flex row */
@@ -1129,6 +1132,32 @@
       align-items: stretch;
       gap: 40px;
       margin-bottom: 11px;
+    }
+
+    /* --- Responsive fallbacks --- */
+    /* Below the filter's natural min-width, wrap filter card + button and reduce gutter */
+    @media (max-width: 1780px) {
+      .filter-row { gap: 16px; }
+    }
+    /* Narrow screens: allow filter fields to wrap, matrix cell width can shrink */
+    @media (max-width: 1400px) {
+      .filter-row { flex-wrap: wrap; }
+      .filter-card { min-width: 100%; flex-wrap: wrap; height: auto; padding: 10px 14px; row-gap: 8px; }
+      .btn-run-aps { align-self: flex-end; }
+      .lm-table thead th.col-date,
+      .lm-table td.cell { width: 52px; min-width: 52px; }
+    }
+    /* 2-col → 1-col fallback for very narrow (e.g. tablet portrait) */
+    @media (max-width: 900px) {
+      html, body { height: auto; overflow-y: auto; }
+      .aps-canvas { height: auto; min-height: 100vh; overflow: visible; }
+      .content-grid { grid-template-columns: 1fr; min-height: 0; }
+      .kpi-row { flex-wrap: wrap; }
+      .kpi-card { flex: 1 1 45%; }
+      /* Let stacked panels use natural size — no flex-grow fight */
+      .col-left > .lm-panel, .col-left > .wp-panel { flex: 0 0 auto; }
+      .area-ai { flex: 0 0 auto; height: auto !important; }
+      .wp-body { max-height: 400px; }
     }
   </style>
 <script>
@@ -1289,12 +1318,11 @@
       risk: WP_RISKS[i % WP_RISKS.length],
     };
   });
-  const SELECTED_ROW = 5; // 0-indexed → row #6 selected
   const wpBody = document.getElementById('wp-body');
   WP_ROWS.forEach((r, i) => {
-    const cls = i === SELECTED_ROW ? ' class="selected"' : '';
+    const selected = i === 5;                     // row #6 pre-selected
     wpBody.insertAdjacentHTML('beforeend', `
-      <tr${cls}>
+      <tr${selected ? ' class="selected" aria-selected="true"' : ' aria-selected="false"'} tabindex="0" role="row">
         <td class="col-gear">${i+1}</td>
         <td>${r.wo}</td>
         <td>${r.tmp}</td>
@@ -1311,6 +1339,72 @@
       </tr>`);
   });
   document.getElementById('wp-count').textContent = WP_ROWS.length;
+
+  // Row click/keyboard selection — only one row selected at a time
+  const selectWpRow = (tr) => {
+    wpBody.querySelectorAll('tr').forEach(x => {
+      x.classList.remove('selected');
+      x.setAttribute('aria-selected', 'false');
+    });
+    tr.classList.add('selected');
+    tr.setAttribute('aria-selected', 'true');
+  };
+  wpBody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (tr) selectWpRow(tr);
+  });
+  wpBody.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest('tr');
+    if (tr) { e.preventDefault(); selectWpRow(tr); }
+  });
+
+  // ---- Custom vertical scrollbar for 작업계획 리스트 (same style as 부하내역) ----
+  {
+    const scrollEl = document.querySelector('.wp-scroll-inner');
+    const track    = document.querySelector('.wp-vscroll-track');
+    const thumb    = document.querySelector('.wp-vscroll-thumb');
+    function update() {
+      const view = scrollEl.clientHeight;
+      const cont = scrollEl.scrollHeight;
+      const trackH = track.clientHeight;
+      if (cont <= view) { thumb.style.display = 'none'; return; }
+      thumb.style.display = 'block';
+      const h = Math.max(24, trackH * (view / cont));
+      thumb.style.height = h + 'px';
+      const scrollable = cont - view;
+      const trackable  = trackH - h;
+      thumb.style.top = (scrollable > 0 ? (scrollEl.scrollTop / scrollable) * trackable : 0) + 'px';
+    }
+    let dragging = false, startY = 0, startScroll = 0;
+    thumb.addEventListener('mousedown', e => {
+      dragging = true;
+      startY = e.clientY;
+      startScroll = scrollEl.scrollTop;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const trackH = track.clientHeight;
+      const thumbH = thumb.clientHeight;
+      const scrollable = scrollEl.scrollHeight - scrollEl.clientHeight;
+      const trackable  = trackH - thumbH;
+      if (trackable <= 0) return;
+      scrollEl.scrollTop = startScroll + ((e.clientY - startY) / trackable) * scrollable;
+    });
+    document.addEventListener('mouseup', () => { dragging = false; });
+    track.addEventListener('mousedown', e => {
+      if (e.target === thumb) return;
+      const rect = track.getBoundingClientRect();
+      const clickY = e.clientY - rect.top;
+      const thumbCenter = thumb.offsetTop + thumb.clientHeight / 2;
+      const dir = clickY < thumbCenter ? -1 : 1;
+      scrollEl.scrollTop += dir * scrollEl.clientHeight * 0.8;
+    });
+    scrollEl.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    update();
+  }
 
   // Helpers ----------------------------------------------------
   function makeThumbDraggable(thumb, track, axis, pad = 0) {
