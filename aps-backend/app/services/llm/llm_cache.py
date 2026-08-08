@@ -13,10 +13,12 @@ from app.models.output.llm_response_cache import LlmResponseCache
 logger = get_logger(__name__)
 
 # Cache type constants
-CACHE_SUGGESTION = "SUGGESTION"
-CACHE_PLAN_DETAIL = "PLAN_DETAIL"
-# Serialized ActionCardResponse (actions/generate) — keyed by impacted_id
-CACHE_ACTION_GENERATE = "ACTION_GENERATE"
+# AI제안 panel (work-plan risk summary) — keyed by a hash of the list filters
+CACHE_RISK_SUMMARY = "RISK_SUMMARY"
+
+# aps_daily_plan / aps_material_shortage are single-version (no scenario), so the
+# scenario column is a constant here. llm_response_cache has no FK on it.
+LIVE_SCENARIO = "live"
 
 
 def get_cached_response(

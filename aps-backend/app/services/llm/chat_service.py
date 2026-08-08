@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 from typing import AsyncGenerator, Dict, Generator, List, Optional
 
@@ -71,6 +72,43 @@ class ChatService:
         if not text.strip():
             raise ChatServiceError("LLM returned empty response")
         return text
+
+    async def invoke_json(
+        self,
+        messages: List[Dict | BaseMessage],
+        schema: Dict,
+        schema_name: str = "response",
+    ) -> Dict:
+        """Non-streaming call constrained to `schema` by the server's decoder.
+
+        vLLM's `response_format={"type": "json_schema"}` masks tokens during
+        generation, so the reply is valid JSON of the right shape by
+        construction — no fence stripping, no repair parsing, and no room for a
+        `<think>` block to leak in front of it. (`guided_json` is ignored by this
+        server; verified against the deployment.)
+
+        Raises ChatServiceError if the server still returns something unparsable.
+        """
+        bound = self.llm.bind(
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": schema_name, "schema": schema},
+            }
+        )
+        try:
+            result = await bound.ainvoke(messages)
+        except Exception as e:
+            logger.error("ChatService invoke_json error: %s", e)
+            raise ChatServiceError(str(e)) from e
+
+        text = (result.content if hasattr(result, "content") else str(result)) or ""
+        if not text.strip():
+            raise ChatServiceError("LLM returned empty response")
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.error("ChatService invoke_json got non-JSON: %.200s", text)
+            raise ChatServiceError(f"LLM returned non-JSON: {e}") from e
 
     async def health_check(self) -> Dict[str, str]:
         """Async health check — safe to call from async context (FastAPI event loop)."""
