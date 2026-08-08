@@ -13,7 +13,6 @@ from .input.item_routing import ItemRoutingSpec
 from .input.work_order import WorkOrder
 
 # Output/result models (aps_result)
-from .output.plan_evaluation import PlanEvaluationAction
 from .output.purchase_request import PurchaseRequest
 from .output.gsystem_sync_job import GsystemSyncJob
 from .output.llm_response_cache import LlmResponseCache
@@ -31,7 +30,6 @@ __all__ = [
     "Demand",
     "MpsPlan",
     "ItemRoutingSpec",
-    "PlanEvaluationAction",
     "PurchaseRequest",
     "GsystemSyncJob",
     "LlmResponseCache",
