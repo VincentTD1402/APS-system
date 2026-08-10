@@ -1,0 +1,810 @@
+/* APS Work Plan — global stylesheet extracted from preview.html */
+:root {
+  --font: "Malgun Gothic", "맑은 고딕", sans-serif;
+  --page-bg: #eef1f5;
+  --panel-bg: #ffffff;
+  --border: #dedede;
+  --text: #222222;
+}
+* { box-sizing: border-box; }
+
+/* Accessible focus outline (keyboard) */
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #2356CE;
+  outline-offset: 1px;
+}
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* APS canvas — fills viewport; content flexes to fit, work-plan-list scrolls internally.
+   min-height (not fixed height) so page can scroll when content is forced taller (zoom / narrow). */
+.aps-canvas {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--panel-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Content: 7fr | 3fr flex cols. Fills remaining viewport; wp-panel scrolls internally. */
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  gap: 16px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.col-left, .col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+  min-height: 0;
+}
+/* Panels use their content size; long lists scroll internally via wp-body max-height. */
+.col-left > .kpi-row,
+.col-left > .lm-panel { flex: 0 0 auto; }
+.col-left > .wp-panel { flex: 0 1 auto; }
+.area-ai { overflow: hidden; min-height: 0; flex-shrink: 0; }   /* height set by JS */
+.col-right > .action-panel { flex: 0 1 auto; }
+
+/* Action [일정조정] panel — same visual style as AI제안 */
+.action-panel {
+  background: #ffffff;
+  border: 1px solid #eeeef2;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+}
+.action-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #EEF6FF;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2356CE;
+}
+.ic-tool { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+.action-body {
+  padding: 16px 14px;
+  overflow: auto;                /* scroll only when content actually overflows */
+  min-height: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: #222222;
+}
+/* 3-column grid: label (right-aligned) | value | chip (rightmost).
+   Labels share the same right edge so all ":" align vertically. */
+.action-content {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 8px;
+  row-gap: 18px;
+  align-items: center;
+  font-size: 13px;
+}
+.act-label {
+  text-align: right;
+  color: #48494d;
+  white-space: nowrap;
+}
+.act-label-top { align-self: start; padding-top: 4px; }
+.act-value {
+  color: #222222;
+  min-width: 0;
+}
+.act-range-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.act-inline-input {
+  border: none;
+  background: transparent;
+  padding: 2px 0;
+  text-align: center;
+  font-family: inherit;
+  font-size: 13px;
+  color: #222222;
+  outline: none;
+  border-bottom: 1px solid #ced4da;
+}
+.act-inline-input::-webkit-calendar-picker-indicator {
+  opacity: 0.7; cursor: pointer; filter: invert(0.4);
+}
+.act-inline-input-end { color: #0052AF; }
+.act-sep { color: #48494d; }
+.act-inline-textarea {
+  width: 100%;
+  height: 28px;                  /* fits ~1 line; no scroll from textarea */
+  border: none;
+  background: transparent;
+  padding: 2px 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: #222222;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+}
+.act-memo-value { grid-column: 2 / -1; }
+.act-inline-textarea::placeholder { color: #ced4da; }
+/* Footer with 취소 + 확인 buttons — top divider only spans middle 80% */
+.action-footer {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #ffffff;
+}
+.action-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 3%;
+  right: 3%;
+  height: 1px;
+  background: #eeeef2;
+}
+.btn-cancel, .btn-confirm {
+  height: 26px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-cancel {
+  background: #ffffff;
+  color: #0052AF;
+  border: 1px solid #d0d5dd;
+}
+.btn-cancel:hover  { background: #f5f6f8; }
+.btn-confirm {
+  background: #0052AF;
+  color: #ffffff;
+  border: 1px solid #0052AF;
+}
+.btn-confirm:hover { background: #024796; border-color: #024796; }
+
+/* Bottom action row (below action panel) — 시뮬레이션 + 작업지시 생성 */
+.action-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.btn-sim, .btn-wo {
+  height: 44px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+}
+.btn-sim {
+  background: #0052AF;
+  color: #ffffff;
+}
+.btn-sim:hover  { background: #024796; }
+.btn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #0052AF;
+  font-size: 13px;
+  font-weight: 700;
+}
+.btn-wo {
+  background: #ffffff;
+  color: #D3D3D3;
+  border: 1px solid #e0e2e6;
+  cursor: not-allowed;
+}
+
+/* AI제안 panel */
+.ai-panel {
+  background: #ffffff;
+  border: 1px solid #eeeef2;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+}
+.ai-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #EEF6FF;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ic-bulb { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+.ai-body {
+  padding: 0 11px 11px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.ai-content {
+  background: #ffffff;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #222222;
+  line-height: 1.6;
+}
+.ai-doc-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.ai-content p { margin: 0 0 8px; }
+.ai-content .ai-num { margin-top: 6px; }
+.ai-crit { color: #DC3044; font-weight: 700; }
+
+/* Work plan list panel (작업계획 리스트) */
+.wp-panel {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #eeeef2;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.wp-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px 0;
+  background: #ffffff;
+}
+.wp-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0052AF;
+}
+.wp-title .ic-list { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+
+.wp-subheader {
+  padding: 4px 14px 10px;
+  font-size: 13px;
+  color: #48494d;
+}
+.wp-subheader b { color: #0052AF; font-weight: 700; }
+
+/* Body uses same custom-scroll pattern as 부하내역 (native hidden + custom thumb) */
+.wp-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 295px;                    /* cap panel body so 12+ rows scroll internally */
+  padding: 0px 0px 11px 11px;
+  overflow: hidden;
+}
+.wp-scroll-inner {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: none;              /* Firefox */
+}
+.wp-scroll-inner::-webkit-scrollbar { width: 0; height: 0; }
+.wp-vscroll { flex: 0 0 var(--vscroll-w); }
+.wp-vscroll-track { position: relative; width: 100%; height: 100%; }
+.wp-vscroll-thumb {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 10px;
+  height: 60px;                       /* computed by JS */
+  background: #D3D3D3;
+  border-radius: 4px;
+  cursor: grab;
+}
+.wp-vscroll-thumb:hover  { background: #a8adb5; }
+.wp-vscroll-thumb:active { background: #8f949c; cursor: grabbing; }
+
+.wp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  color: #222222;
+}
+.wp-table thead th {
+  background: #ffffff;
+  color: #222222;
+  font-weight: 700;
+  padding: 3px 10px;
+  text-align: center;
+  border-top: 1px solid #EEEEEE;        /* keep top edge visible */
+  border-right: 1px solid #EEEEEE;
+  border-bottom: 1px solid #C3C5C9;     /* darker separator under header */
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.wp-table thead th:last-child { border-right: none; }
+.wp-table tbody td {
+  padding: 4px 10px;
+  text-align: center;
+  white-space: nowrap;
+  border-right: 1px solid #EEEEEE;
+  border-bottom: 1px solid #EEEEEE;
+}
+.wp-table tbody td:last-child { border-right: none; }
+/* Left-aligned body cells: 작업지시번호(2), (임시)작업계획번호(3), 워크센터(6), 공정(7), 리스크유형(13) */
+.wp-table tbody td:nth-child(2),
+.wp-table tbody td:nth-child(3),
+.wp-table tbody td:nth-child(6),
+.wp-table tbody td:nth-child(7),
+.wp-table tbody td:nth-child(13) { text-align: left; }
+.wp-table .col-gear { width: 44px; text-align: center; }
+.wp-table .col-num  { text-align: right; }
+.wp-table tbody td.col-num { text-align: right; }
+.wp-table tbody tr:hover { background: #f9fbff; }
+.wp-table tbody tr.selected td {
+  box-shadow: inset 0 1px 0 #0052AF, inset 0 -1px 0 #0052AF;
+
+}
+.wp-table tbody tr.selected td:first-child { box-shadow: inset 1px 0 0 #0052AF, inset 0 1px 0 #0052AF, inset 0 -1px 0 #0052AF; }
+.wp-table tbody tr.selected td:last-child  { box-shadow: inset -1px 0 0 #0052AF, inset 0 1px 0 #0052AF, inset 0 -1px 0 #0052AF; }
+
+/* Gear icon in first header col */
+.ic-gear { display: inline-block; vertical-align: middle; }
+
+/* Risk chip inside work plan list */
+.risk-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.risk-chip.r-overload  { color: #FF7D00; background: #FFFBF6; border-color: #FFCFA1; }
+.risk-chip.r-normal    { color: #18A566; background: #ECFFF6; border-color: #2FD188; }
+.risk-chip.r-shortage  { color: #4F8CFF; background: #EEF4FF; border-color: #9BBEFF; }
+.risk-chip.r-both      { color: #DC3044; background: #FFE9EC; border-color: #FFAEB8; }
+.risk-chip.r-unassign  { color: #48494D; background: #FFFFFF; border: 1px dashed #CCCCCC; }
+
+/* Load matrix panel (부하내역) */
+.lm-panel {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #eeeef2;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+}
+.lm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #ffffff;
+  background: #ffffff;
+}
+.lm-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0052AF;
+}
+.lm-title .ic-clock { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+
+.lm-legend { display: inline-flex; gap: 18px; }
+.lg-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #48494d;
+}
+.sw {
+  display: inline-block; width: 12px; height: 12px;
+  border: 1px solid transparent; border-radius: 2px;
+}
+.sw-normal     { background: #a8e6c8; border-color: #2FD188; }
+.sw-shortage   { background: #c9d9f5; border-color: #4F8CFF; }
+.sw-overload   { background: #f5c68b; border-color: #FF9F43; }
+.sw-both       { background: #f5a6b8; border-color: #FF7283; }
+.sw-unassigned { background: transparent; border: 1px dashed #dcdcdc; }
+
+/* Body — flex row: fixed-cols side + scrollable dates side */
+.lm-body {
+  display: flex;
+  height: 300px;                 /* ~9 WC rows visible, rest scrolls */
+  overflow: hidden;
+}
+.lm-fixed-side {
+  flex: 0 0 auto;
+  overflow: hidden;              /* no scrollbars; y-scroll synced via JS */
+  border-right: 1px solid #eeeef2;
+  background: #ffffff;
+}
+.lm-scroll-side {
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  /* Hide native scrollbars entirely (both axes) */
+  scrollbar-width: none;         /* Firefox */
+}
+/* Sticky strip fills the 4px left gap in the header area so it matches thead bg */
+.lm-scroll-cap {
+  position: sticky;
+  top: 0; left: 0;
+  width: 8px;
+  height: 32px;
+  border-bottom: 1px solid white;
+  background: #f6f7fa;
+  margin-bottom: -32px;          /* don't push table content down */
+  z-index: 3;                    /* above sticky header th (z:2) */
+}
+.lm-scroll-side::-webkit-scrollbar { width: 0; height: 0; }
+
+/* Custom vertical scrollbar — sits to the right of .lm-scroll-side */
+:root { --vscroll-w: 20px; }
+.lm-vscroll {
+  flex: 0 0 var(--vscroll-w);
+  background: #ffffff;
+}
+.lm-vscroll-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.lm-vscroll-thumb {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 10px;
+  height: 60px;                  /* computed by JS */
+  background: #D3D3D3;
+  border-radius: 4px;
+  cursor: grab;
+}
+.lm-vscroll-thumb:hover  { background: #a8adb5; }
+.lm-vscroll-thumb:active { background: #8f949c; cursor: grabbing; }
+
+/* Custom horizontal scrollbar — sits in the footer row, right of 합계 */
+:root { --hscroll-h: 34px; }
+.lm-hscroll {
+  flex: 1 1 auto;
+  height: var(--hscroll-h);
+  background: #ffffff;
+}
+.lm-hscroll-track {
+  position: relative;
+  height: 100%;
+  padding: 0 8px;
+}
+.lm-hscroll-thumb {
+  position: absolute;
+  top: 50%;                      /* center vertically inside 34px track */
+  transform: translateY(-50%);
+  left: 0;
+  height: 10px;                   /* slim thumb */
+  background: #D3D3D3;
+  border-radius: 4px;
+  cursor: grab;
+}
+.lm-hscroll-thumb:hover  { background: #a8adb5; }
+.lm-hscroll-thumb:active { background: #8f949c; cursor: grabbing; }
+.lm-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  font-size: 13px;
+  color: #222222;
+}
+.lm-table thead th {
+  height: 32px;
+  background: #F7F8FA;
+  color: #222222;
+  font-weight: 700;
+  padding: 0 8px;
+  border-bottom: 1px solid white;
+  text-align: center;
+  white-space: nowrap;
+  position: sticky;              /* sticky top within its scroll ancestor */
+  top: 0;
+  z-index: 2;
+}
+.lm-table th.col-wc, .lm-table td.col-wc {
+  width: 100px; text-align: left; padding-left: 14px;
+}
+.lm-table th.col-count, .lm-table td.col-count {
+  width: 80px; text-align: right; padding-right: 14px;
+}
+.lm-table th.col-sum, .lm-table td.col-sum {
+  width: 80px; text-align: right; padding-right: 14px;
+}
+/* Date column width */
+.lm-table thead th.col-date { width: 64px; min-width: 64px; }
+.lm-table td.cell { width: 64px; min-width: 64px; }
+/* Push the whole dates table right 8px — cell widths unchanged */
+.lm-t-dates { margin-left: 8px; }
+.lm-table tbody td {
+  height: 28px;
+  padding: 2px 4px;              /* tighter vertical gap between rows */
+  text-align: center;
+  white-space: nowrap;
+}
+.lm-table tbody td.col-wc { font-weight: 400; }
+.lm-table tbody td.cell {
+  padding: 1px;                /* 1px each side → 2px gap between neighbors */
+  vertical-align: middle;
+}
+.lm-table tbody td.cell .chip-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 26px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.cell-normal     .chip-cell { background: #CFF5E4; color: #222222; }
+.cell-shortage   .chip-cell { background: #C1D6FF; color: #222222; }
+.cell-overload   .chip-cell { background: #FFDBB9; color: #222222; }
+.cell-both       .chip-cell { background: #FFC8CF; color: #222222; }
+.cell-empty      .chip-cell {
+  background: transparent; color: transparent;
+  border: 1px dashed #dcdcdc;
+}
+.cell-selected .chip-cell {
+  box-shadow: 0 0 0 1.5px #0052AF;
+}
+/* Footer row: 합계 on left, custom h-scrollbar on right */
+.lm-footer-row {
+  display: flex;
+  height: 34px;
+  background: #ffffff;
+}
+.lm-footer-fixed {
+  flex: 0 0 261px;              /* fixed side width (100+80+80) + 1px border */
+  border-top: 1px solid #eeeef2;
+  border-right: 1px solid #eeeef2;
+  background: #F7F8FA;          /* 합계 row background */
+  display: grid;
+  grid-template-columns: 100px 80px 80px;
+  align-items: center;
+  font-weight: 700;
+  color: #0052AF;
+  font-size: 13px;
+}
+.lm-footer-fixed .ff-wc    { text-align: center; }
+.lm-footer-fixed .ff-count { text-align: right; padding-right: 14px; }
+.lm-footer-fixed .ff-sum   { text-align: right; padding-right: 14px; }
+
+/* KPI row — inside left column, cards fill available width */
+.kpi-row {
+  display: flex;
+  gap: 12px;
+}
+.kpi-card {
+  flex: 1;
+  height: 60px;
+  background: #ffffff;
+  border: 1px solid #eeeef2;
+  border-left: 4px solid #0052AF;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 0 18px;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+}
+.kpi-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #222222;
+  line-height: 1;
+}
+.kpi-value {
+  font-size: 20px;
+  font-weight: 700;            /* XD spec: Bold */
+  color: #0052AF;
+  line-height: 1;
+  letter-spacing: -0.4px;
+}
+.kpi-unit {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0052AF;
+  margin-left: 2px;
+}
+
+/* RUN button — geometry from XD (176×42, same height as filter card) */
+.btn-run-aps {
+  flex: 0 0 176px;
+  height: 42px;
+  background: #1AB56F;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
+}
+.btn-run-aps:hover  { background: #00c26f; }
+.btn-run-aps:active { background: #00a961; }
+
+/* Filter card — flex row of fields evenly spaced */
+.filter-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 42px;
+  border: 1px solid #eeeef2;
+  border-radius: 6px;
+  background: #f9fbff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  gap: 12px;
+}
+.f-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.filter-card .lbl {
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 700;
+  color: #222222;
+}
+/* Controls: borderless, flush inside field row */
+.filter-card .ctl {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #ced4da;
+  position: relative;
+}
+.filter-card .ctl select,
+.filter-card .ctl input {
+  width: 100%;
+  height: 20px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: #48494d;              /* muted vs label #222 */
+  outline: none;
+  -webkit-appearance: none;
+     -moz-appearance: none;
+          appearance: none;
+}
+.filter-card .ctl input::-webkit-search-cancel-button { display: none; }
+.filter-card .ctl input::placeholder { color: #ced4da; }
+.filter-card .ctl select { padding-right: 14px; cursor: pointer; }
+
+/* Dropdown caret ᐯ (right side of select) */
+.filter-card .ctl.select::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid #6b7280;
+  border-bottom: 1px solid #6b7280;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* Search icon ⌕ (right side of search input) */
+.filter-card .ctl.search .ic-search {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.filter-card .ctl.search input { padding-right: 18px; }
+
+/* Date input — native picker with visible calendar icon */
+.filter-card .ctl.date { cursor: pointer; }
+.filter-card .ctl.date input { color: #48494d; cursor: pointer; padding-right: 2px; }
+.filter-card .ctl.date input::-webkit-calendar-picker-indicator {
+  opacity: 0.7; cursor: pointer; filter: invert(0.4);
+}
+.filter-card .range-sep {
+  font-size: 13px;
+  color: #48494d;
+}
+
+/* Title `APS 작업계획` — Malgun Gothic Bold 16px, #222 (from XD) */
+.aps-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #222222;
+  line-height: 1;
+  letter-spacing: -0.2px;
+  margin: 0 0 11px;              /* reset default h1 margin */
+}
+
+/* Filter row: card + RUN button in flex row */
+.filter-row {
+  display: flex;
+  align-items: stretch;
+  gap: 40px;
+  margin-bottom: 11px;
+}
+
+/* --- Responsive fallbacks --- */
+/* Below the filter's natural min-width, wrap filter card + button and reduce gutter */
+@media (max-width: 1780px) {
+  .filter-row { gap: 16px; }
+}
+/* Narrow screens: allow filter fields to wrap, matrix cell width can shrink */
+@media (max-width: 1400px) {
+  .filter-row { flex-wrap: wrap; }
+  .filter-card { min-width: 100%; flex-wrap: wrap; height: auto; padding: 10px 14px; row-gap: 8px; }
+  .btn-run-aps { align-self: flex-end; }
+  .lm-table thead th.col-date,
+  .lm-table td.cell { width: 52px; min-width: 52px; }
+}
+/* 2-col → 1-col fallback for very narrow (e.g. tablet portrait) */
+@media (max-width: 900px) {
+  .aps-canvas { height: auto; min-height: 100%; overflow: visible; }
+  .content-grid { grid-template-columns: 1fr; min-height: 0; }
+  .kpi-row { flex-wrap: wrap; }
+  .kpi-card { flex: 1 1 45%; }
+  /* Let stacked panels use natural size — no flex-grow fight */
+  .col-left > .lm-panel, .col-left > .wp-panel { flex: 0 0 auto; }
+  .area-ai { flex: 0 0 auto; height: auto !important; }
+  .wp-body { max-height: 400px; }
+}

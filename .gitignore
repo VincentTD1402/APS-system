@@ -109,8 +109,6 @@ ck.md
 
 # Gemini CLI settings (symlink to staged .claude/.mcp.json)
 .gemini/settings.json
-# Showoff/marketing assets (images, showcases)
-assets/
 # Exception: use-mcp ships a persistent tool catalog at assets/tools.json
 !claude/skills/use-mcp/assets/
 !claude/skills/use-mcp/assets/**
