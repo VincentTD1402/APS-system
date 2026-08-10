@@ -1,87 +1,186 @@
 <script setup lang="ts">
-import Toast from 'primevue/toast'
-import ConfirmDialog from 'primevue/confirmdialog'
-import SelectButton from 'primevue/selectbutton'
+import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { useApsStore } from '@/stores/aps-store'
 import FilterBar from '@/components/aps/filter-bar.vue'
 import KpiRow from '@/components/aps/kpi-row.vue'
 import LoadMatrix from '@/components/aps/load-matrix.vue'
-import PlanDetailMatrix from '@/components/aps/plan-detail-matrix.vue'
 import WorkPlanList from '@/components/aps/work-plan-list.vue'
-import DetailPanel from '@/components/aps/detail-panel.vue'
-import { useApsStore } from '@/stores/aps-store'
-import { onMounted, ref, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import AiPanel from '@/components/aps/ai-panel.vue'
+import ActionPanel from '@/components/aps/action-panel.vue'
+import Toast from '@/components/aps/toast.vue'
+import type { WorkPlanRow } from '@/data/mock-scheduler'
 
-const { t } = useI18n()
 const store = useApsStore()
 
-type MatrixMode = 'aggregate' | 'detail'
-const mode = ref<MatrixMode>('aggregate')
-const modeOptions = computed(() => [
-  { label: t('matrix.aggregate'), value: 'aggregate', icon: 'pi pi-th-large' },
-  { label: t('matrix.detail'), value: 'detail', icon: 'pi pi-list' },
-])
+// ── Toast ─────────────────────────────────────────────────────────────────────
+const toastMessage = ref('')
+const toastVisible = ref(false)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-onMounted(async () => {
-  if (!store.runId) await store.runAps()
+function showToast(msg: string) {
+  if (toastTimer) clearTimeout(toastTimer)
+  toastMessage.value = msg
+  toastVisible.value = true
+  toastTimer = setTimeout(() => { toastVisible.value = false }, 1800)
+}
+
+// ── Selected row (lifted from work-plan-list) ─────────────────────────────────
+const selectedRow = ref<WorkPlanRow | null>(null)
+const selectedKey = ref<string | null>(null)
+
+function onWpSelect(row: WorkPlanRow, key: string) {
+  selectedRow.value = row
+  selectedKey.value = key
+}
+
+// ── Action panel handlers ─────────────────────────────────────────────────────
+function onConfirm(payload: {
+  rowKey: string
+  mode: string
+  data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number }
+}) {
+  if (!selectedRow.value) return
+  store.stageConfirm({
+    rowKey: payload.rowKey,
+    orderId: selectedRow.value.id,
+    mode: payload.mode,
+    data: payload.data,
+  })
+  showToast('저장되었습니다 · 시뮬레이션 대기')
+}
+
+function onCancel() {
+  // Form đã tự reset trong action-panel. Ngoài ra: nếu row đang có
+  // pending adjustment hoặc đã 확인 → xoá để chip/badge trở về gốc.
+  if (!selectedRow.value || !selectedKey.value) return
+  const wasConfirmed = store.confirmedRows.has(selectedKey.value)
+  store.cancelAdjustment(selectedRow.value.id, selectedKey.value)
+  if (wasConfirmed) showToast('취소되었습니다')
+}
+
+// ── 시뮬레이션 button ──────────────────────────────────────────────────────────
+function onSimulate() {
+  store.runSimulation()
+  // Selection sau simulation có thể trỏ tới data cũ — clear để user chọn lại
+  selectedRow.value = null
+  selectedKey.value = null
+  store.selectRow(null)
+  showToast('시뮬레이션 완료 · 스케줄 재계산됨')
+}
+
+// ── 작업지시 생성 button ───────────────────────────────────────────────────────
+const canDispatch = computed(() => {
+  if (!selectedKey.value || !selectedRow.value) return false
+  // Chỉ cho dispatch khi row ở state 'solved' (đã simulate xong + risk hết).
+  if (store.badgeStateOf(selectedRow.value, selectedKey.value) !== 'solved') return false
+  if (store.dispatchedIds.has(selectedKey.value)) return false
+  return true
+})
+
+function onDispatch() {
+  if (!selectedKey.value || !canDispatch.value) return
+  store.dispatchWorkOrder(selectedKey.value)
+  showToast('작업지시가 생성되었습니다')
+}
+
+// ── Height sync (KPI + LoadMatrix → AiPanel) ──────────────────────────────────
+const kpiCmp = ref<ComponentPublicInstance | null>(null)
+const lmCmp  = ref<ComponentPublicInstance | null>(null)
+const aiCmp  = ref<ComponentPublicInstance | null>(null)
+const ROW_GAP = 11
+
+let ro: ResizeObserver | null = null
+
+function syncAiHeight() {
+  const kpiEl = kpiCmp.value?.$el as HTMLElement | undefined
+  const lmEl  = lmCmp.value?.$el as HTMLElement | undefined
+  const aiEl  = aiCmp.value?.$el as HTMLElement | undefined
+  if (!kpiEl || !lmEl || !aiEl) return
+  const kpiH = kpiEl.getBoundingClientRect().height
+  const lmH  = lmEl.getBoundingClientRect().height
+  aiEl.style.height = `${kpiH + ROW_GAP + lmH}px`
+}
+
+onMounted(() => {
+  syncAiHeight()
+  requestAnimationFrame(syncAiHeight)
+  setTimeout(syncAiHeight, 100)
+  setTimeout(syncAiHeight, 500)
+
+  window.addEventListener('resize', syncAiHeight)
+
+  if (window.ResizeObserver) {
+    ro = new ResizeObserver(syncAiHeight)
+    const kpiEl = kpiCmp.value?.$el as HTMLElement | undefined
+    const lmEl  = lmCmp.value?.$el as HTMLElement | undefined
+    if (kpiEl) ro.observe(kpiEl)
+    if (lmEl)  ro.observe(lmEl)
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncAiHeight)
+  ro?.disconnect()
+  if (toastTimer) clearTimeout(toastTimer)
 })
 </script>
 
 <template>
-  <Toast position="top-right" />
-  <ConfirmDialog />
-  <FilterBar />
-  <KpiRow :kpi="store.kpi" />
-  <div class="matrix-toolbar">
-    <SelectButton v-model="mode" :options="modeOptions" option-label="label" option-value="value" size="small">
-      <template #option="{ option }">
-        <i :class="option.icon" style="margin-right: 6px" />
-        {{ option.label }}
-      </template>
-    </SelectButton>
-  </div>
-  <div class="aps-grid">
-    <div class="col-left">
-      <LoadMatrix v-if="mode === 'aggregate'" />
-      <PlanDetailMatrix v-else />
-      <WorkPlanList />
-    </div>
-    <div class="col-right">
-      <DetailPanel />
-    </div>
-  </div>
-</template>
+  <main class="aps-canvas" aria-label="APS 작업계획 대시보드">
+    <Toast :message="toastMessage" :visible="toastVisible" />
 
-<style scoped>
-.matrix-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
-}
-.aps-grid {
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 14px;
-  align-items: start;
-}
-.col-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-width: 0;
-}
-.col-right {
-  position: sticky;
-  top: 14px;
-  max-height: calc(100vh - 100px);
-}
-@media (max-width: 1200px) {
-  .aps-grid {
-    grid-template-columns: 1fr;
-  }
-  .col-right {
-    position: static;
-    max-height: none;
-  }
-}
-</style>
+    <h1 class="aps-title">APS 작업계획</h1>
+
+    <div class="filter-row">
+      <FilterBar />
+      <button
+        class="btn-run-aps"
+        type="button"
+        aria-label="데이터 불러오기"
+        :disabled="store.isRunning"
+        @click="store.runAps()"
+      >
+        <span v-if="store.isRunning">불러오는 중…</span>
+        <template v-else>▶ 데이터 불러오기</template>
+      </button>
+    </div>
+
+    <div class="content-grid">
+      <div class="col-left">
+        <KpiRow ref="kpiCmp" />
+        <LoadMatrix ref="lmCmp" />
+        <WorkPlanList @select="onWpSelect" />
+      </div>
+
+      <div class="col-right">
+        <AiPanel ref="aiCmp" />
+        <ActionPanel
+          :row="selectedRow"
+          :row-key="selectedKey"
+          @confirm="onConfirm"
+          @cancel="onCancel"
+        />
+        <div class="action-btn-row">
+          <button
+            class="btn-sim"
+            type="button"
+            :disabled="store.pendingCount === 0"
+            :class="{ 'is-disabled': store.pendingCount === 0 }"
+            @click="onSimulate"
+          >
+            시뮬레이션
+            <span class="btn-badge">{{ store.pendingCount }}</span>
+          </button>
+          <button
+            class="btn-wo"
+            type="button"
+            :disabled="!canDispatch"
+            @click="onDispatch"
+          >
+            작업지시 생성
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</template>
