@@ -2,41 +2,9 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useDragScroll } from '@/composables/use-drag-scroll'
 import { useApsStore } from '@/stores/aps-store'
-<<<<<<< HEAD
-import { computed } from 'vue'
-import dayjs from 'dayjs'
-import type { LoadCellStatus } from '@/types/enums'
-=======
 import type { LoadCellStatus, WorkPlanRow } from '@/data/mock-scheduler'
->>>>>>> 0a34f17 (feat(fe): rebuild APS view from XD design with interactive flow)
 
 const store = useApsStore()
-<<<<<<< HEAD
-
-// dateFrom/dateTo (filter-bar) pin the exact column span when set — this is
-// a WC×day calendar view, so "chosen date window" is the natural read,
-// unlike plan-detail-matrix (per-plan schedule, which must NOT be pinned to
-// the completion-date filter — see that component). Falls back to the actual
-// loaded schedule (min..max cellDate from /aps/run) when no filter is set,
-// not a hardcoded month — aps_daily_plan's real window varies per run/
-// backward-fill anchor and previously missed most of it, making workcenters
-// look empty.
-const dateRange = computed(() => {
-  const { dateFrom, dateTo } = store.filter
-  const cellDates = store.loadCells.map((c) => c.cellDate)
-  const start = dateFrom
-    ? dayjs(dateFrom)
-    : cellDates.length ? dayjs(cellDates.reduce((a, b) => (a < b ? a : b))) : dayjs()
-  const end = dateTo
-    ? dayjs(dateTo)
-    : cellDates.length ? dayjs(cellDates.reduce((a, b) => (a > b ? a : b))) : start.add(30, 'day')
-
-  const dates: string[] = []
-  let d = start
-  while (!d.isAfter(end)) {
-    dates.push(d.format('YYYY-MM-DD'))
-    d = d.add(1, 'day')
-=======
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const fixedSide  = ref<HTMLElement | null>(null)
@@ -106,38 +74,10 @@ const flatRows = computed<FlatRow[]>(() => {
         out.push({ kind: 'order', key: `${row.code}::${p.id}`, wc: row, plan: p, planDailyIndex: idx })
       }
     }
->>>>>>> 0a34f17 (feat(fe): rebuild APS view from XD design with interactive flow)
   }
   return out
 })
 
-<<<<<<< HEAD
-// Only workcenters that actually appear in this run's loadCells — a workcenter
-// with zero aps_daily_plan rows has nothing to show and only pads the grid.
-const activeWorkCenters = computed(() => {
-  const byCode = new Map<string, string | null>()
-  for (const c of store.loadCells) if (!byCode.has(c.wcCode)) byCode.set(c.wcCode, c.wcName)
-  return [...byCode.entries()]
-    .map(([code, name]) => ({ code, name }))
-    .sort((a, b) => a.code.localeCompare(b.code))
-})
-
-// CSS Grid instead of an HTML table — a table's row/cell layout (baseline
-// alignment, inline-block whitespace gaps between elements) is a classic
-// source of uneven-looking grids; a real grid keeps every cell an identical
-// size with no such quirks, at any column count.
-// wc-name column wide enough for "WS71 · WC-001"-style labels (was 88px —
-// too narrow, clipped the text). Date columns always fill the remaining
-// 100% of the panel width evenly (1fr each, min 24px) — by explicit choice,
-// accepting that with few date columns each cell will be wider than tall.
-const gridTemplateColumns = computed(() => `140px repeat(${dateRange.value.length}, minmax(24px, 1fr))`)
-
-const cellIndex = computed(() => {
-  const idx = new Map<string, LoadCellStatus>()
-  for (const c of store.loadCells) idx.set(`${c.wcCode}|${c.cellDate}`, c.status)
-  return idx
-})
-=======
 /**
  * CSS class cho ô sub-row tại 1 ngày.
  * Màu lấy từ aggregate cell status của (WC, date) đó — tức là chỉ overload khi
@@ -149,7 +89,6 @@ function orderCellClass(plan: WorkPlanRow, date: string, hasQty: boolean): strin
   const status = c?.status ?? 'normal'
   return `cell ${STATUS_CLASS[status]}`
 }
->>>>>>> 0a34f17 (feat(fe): rebuild APS view from XD design with interactive flow)
 
 // ── Aggregate cell (WC level) ────────────────────────────────────────────────
 function cellFor(wc: string, date: string) {
@@ -254,26 +193,6 @@ function shortDate(d: string): string {
         <span class="lg-item"><i class="sw sw-unassigned"></i>미배정</span>
       </div>
     </div>
-<<<<<<< HEAD
-    <div class="matrix-scroll">
-      <div class="matrix-grid" :style="{ gridTemplateColumns }">
-        <div class="grid-cell wc-col-head">WC</div>
-        <div v-for="d in dateRange" :key="`h-${d}`" class="grid-cell date-col-head">{{ shortDate(d) }}</div>
-        <template v-for="wc in activeWorkCenters" :key="wc.code">
-          <div class="grid-cell wc-name">{{ wc.code }} · {{ wc.name }}</div>
-          <div
-            v-for="d in dateRange"
-            :key="`${wc.code}-${d}`"
-            class="grid-cell cell-slot"
-          >
-            <div
-              :class="cellClass(wc.code, d)"
-              :title="cellTitle(wc.code, d)"
-              @click="onCellClick(wc.code, d)"
-            />
-          </div>
-        </template>
-=======
 
     <div class="lm-body" ref="lmBody">
       <!-- Left: 3 fixed cols -->
@@ -367,7 +286,6 @@ function shortDate(d: string): string {
         <div class="lm-hscroll-track" ref="hTrack">
           <div class="lm-hscroll-thumb" ref="hThumb"></div>
         </div>
->>>>>>> 0a34f17 (feat(fe): rebuild APS view from XD design with interactive flow)
       </div>
     </div>
   </div>
@@ -388,96 +306,6 @@ function shortDate(d: string): string {
 .lm-order-item { color: #7a7a7a; }
 .chip-order {
   font-size: 11px;
-<<<<<<< HEAD
-  color: var(--p-text-muted-color);
-  margin-top: 2px;
-}
-.legend {
-  display: flex;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--p-text-muted-color);
-  flex-wrap: wrap;
-}
-.legend .dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  margin-right: 4px;
-  vertical-align: middle;
-}
-.legend .dot.normal {
-  background: var(--aps-ok);
-}
-.legend .dot.material-short {
-  background: var(--aps-mat);
-}
-.legend .dot.overload {
-  background: var(--aps-cap);
-}
-.legend .dot.both {
-  background: var(--aps-crit);
-}
-.legend .dot.empty {
-  border: 1px dashed rgba(128, 128, 128, 0.6);
-}
-.matrix-scroll {
-  overflow: auto;
-  max-height: 280px; /* cap chiều cao — nhiều WC thì scroll dọc, giữ header sticky */
-  padding: 0px 14px 10px;
-  margin-top: 10px;
-}
-.matrix-scroll thead th {
-  position: sticky;
-  top: 0;
-  background: var(--p-content-background);
-  z-index: 1;
-}
-/* CSS Grid: every column is an explicit track — 140px for the WC name
-   column, then a 1fr (min 24px) track per date column (see
-   gridTemplateColumns above), so date columns always share 100% of the
-   panel's width evenly — by explicit choice, few columns means each is
-   wider than tall. display:grid (not inline-grid) is required for the 1fr
-   tracks to resolve against the full container width instead of shrinking
-   to content. overflow-x above scrolls once min-width (24px/col) is hit
-   with many columns. */
-.matrix-grid {
-  display: grid;
-  gap: 2px;
-  grid-auto-rows: 24px;
-}
-.grid-cell {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-}
-.wc-col-head,
-.date-col-head {
-  font-family: var(--aps-mono);
-  color: var(--p-text-muted-color);
-  font-size: 10px;
   font-weight: 500;
-  justify-content: center;
-}
-.wc-col-head {
-  justify-content: flex-start;
-  font-size: 11px;
-  font-weight: 600;
-}
-.wc-name {
-  font-family: var(--aps-mono);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--p-text-color);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  padding-right: 8px;
-}
-.cell-slot {
-  justify-content: center;
-=======
-  font-weight: 500;
->>>>>>> 0a34f17 (feat(fe): rebuild APS view from XD design with interactive flow)
 }
 </style>
