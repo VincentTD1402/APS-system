@@ -36,9 +36,49 @@
     flex-direction: column;
     overflow: hidden;
   }
+
+  /* Toast top-center, auto-fade */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .toast.show { opacity: 1; }
+
+  /* 3-state badge — dùng cạnh mã đơn hàng ở wp-list và action-panel header */
+  .badge-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    vertical-align: middle;
+    border: 1px solid transparent;
+  }
+  .badge-pending    { color: #b26a00; background: #fff4e5; border-color: #ffcc80; }
+  .badge-solved     { color: #2e7d32; background: #e8f5e9; border-color: #a5d6a7; }
+  .badge-unresolved { color: #c62828; background: #ffebee; border-color: #ef9a9a; }
+
+  /* Disabled cells (empty) — không con trỏ */
+  .cell.cell-empty { cursor: default !important; }
+  .cell:not(.cell-empty) { cursor: pointer; }
 </style>
 </head>
 <body>
+  <!-- Toast (top-center, hiển thị ~1.8s sau các thao tác) -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
   <!-- Icon sprite — reused via <svg><use href="#ic-..."/></svg> -->
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
     <symbol id="ic-clock" viewBox="0 0 24 24">
@@ -145,7 +185,7 @@
     </div>
 
     <!-- RUN APS button -->
-    <button class="btn-run-aps" type="button" aria-label="데이터 불러오기">
+    <button id="btn-run" class="btn-run-aps" type="button" aria-label="데이터 불러오기">
       ▶ 데이터 불러오기
     </button>
     </div>
@@ -157,19 +197,19 @@
         <div class="kpi-row area-kpi">
           <div class="kpi-card">
             <div class="kpi-label">계획납기 준수율</div>
-            <div class="kpi-value">100.0<span class="kpi-unit">%</span></div>
+            <div class="kpi-value"><span id="kpi-ontime">0.0</span><span class="kpi-unit">%</span></div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">공정 부하율 초과</div>
-            <div class="kpi-value">2<span class="kpi-unit">건</span></div>
+            <div class="kpi-value"><span id="kpi-overload">0.0</span><span class="kpi-unit">%</span></div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">공정 투입 자재 부족</div>
-            <div class="kpi-value">13.3<span class="kpi-unit">%</span></div>
+            <div class="kpi-value"><span id="kpi-shortage">0</span><span class="kpi-unit">건</span></div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">계획수립 예상 리스크</div>
-            <div class="kpi-value">3<span class="kpi-unit">건</span></div>
+            <div class="kpi-value"><span id="kpi-risk">0</span><span class="kpi-unit">건</span></div>
           </div>
         </div>
 
@@ -223,8 +263,8 @@
           <div class="lm-footer-row">
             <div class="lm-footer-fixed">
               <span class="ff-wc">합계</span>
-              <span class="ff-count">40</span>
-              <span class="ff-sum">20,000</span>
+              <span id="lm-total-count" class="ff-count">0</span>
+              <span id="lm-total-sum" class="ff-sum">0</span>
             </div>
             <div class="lm-hscroll">
               <div class="lm-hscroll-track">
@@ -321,58 +361,32 @@
           </div>
         </div>
 
-        <!-- Action [일정조정] panel -->
+        <!-- Action panel — nội dung do JS render dựa trên row đang chọn -->
         <div class="action-panel area-action">
           <div class="action-header">
             <svg class="ic-tool" aria-hidden="true"><use href="#ic-tool"/></svg>
-            Action [일정조정]
+            <span id="action-title">Action [일정조정]</span>
+            <span id="action-badge-slot"></span>
           </div>
           <div class="action-body">
-            <div class="action-content">
-              <!-- Row 1: 작업지시번호 + chip on right -->
-              <span class="act-label">작업지시번호 :</span>
-              <span class="act-value">PP260603003-018</span>
-              <span class="risk-chip r-overload">부하초과</span>
-
-              <!-- Row 2: 품목 -->
-              <span class="act-label">품목 :</span>
-              <span class="act-value">NGOC-1707</span>
-              <span></span>
-
-              <!-- Row 3: 워크센터 -->
-              <span class="act-label">워크센터 :</span>
-              <span class="act-value">WC-003</span>
-              <span></span>
-
-              <!-- Row 4: 요청일 (date range) -->
-              <span class="act-label">요청일 :</span>
-              <span class="act-value act-range-inline">
-                <input type="date" value="2026-08-01" class="act-inline-input" />
-                <span class="act-sep">~</span>
-                <input type="date" value="2026-08-31" class="act-inline-input act-inline-input-end" />
+            <div id="action-content" class="action-content">
+              <span style="grid-column:1/-1; text-align:center; color:#48494d; padding:24px 0;">
+                행을 선택하세요
               </span>
-              <span></span>
-
-              <!-- Row 5: 메모 — textarea spans value + chip columns -->
-              <span class="act-label act-label-top">메모 :</span>
-              <span class="act-value act-memo-value">
-                <textarea placeholder="메모를 입력하세요" class="act-inline-textarea"></textarea>
-              </span>
-
             </div>
           </div>
           <div class="action-footer">
-            <button class="btn-cancel"  type="button">✕ 취소</button>
-            <button class="btn-confirm" type="button">✓ 확인</button>
+            <button id="btn-cancel"  class="btn-cancel"  type="button" disabled>✕ 취소</button>
+            <button id="btn-confirm" class="btn-confirm" type="button" disabled>✓ 확인</button>
           </div>
         </div>
 
         <!-- Bottom actions: 시뮬레이션 + 작업지시 생성 -->
         <div class="action-btn-row">
-          <button class="btn-sim" type="button">
-            시뮬레이션 <span class="btn-badge">1</span>
+          <button id="btn-sim" class="btn-sim" type="button" disabled>
+            시뮬레이션 <span id="btn-sim-badge" class="btn-badge">0</span>
           </button>
-          <button class="btn-wo" type="button" disabled>작업지시 생성</button>
+          <button id="btn-wo" class="btn-wo" type="button" disabled>작업지시 생성</button>
         </div>
       </div>
     </div>
@@ -1161,50 +1175,599 @@
     }
   </style>
 <script>
-  // ---- Load matrix mock data ----
-  // Cell codes: n=normal, o=overload, b=shortage, p=both, _=empty, s=selected (normal+outline)
-  const DAYS = 31;                                            // full August
-  const ROWS = [
-    { name: 'WC name 001', count: 3,  sum: '2,000', cells: '______nnnnnnnn__nnnn_ooo___nnnn' },
-    { name: 'WC name 002', count: 6,  sum: '2,000', cells: 'nnnooponn_nbnn___nnnnn__nnnnooo' },
-    { name: 'WC name 003', count: 2,  sum: '2,000', cells: '____nnnnnnnn_____nnnnnnnnnnn___' },
-    { name: 'WC name 004', count: 1,  sum: '2,000', cells: '__nnnnnnnnnnnnn___nnnn___nnnnnn' },
-    { name: 'WC name 005', count: 10, sum: '2,000', cells: 'nnnnnnnnnnnn_____nnnooponnnn___' },
-    { name: 'WC name 006', count: 2,  sum: '2,000', cells: 'nnn__________________nnnnnnnnn_' },
-    { name: 'WC name 007', count: 5,  sum: '2,000', cells: 'nnnnnnnnsnnn_____nnnnnnnnnnn_o_' },
-    { name: 'WC name 008', count: 6,  sum: '2,000', cells: 'onbnnnnnnnnnnnnn_nnnnnnp__nnnnn' },
-    { name: 'WC name 009', count: 4,  sum: '2,000', cells: '___nnnnn___nnnnn___nnnnn___nnnn' },
-    { name: 'WC name 010', count: 7,  sum: '2,000', cells: 'nnbnnnnnnnnn_ooonnnnn__nnppp___' },
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  Mock master data — G-System sẽ đẩy sang khi tích hợp thật.
+  //  5 WC × 1-2 equipment, 5 finished + 2 raw, 9 MPS + 1 WO.
+  // ═══════════════════════════════════════════════════════════════════════════
+  const DEFAULT_RUNTIME = 480;   // 기본 가동시간 phút/ngày
+  const DAYS = 31;               // Aug 1..31
+  const MOCK_TODAY = '2026-08-01';
+
+  const WCS = [
+    { code: 'WC001', name: '조립', equips: [{st:0.80}, {st:1.30}] },   // 1008
+    { code: 'WC002', name: '사출', equips: [{st:1.00}, {st:1.10}] },   // 1008
+    { code: 'WC003', name: '도장', equips: [{st:0.90}, {st:1.20}] },   // 1008
+    { code: 'WC004', name: '검사', equips: [{st:1.00}] },              //  480
+    { code: 'WC005', name: '포장', equips: [{st:0.80}, {st:1.00}] },   //  864
   ];
-  const CLASS = { n:'cell-normal', o:'cell-overload', b:'cell-shortage', p:'cell-both', s:'cell-selected cell-normal', _:'cell-empty' };
-  const VALUE = { n:'55', o:'60', b:'50', p:'53', s:'55', _:'' };
-  const OVERRIDES = {
-    1: { 3:'60', 4:'60', 5:'53', 8:'10' },
-    7: { 0:'70', 2:'50' },
+  const capOf = (wc) => wc.equips.reduce((s,e) => s + DEFAULT_RUNTIME * e.st, 0);
+  const WC_CAP = Object.fromEntries(WCS.map(w => [w.code, capOf(w)]));
+
+  const ITEMS = {
+    '제품1': { wc: 'WC001', st: 6.00 },
+    '제품2': { wc: 'WC002', st: 10.50 },
+    '제품3': { wc: 'WC003', st: 18.33 },
+    '제품4': { wc: 'WC004', st: 4.00 },
+    '제품5': { wc: 'WC005', st: 8.00 },
   };
 
-  // Inject date <th> header (dates side has no tfoot — scrollbar sits at its bottom)
-  const theadRow = document.getElementById('lm-thead-row');
-  for (let d = 1; d <= DAYS; d++) {
-    theadRow.insertAdjacentHTML('beforeend', `<th class="col-date">8/${d}</th>`);
+  const BOM = {
+    '제품1': [{mat:'자재-A', per:2}],
+    '제품2': [{mat:'자재-A', per:1}, {mat:'자재-B', per:3}],
+    '제품3': [{mat:'자재-B', per:1}],
+    '제품4': [{mat:'자재-A', per:1}],
+    '제품5': [{mat:'자재-B', per:2}],
+  };
+
+  const INVENTORY = { '자재-A': 5300, '자재-B': 3000 };
+
+  const ORDERS = [
+    { id:'PO-2026-001', item:'제품1', qty:500,  due:'2026-08-11', type:'MPS' },
+    { id:'PO-2026-002', item:'제품1', qty:1000, due:'2026-08-15', type:'MPS' },
+    { id:'PO-2026-003', item:'제품2', qty:1200, due:'2026-08-20', type:'MPS' },
+    { id:'PO-2026-004', item:'제품3', qty:800,  due:'2026-08-19', type:'MPS' },
+    { id:'PO-2026-005', item:'제품3', qty:170,  due:'2026-08-05', type:'MPS' },
+    { id:'PO-2026-006', item:'제품4', qty:300,  due:'2026-08-08', type:'MPS' },
+    { id:'PO-2026-007', item:'제품5', qty:250,  due:'2026-08-12', type:'MPS' },
+    { id:'PO-2026-008', item:'제품4', qty:400,  due:'2026-08-22', type:'MPS' },
+    { id:'PO-2026-009', item:'제품2', qty:200,  due:'2026-08-20', type:'MPS' },
+    { id:'WO-2026-0001',item:'제품2', qty:200,  due:'2026-08-04', type:'WO' },
+  ];
+
+  const DATES = Array.from({length: DAYS}, (_, i) => `2026-08-${String(i+1).padStart(2,'0')}`);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  App state
+  // ═══════════════════════════════════════════════════════════════════════════
+  const state = {
+    hasData: false,
+    workPlans: [],           // [{id, wo, tmp, item, wc, qty, planStart, planEnd, due, type, riskTypes[], shortages[], daily{}}]
+    loadCells: new Map(),    // "wc::date" → {status, loaded, cap}
+    kpi: { onTime: 0, overloadPct: 0, shortageCount: 0, riskCount: 0 },
+    selectedCell: null,      // {wc, date}
+    selectedPlan: null,      // full plan object
+    confirmedIds: new Set(),
+    pendingAdj: new Map(),   // orderId → {due: newDate}
+    appliedAdj: new Map(),
+    dispatched: new Set(),
+    isRunning: false,
+    formDate: '',            // giá trị input date đang gõ
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  Backward scheduler mini
+  // ═══════════════════════════════════════════════════════════════════════════
+  function addDays(ymd, delta) {
+    const d = new Date(ymd + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + delta);
+    return d.toISOString().slice(0,10);
   }
 
-  // Inject rows into split tbodies (left: 3 cols / right: date cols)
+  function backwardFill(qty, dueDate, today, capEa) {
+    if (qty <= 0 || capEa <= 0) return {};
+    const alloc = {};
+    let remaining = qty;
+    let cursor = dueDate < today ? today : dueDate;
+    while (remaining > 0 && cursor >= today) {
+      const take = Math.min(remaining, capEa);
+      alloc[cursor] = take;
+      remaining -= take;
+      if (cursor === today) break;
+      cursor = addDays(cursor, -1);
+    }
+    if (remaining > 0) alloc[today] = (alloc[today] || 0) + remaining;
+    return alloc;
+  }
+
+  function runScheduler(overrides) {
+    overrides = overrides || new Map();
+
+    // Step 1: build tasks với override
+    const tasks = ORDERS.map(o => {
+      const due = (overrides.get(o.id) && overrides.get(o.id).due) || o.due;
+      const item = ITEMS[o.item];
+      const cap = WC_CAP[item.wc];
+      const capEa = Math.floor(cap / item.st);
+      return { ...o, due, wc: item.wc, st: item.st, cap, capEa };
+    });
+
+    // Step 2: backward fill mỗi task
+    const drafts = tasks.map(t => ({ task: t, alloc: backwardFill(t.qty, t.due, MOCK_TODAY, t.capEa), shortages: [] }));
+
+    // Step 3: shortage check sort by delivery ASC
+    const sorted = [...tasks].sort((a,b) => a.due.localeCompare(b.due));
+    const inv = { ...INVENTORY };
+    const shortageMap = new Map();
+    for (const t of sorted) {
+      const shorts = [];
+      for (const b of (BOM[t.item] || [])) {
+        const need = t.qty * b.per;
+        const stock = inv[b.mat] || 0;
+        if (stock < need) {
+          shorts.push({ mat: b.mat, need, have: stock, short: need - stock });
+          inv[b.mat] = 0;
+        } else {
+          inv[b.mat] = stock - need;
+        }
+      }
+      if (shorts.length) shortageMap.set(t.id, shorts);
+    }
+    drafts.forEach(d => { d.shortages = shortageMap.get(d.task.id) || []; });
+
+    // Step 4: build workPlans + aggregate load
+    const loadedByCell = new Map();  // "wc::date" → minutes
+    const qtyByCell = new Map();
+    const workPlans = drafts.map(d => {
+      const dates = Object.keys(d.alloc).sort();
+      const daily = {};
+      dates.forEach(dt => {
+        const q = d.alloc[dt];
+        daily[dt] = q;
+        const key = `${d.task.wc}::${dt}`;
+        loadedByCell.set(key, (loadedByCell.get(key) || 0) + q * d.task.st);
+        qtyByCell.set(key, (qtyByCell.get(key) || 0) + q);
+      });
+      return {
+        id: d.task.id,
+        wo: d.task.type === 'WO' ? d.task.id : '-',
+        tmp: d.task.type === 'MPS' ? d.task.id : '-',
+        item: d.task.item,
+        wc: d.task.wc,
+        wcName: WCS.find(w => w.code === d.task.wc).name,
+        qty: d.task.qty,
+        planStart: dates[0] || d.task.due,
+        planEnd: dates[dates.length - 1] || d.task.due,
+        due: d.task.due,
+        type: d.task.type,
+        shortages: d.shortages,
+        daily,
+        riskTypes: [],
+      };
+    });
+
+    // Step 5a: shortageCells trước
+    const shortageCells = new Set();
+    workPlans.forEach(p => {
+      if (!p.shortages.length) return;
+      Object.keys(p.daily).forEach(dt => shortageCells.add(`${p.wc}::${dt}`));
+    });
+
+    // Step 5b: per-plan risk (day-based cả 2)
+    workPlans.forEach(p => {
+      const cap = WC_CAP[p.wc];
+      const overload = Object.keys(p.daily).some(dt => (loadedByCell.get(`${p.wc}::${dt}`) || 0) > cap);
+      const touchShort = Object.keys(p.daily).some(dt => shortageCells.has(`${p.wc}::${dt}`));
+      if (touchShort) p.riskTypes.push('material_short');
+      if (overload)   p.riskTypes.push('overload');
+    });
+
+    // Step 6: per-cell status
+    const loadCells = new Map();
+    for (const w of WCS) {
+      const cap = WC_CAP[w.code];
+      for (const dt of DATES) {
+        const key = `${w.code}::${dt}`;
+        const loaded = loadedByCell.get(key) || 0;
+        const qty = qtyByCell.get(key) || 0;
+        const over = loaded > cap;
+        const shortHere = shortageCells.has(key);
+        let status = 'empty';
+        if (loaded === 0 && !shortHere) status = 'empty';
+        else if (over && shortHere) status = 'urgent';
+        else if (over) status = 'overload';
+        else if (shortHere) status = 'material-shortage';
+        else status = 'normal';
+        loadCells.set(key, { status, loaded, cap, qty });
+      }
+    }
+
+    // Step 7: KPI
+    const total = workPlans.length;
+    const onTime = workPlans.filter(p => p.planEnd <= p.due).length;
+    const shortCnt = workPlans.filter(p => p.riskTypes.includes('material_short')).length;
+    const wcOver = new Set();
+    for (const [k, c] of loadCells) {
+      if (c.status === 'overload' || c.status === 'urgent') wcOver.add(k.split('::')[0]);
+    }
+    const riskCnt = workPlans.filter(p => p.riskTypes.length > 0).length;
+    const kpi = {
+      onTime: total ? +(onTime/total*100).toFixed(1) : 0,
+      overloadPct: +((wcOver.size/WCS.length)*100).toFixed(1),
+      shortageCount: shortCnt,
+      riskCount: riskCnt,
+    };
+
+    return { workPlans, loadCells, kpi };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  Renderers
+  // ═══════════════════════════════════════════════════════════════════════════
+  const STATUS_CLASS = {
+    empty: 'cell-empty',
+    normal: 'cell-normal',
+    overload: 'cell-overload',
+    'material-shortage': 'cell-shortage',
+    urgent: 'cell-both',
+  };
+  const RISK_CHIP = {
+    both:     { code:'both',     label:'자재부족+부하초과' },
+    overload: { code:'overload', label:'부하초과' },
+    shortage: { code:'shortage', label:'자재부족' },
+    normal:   { code:'normal',   label:'정상' },
+  };
+  function chipOf(rt) {
+    if (rt.includes('overload') && rt.includes('material_short')) return RISK_CHIP.both;
+    if (rt.includes('overload')) return RISK_CHIP.overload;
+    if (rt.includes('material_short')) return RISK_CHIP.shortage;
+    return RISK_CHIP.normal;
+  }
+  function badgeStateOf(plan) {
+    if (!plan) return null;
+    if (state.pendingAdj.has(plan.id)) return 'pending';
+    if (!state.confirmedIds.has(plan.id)) return null;
+    return plan.riskTypes.length === 0 ? 'solved' : 'unresolved';
+  }
+  const BADGE_LABEL = { pending: '대기중', solved: '해결됨', unresolved: '미해결' };
+  function badgeHtml(state) {
+    if (!state) return '';
+    return `<span class="badge-tag badge-${state}">${BADGE_LABEL[state]}</span>`;
+  }
+
+  // Inject header dates once
+  const theadRow = document.getElementById('lm-thead-row');
+  DATES.forEach(dt => {
+    const [_, m, d] = dt.split('-');
+    theadRow.insertAdjacentHTML('beforeend', `<th class="col-date">${+m}/${+d}</th>`);
+  });
+
   const tbodyFixed = document.getElementById('lm-body-fixed');
   const tbodyDates = document.getElementById('lm-body-dates');
-  ROWS.forEach((r, ri) => {
-    tbodyFixed.insertAdjacentHTML('beforeend',
-      `<tr><td class="col-wc">${r.name}</td>` +
-      `<td class="col-count col-num">${r.count}</td>` +
-      `<td class="col-sum col-num">${r.sum}</td></tr>`);
-    let cells = '';
-    for (let i = 0; i < DAYS; i++) {
-      const ch = r.cells[i] || '_';
-      const cls = CLASS[ch] || 'cell-empty';
-      const val = (OVERRIDES[ri] && OVERRIDES[ri][i]) || VALUE[ch] || '';
-      cells += `<td class="cell ${cls}"><span class="chip-cell">${val}</span></td>`;
+
+  function renderMatrix() {
+    tbodyFixed.innerHTML = '';
+    tbodyDates.innerHTML = '';
+
+    // Count + sum per WC theo workPlans
+    const countByWc = {}, qtyByWc = {};
+    state.workPlans.forEach(p => {
+      countByWc[p.wc] = (countByWc[p.wc] || 0) + 1;
+      qtyByWc[p.wc]   = (qtyByWc[p.wc]   || 0) + p.qty;
+    });
+
+    WCS.forEach(w => {
+      tbodyFixed.insertAdjacentHTML('beforeend',
+        `<tr><td class="col-wc">${w.code} · ${w.name}</td>` +
+        `<td class="col-count col-num">${countByWc[w.code] || 0}</td>` +
+        `<td class="col-sum col-num">${(qtyByWc[w.code] || 0).toLocaleString('en-US')}</td></tr>`);
+
+      let cells = '';
+      DATES.forEach(dt => {
+        const c = state.loadCells.get(`${w.code}::${dt}`);
+        const status = c ? c.status : 'empty';
+        const clsBase = STATUS_CLASS[status] || 'cell-empty';
+        const isSel = state.selectedCell && state.selectedCell.wc === w.code && state.selectedCell.date === dt;
+        const cls = `cell ${clsBase}${isSel ? ' cell-selected' : ''}`;
+        cells += `<td class="${cls}" data-wc="${w.code}" data-date="${dt}"><span class="chip-cell"></span></td>`;
+      });
+      tbodyDates.insertAdjacentHTML('beforeend', `<tr>${cells}</tr>`);
+    });
+
+    // Footer 합계
+    document.getElementById('lm-total-count').textContent = state.workPlans.length;
+    const sum = state.workPlans.reduce((s,p) => s + p.qty, 0);
+    document.getElementById('lm-total-sum').textContent = sum.toLocaleString('en-US');
+
+    // Refresh scrollbars
+    if (typeof updateHThumb === 'function') updateHThumb();
+    if (typeof updateVThumb === 'function') updateVThumb();
+  }
+
+  const wpBody = document.getElementById('wp-body');
+  function renderWpList() {
+    let rows = state.workPlans;
+    if (state.selectedCell) {
+      const { wc, date } = state.selectedCell;
+      rows = rows.filter(p => p.wc === wc && p.planStart <= date && date <= p.planEnd);
     }
-    tbodyDates.insertAdjacentHTML('beforeend', `<tr>${cells}</tr>`);
+    wpBody.innerHTML = '';
+    rows.forEach((p, i) => {
+      const chip = chipOf(p.riskTypes);
+      const bs = badgeStateOf(p);
+      const isSel = state.selectedPlan && state.selectedPlan.id === p.id;
+      const woCell   = p.wo  !== '-' ? `${p.wo}${bs  ? ' ' + badgeHtml(bs) : ''}` : '-';
+      const tmpCell  = p.tmp !== '-' ? `${p.tmp}${bs ? ' ' + badgeHtml(bs) : ''}` : '-';
+      wpBody.insertAdjacentHTML('beforeend', `
+        <tr${isSel ? ' class="selected" aria-selected="true"' : ' aria-selected="false"'} tabindex="0" role="row" data-plan-id="${p.id}">
+          <td class="col-gear">${i+1}</td>
+          <td>${woCell}</td>
+          <td>${tmpCell}</td>
+          <td class="col-num">1</td>
+          <td>${p.item}</td>
+          <td>${p.wc}</td>
+          <td>${p.wcName} 공정</td>
+          <td class="col-num">${p.qty}</td>
+          <td>${p.planStart}</td>
+          <td>${p.planEnd}</td>
+          <td>${p.due}</td>
+          <td>${p.type}</td>
+          <td><span class="risk-chip r-${chip.code}">${chip.label}</span></td>
+        </tr>`);
+    });
+    document.getElementById('wp-count').textContent = rows.length;
+  }
+
+  function renderKpi() {
+    document.getElementById('kpi-ontime').textContent   = state.kpi.onTime.toFixed(1);
+    document.getElementById('kpi-overload').textContent = state.kpi.overloadPct.toFixed(1);
+    document.getElementById('kpi-shortage').textContent = state.kpi.shortageCount;
+    document.getElementById('kpi-risk').textContent     = state.kpi.riskCount;
+  }
+
+  function renderActionPanel() {
+    const container = document.getElementById('action-content');
+    const titleEl = document.getElementById('action-title');
+    const badgeSlot = document.getElementById('action-badge-slot');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnConfirm = document.getElementById('btn-confirm');
+    const p = state.selectedPlan;
+
+    if (!p) {
+      titleEl.textContent = 'Action [일정조정]';
+      badgeSlot.innerHTML = '';
+      container.innerHTML = `<span style="grid-column:1/-1; text-align:center; color:#48494d; padding:24px 0;">행을 선택하세요</span>`;
+      btnCancel.disabled = true;
+      btnConfirm.disabled = true;
+      return;
+    }
+
+    const chip = chipOf(p.riskTypes);
+    const hasOwnShort = p.shortages.length > 0;
+    const isOverload = p.riskTypes.includes('overload');
+    let mode;
+    if (isOverload && hasOwnShort) mode = 'both';
+    else if (hasOwnShort) mode = 'shortage';
+    else mode = 'adjust';
+
+    const title = mode === 'shortage' ? '구매요청'
+                : mode === 'both'     ? '일정조정+구매요청'
+                : '일정조정';
+    titleEl.textContent = `Action [${title}]`;
+
+    const bs = badgeStateOf(p);
+    badgeSlot.innerHTML = bs ? ` ${badgeHtml(bs)}` : '';
+
+    const shortInfo = hasOwnShort ? p.shortages[0] : null;
+
+    // Default input values
+    if (!state.formDate || state.formDate === '__RESET__') state.formDate = p.due;
+    const dateStart = p.planStart;
+    const reqQty = shortInfo ? shortInfo.short : 0;
+
+    let html = '';
+    // 작업지시번호 / 품목 / 워크센터 (chung 3 mode)
+    const idStr = p.wo !== '-' ? p.wo : p.tmp;
+    html += `<span class="act-label">${p.wo !== '-' ? '작업지시번호' : '(임시)작업계획번호'} :</span>`;
+    html += `<span class="act-value">${idStr}</span>`;
+    html += `<span class="risk-chip r-${chip.code}">${chip.label}</span>`;
+
+    html += `<span class="act-label">품목 :</span><span class="act-value">${p.item}</span><span></span>`;
+    html += `<span class="act-label">워크센터 :</span><span class="act-value">${p.wc}</span><span></span>`;
+
+    if (mode === 'adjust' || mode === 'both') {
+      html += `<span class="act-label">요청일 :</span>`;
+      html += `<span class="act-value act-range-inline">`;
+      html += `<input type="date" value="${dateStart}" class="act-inline-input" disabled />`;
+      html += `<span class="act-sep">~</span>`;
+      html += `<input type="date" value="${state.formDate}" class="act-inline-input act-inline-input-end" id="act-date-end" />`;
+      html += `</span><span></span>`;
+    }
+    if (mode === 'shortage' || mode === 'both') {
+      html += `<span class="act-label">자재명 :</span><span class="act-value">${shortInfo.mat}</span><span></span>`;
+      html += `<span class="act-label">현재고 :</span><span class="act-value">${shortInfo.have.toLocaleString('en-US')}</span><span></span>`;
+      html += `<span class="act-label">부족수량 :</span><span class="act-value">${shortInfo.short.toLocaleString('en-US')}</span><span></span>`;
+      html += `<span class="act-label">요청수량 :</span>`;
+      html += `<span class="act-value"><input type="number" value="${reqQty}" min="0" class="act-inline-input act-inline-input-end" id="act-req-qty" /></span><span></span>`;
+    }
+    if (mode !== 'shortage') {
+      html += `<span class="act-label act-label-top">메모 :</span>`;
+      html += `<span class="act-value act-memo-value"><textarea placeholder="메모를 입력하세요" class="act-inline-textarea" id="act-memo"></textarea></span>`;
+    }
+
+    container.innerHTML = html;
+
+    // Wire date input to state so re-render trong cùng row không mất
+    const dateEnd = document.getElementById('act-date-end');
+    if (dateEnd) dateEnd.addEventListener('input', e => { state.formDate = e.target.value; });
+
+    btnCancel.disabled = false;
+    btnConfirm.disabled = false;
+  }
+
+  function renderBottomButtons() {
+    const sim = document.getElementById('btn-sim');
+    const simBadge = document.getElementById('btn-sim-badge');
+    const wo = document.getElementById('btn-wo');
+    simBadge.textContent = state.pendingAdj.size;
+    sim.disabled = state.pendingAdj.size === 0;
+
+    const p = state.selectedPlan;
+    let canDispatch = false;
+    if (p && !state.dispatched.has(p.id) && badgeStateOf(p) === 'solved') canDispatch = true;
+    wo.disabled = !canDispatch;
+  }
+
+  function renderAll() {
+    renderMatrix();
+    renderWpList();
+    renderKpi();
+    renderActionPanel();
+    renderBottomButtons();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  Actions
+  // ═══════════════════════════════════════════════════════════════════════════
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  function runAps() {
+    if (state.isRunning) return;
+    state.isRunning = true;
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.textContent = '불러오는 중…';
+
+    // Fresh RUN: reset toàn bộ interactive state
+    state.selectedCell = null;
+    state.selectedPlan = null;
+    state.confirmedIds = new Set();
+    state.dispatched = new Set();
+    state.pendingAdj = new Map();
+    state.appliedAdj = new Map();
+    state.formDate = '';
+
+    setTimeout(() => {
+      const res = runScheduler(new Map());
+      state.workPlans = res.workPlans;
+      state.loadCells = res.loadCells;
+      state.kpi = res.kpi;
+      state.hasData = true;
+      state.isRunning = false;
+      btn.disabled = false;
+      btn.textContent = '▶ 데이터 불러오기';
+      renderAll();
+      showToast('데이터 불러오기 완료');
+    }, 400);
+  }
+
+  function onCellClick(td) {
+    if (td.classList.contains('cell-empty')) return;
+    const wc = td.dataset.wc;
+    const date = td.dataset.date;
+    if (state.selectedCell && state.selectedCell.wc === wc && state.selectedCell.date === date) {
+      state.selectedCell = null;
+    } else {
+      state.selectedCell = { wc, date };
+    }
+    renderMatrix();
+    renderWpList();
+  }
+
+  function onRowSelect(tr) {
+    const id = tr.dataset.planId;
+    const p = state.workPlans.find(x => x.id === id);
+    if (!p) return;
+    state.selectedPlan = p;
+    state.formDate = p.due;   // reset form
+    renderWpList();
+    renderActionPanel();
+    renderBottomButtons();
+  }
+
+  function onConfirm() {
+    const p = state.selectedPlan;
+    if (!p) return;
+    const chip = chipOf(p.riskTypes);
+    const hasOwnShort = p.shortages.length > 0;
+    const isOverload = p.riskTypes.includes('overload');
+    const mode = (isOverload && hasOwnShort) ? 'both'
+               : hasOwnShort ? 'shortage'
+               : 'adjust';
+    // Mode adjust/both → tạo override cho deliveryDate
+    if (mode === 'adjust' || mode === 'both') {
+      const newDue = state.formDate || p.due;
+      if (newDue !== p.due) {
+        state.pendingAdj.set(p.id, { due: newDue });
+      } else {
+        // Không đổi ngày cũng vẫn add pending để mark "user đã confirm"
+        state.pendingAdj.set(p.id, { due: newDue });
+      }
+    }
+    state.confirmedIds.add(p.id);
+    renderWpList();
+    renderActionPanel();
+    renderBottomButtons();
+    showToast('저장되었습니다 · 시뮬레이션 대기');
+  }
+
+  function onCancel() {
+    const p = state.selectedPlan;
+    if (!p) return;
+    const wasConfirmed = state.confirmedIds.has(p.id);
+    state.pendingAdj.delete(p.id);
+    state.confirmedIds.delete(p.id);
+    state.formDate = p.due;
+    renderWpList();
+    renderActionPanel();
+    renderBottomButtons();
+    if (wasConfirmed) showToast('취소되었습니다');
+  }
+
+  function onSimulate() {
+    if (state.pendingAdj.size === 0) return;
+    // Merge applied + pending
+    const merged = new Map(state.appliedAdj);
+    for (const [k, v] of state.pendingAdj) merged.set(k, v);
+    const res = runScheduler(merged);
+    state.workPlans = res.workPlans;
+    state.loadCells = res.loadCells;
+    state.kpi = res.kpi;
+    state.appliedAdj = merged;
+    state.pendingAdj = new Map();
+    // Clear selection để user chọn lại row với data mới
+    state.selectedPlan = null;
+    state.selectedCell = null;
+    renderAll();
+    showToast('시뮬레이션 완료 · 스케줄 재계산됨');
+  }
+
+  function onDispatch() {
+    const p = state.selectedPlan;
+    if (!p) return;
+    if (badgeStateOf(p) !== 'solved') return;
+    state.dispatched.add(p.id);
+    renderBottomButtons();
+    showToast('작업지시가 생성되었습니다');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  Wire events
+  // ═══════════════════════════════════════════════════════════════════════════
+  document.getElementById('btn-run').addEventListener('click', runAps);
+  document.getElementById('btn-confirm').addEventListener('click', onConfirm);
+  document.getElementById('btn-cancel').addEventListener('click', onCancel);
+  document.getElementById('btn-sim').addEventListener('click', onSimulate);
+  document.getElementById('btn-wo').addEventListener('click', onDispatch);
+
+  tbodyDates.addEventListener('click', e => {
+    const td = e.target.closest('td.cell');
+    if (td) onCellClick(td);
+  });
+
+  wpBody.addEventListener('click', e => {
+    const tr = e.target.closest('tr');
+    if (tr && tr.dataset.planId) onRowSelect(tr);
+  });
+  wpBody.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest('tr');
+    if (tr && tr.dataset.planId) { e.preventDefault(); onRowSelect(tr); }
   });
 
   // ---- Vertical scroll sync (right → left) + thumb updates ----
@@ -1267,6 +1830,10 @@
   updateHThumb();
   updateVThumb();
 
+  // Initial render — mọi panel rỗng, user phải bấm ▶ 데이터 불러오기.
+  // Đặt sau khi scrollbar helpers đã init để renderMatrix() có thể refresh thumb.
+  renderAll();
+
   // ---- Sync AI panel height with (KPI + gap + 부하내역) ----
   {
     const kpi = document.querySelector('.area-kpi');
@@ -1292,72 +1859,6 @@
     setTimeout(sync, 100);
     setTimeout(sync, 500);
   }
-
-  // ---- Work plan list ----
-  const WP_RISKS = [
-    { code:'overload', label:'부하초과' },
-    { code:'normal',   label:'정상' },
-    { code:'shortage', label:'자재부족' },
-    { code:'both',     label:'자재부족+부하초과' },
-    { code:'unassign', label:'미배정' },
-  ];
-  const WP_ROWS = Array.from({length: 12}, (_, i) => {
-    const isMps = i % 2 === 0;
-    return {
-      wo:  isMps ? '-' : 'PP260603003-018',
-      tmp: isMps ? 'WO-20260801-82846884' : '-',
-      order: 3,
-      item: 'NGOC-1707',
-      wc: 'WC-003',
-      op: 'test_공정2-1',
-      qty: 800,
-      s: '2026-08-01',
-      e: '2026-08-18',
-      due: '2026-08-31',
-      listType: isMps ? 'MPS' : 'WO',
-      risk: WP_RISKS[i % WP_RISKS.length],
-    };
-  });
-  const wpBody = document.getElementById('wp-body');
-  WP_ROWS.forEach((r, i) => {
-    const selected = i === 5;                     // row #6 pre-selected
-    wpBody.insertAdjacentHTML('beforeend', `
-      <tr${selected ? ' class="selected" aria-selected="true"' : ' aria-selected="false"'} tabindex="0" role="row">
-        <td class="col-gear">${i+1}</td>
-        <td>${r.wo}</td>
-        <td>${r.tmp}</td>
-        <td class="col-num">${r.order}</td>
-        <td>${r.item}</td>
-        <td>${r.wc}</td>
-        <td>${r.op}</td>
-        <td class="col-num">${r.qty}</td>
-        <td>${r.s}</td>
-        <td>${r.e}</td>
-        <td>${r.due}</td>
-        <td>${r.listType}</td>
-        <td><span class="risk-chip r-${r.risk.code}">${r.risk.label}</span></td>
-      </tr>`);
-  });
-  document.getElementById('wp-count').textContent = WP_ROWS.length;
-
-  // Row click/keyboard selection — only one row selected at a time
-  const selectWpRow = (tr) => {
-    wpBody.querySelectorAll('tr').forEach(x => {
-      x.classList.remove('selected');
-      x.setAttribute('aria-selected', 'false');
-    });
-    tr.classList.add('selected');
-    tr.setAttribute('aria-selected', 'true');
-  };
-  wpBody.addEventListener('click', e => {
-    const tr = e.target.closest('tr');
-    if (tr) selectWpRow(tr);
-  });
-  wpBody.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const tr = e.target.closest('tr');
-    if (tr) { e.preventDefault(); selectWpRow(tr); }
-  });
 
   // ---- Custom vertical scrollbar for 작업계획 리스트 (same style as 부하내역) ----
   {
