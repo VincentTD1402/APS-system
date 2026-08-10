@@ -1,6 +1,12 @@
 import { http } from './http'
 import type { ApsRunResult } from '@/types/aps'
-import type { PendingAdjustment } from '@/stores/aps-store'
+
+// Kept for potential future use; not called from the mock-only APS store.
+interface PendingAdjustment {
+  planId: string
+  newStart: string
+  newEnd: string
+}
 
 export async function runAps(): Promise<ApsRunResult> {
   const { data } = await http.post<ApsRunResult>('/aps/run')

@@ -1,70 +1,157 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useDragScroll } from '@/composables/use-drag-scroll'
 import { useApsStore } from '@/stores/aps-store'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Tag from 'primevue/tag'
-import RiskChip from './risk-chip.vue'
-import { computed } from 'vue'
-import type { WorkPlan } from '@/types/planning'
-import type { RiskType } from '@/types/enums'
+import BadgeTag from '@/components/aps/badge-tag.vue'
+import type { WorkPlanRow, RiskKind } from '@/data/mock-scheduler'
 
-const { t, locale } = useI18n()
 const store = useApsStore()
 
-const selectedCellStatus = computed(() => {
-  const sel = store.filter.cellSelection
-  if (!sel) return null
-  return (
-    store.loadCells.find((c) => c.wcCode === sel.wcCode && c.cellDate === sel.date)?.status ?? null
-  )
-})
+const emit = defineEmits<{
+  select: [row: WorkPlanRow, key: string]
+}>()
 
-function contextualRisk(plan: WorkPlan): RiskType {
-  const cellStatus = selectedCellStatus.value
-  if (!cellStatus) return plan.riskType
-  // Filter theo cell → risk chip phản ánh trạng thái tại cell đó, không phải plan-level
-  const cellOverload =
-    cellStatus === 'OVERLOAD' || cellStatus === 'OVERLOAD_AND_MATERIAL_SHORT'
-  const cellMaterialShort =
-    cellStatus === 'MATERIAL_SHORT' || cellStatus === 'OVERLOAD_AND_MATERIAL_SHORT'
-  if (cellOverload && cellMaterialShort) return 'MATERIAL_AND_OVERLOAD'
-  if (cellOverload) return 'OVERLOAD'
-  if (cellMaterialShort) return 'MATERIAL_SHORT'
-  return 'NORMAL'
+const selectedKey = ref<string | null>(null)
+
+function selectRow(row: WorkPlanRow, idx: number) {
+  const key = store.rowKey(row, idx)
+  selectedKey.value = key
+  store.selectRow(key)
+  emit('select', row, key)
 }
 
-const rows = computed(() => {
-  const rank: Record<string, number> = {
-    MATERIAL_AND_OVERLOAD: 0,
-    OVERLOAD: 1,
-    MATERIAL_SHORT: 2,
-    NORMAL: 3,
-  }
-  return [...store.filteredPlans].sort((a, b) => {
-    const r = rank[contextualRisk(a)] - rank[contextualRisk(b)]
-    if (r !== 0) return r
-    return a.planStartDate.localeCompare(b.planStartDate)
+function onKeydown(e: KeyboardEvent, row: WorkPlanRow, idx: number) {
+  if (e.key !== 'Enter' && e.key !== ' ') return
+  e.preventDefault()
+  selectRow(row, idx)
+}
+
+// ── Risk chip ─────────────────────────────────────────────────────────────────
+// riskTypes là mảng. Chip hiển thị: normal | overload | shortage | both.
+interface Chip { code: string; label: string }
+function riskChip(rt: RiskKind[]): Chip {
+  const hasOver = rt.includes('overload')
+  const hasShort = rt.includes('material_short')
+  if (hasOver && hasShort) return { code: 'both', label: '자재부족+부하초과' }
+  if (hasOver) return { code: 'overload', label: '부하초과' }
+  if (hasShort) return { code: 'shortage', label: '자재부족' }
+  return { code: 'normal', label: '정상' }
+}
+
+// ── Custom vertical scrollbar ─────────────────────────────────────────────────
+const scrollInner = ref<HTMLElement | null>(null)
+const wpVTrack    = ref<HTMLElement | null>(null)
+const wpVThumb    = ref<HTMLElement | null>(null)
+
+let cleanupScroll: (() => void) | null = null
+
+onMounted(() => {
+  const el    = scrollInner.value!
+  const track = wpVTrack.value!
+  const thumb = wpVThumb.value!
+
+  const { cleanup } = useDragScroll({
+    scrollEl: el,
+    track,
+    thumb,
+    axis: 'y',
   })
+  cleanupScroll = cleanup
 })
 
-function onRowSelect(evt: { data: WorkPlan }): void {
-  store.selectedPlanId = evt.data.id
-}
+onUnmounted(() => {
+  cleanupScroll?.()
+})
 
-const selectedRow = computed(() => rows.value.find((r) => r.id === store.selectedPlanId) ?? null)
+// Format YYYY-MM-DD identity (đã đúng shape). Extract cho consistency.
+function d(s: string): string { return s }
+
+const rows = computed(() => store.filteredWp)
 </script>
 
 <template>
-  <div class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="panel-title">{{ t('workPlanList.title') }}</div>
-        <div class="panel-sub">
-          {{ t('workPlanList.subtitle', { total: rows.length, risk: store.riskCount, delay: store.delayCount }) }}
+  <div class="wp-panel area-wp">
+    <div class="wp-header">
+      <div class="wp-title">
+        <svg class="ic-list" aria-hidden="true"><use href="#ic-list"/></svg>
+        작업계획 리스트
+      </div>
+    </div>
+    <div class="wp-subheader"><b>{{ rows.length }}</b> 건</div>
+    <div class="wp-body">
+      <div class="wp-scroll-inner" ref="scrollInner">
+        <table class="wp-table">
+          <thead>
+            <tr>
+              <th class="col-gear">
+                <svg class="ic-gear" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><use href="#ic-gear"/></svg>
+              </th>
+              <th>작업지시번호</th>
+              <th>(임시)작업계획번호</th>
+              <th class="col-num">오더</th>
+              <th>품목</th>
+              <th>워크센터</th>
+              <th>공정</th>
+              <th class="col-num">계획수량</th>
+              <th>계획시작</th>
+              <th>계획완료</th>
+              <th>납기일자</th>
+              <th>리스트유형</th>
+              <th>리스크유형</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, i) in rows"
+              :key="store.rowKey(row, i)"
+              :class="{ selected: selectedKey === store.rowKey(row, i) }"
+              :aria-selected="selectedKey === store.rowKey(row, i)"
+              tabindex="0"
+              role="row"
+              @click="selectRow(row, i)"
+              @keydown="onKeydown($event, row, i)"
+            >
+              <td class="col-gear">{{ i + 1 }}</td>
+              <!-- Badge 3-state cạnh identifier chính: 대기중 / 해결됨 / 미해결 -->
+              <td>
+                {{ row.workOrderNo ?? '-' }}
+                <BadgeTag
+                  v-if="row.workOrderNo"
+                  :state="store.badgeStateOf(row, store.rowKey(row, i))"
+                />
+              </td>
+              <td>
+                {{ row.tmpPlanNo ?? '-' }}
+                <BadgeTag
+                  v-if="!row.workOrderNo"
+                  :state="store.badgeStateOf(row, store.rowKey(row, i))"
+                />
+              </td>
+              <td class="col-num">{{ row.orderNo }}</td>
+              <td>{{ row.itemName }}</td>
+              <td>{{ row.workcenterNo }}</td>
+              <td>{{ row.procName }}</td>
+              <td class="col-num">{{ row.plannedQty }}</td>
+              <td>{{ d(row.planStart) }}</td>
+              <td>{{ d(row.planEnd) }}</td>
+              <td>{{ d(row.deliveryDate) }}</td>
+              <td>{{ row.sourceType }}</td>
+              <td>
+                <span :class="`risk-chip r-${riskChip(row.riskTypes).code}`">
+                  {{ riskChip(row.riskTypes).label }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="wp-vscroll">
+        <div class="wp-vscroll-track" ref="wpVTrack">
+          <div class="wp-vscroll-thumb" ref="wpVThumb"></div>
         </div>
       </div>
     </div>
+<<<<<<< HEAD
     <DataTable
       :value="rows"
       :selection="selectedRow"
@@ -138,30 +225,8 @@ const selectedRow = computed(() => rows.value.find((r) => r.id === store.selecte
         </template>
       </Column>
     </DataTable>
+=======
+>>>>>>> 0a34f17 (feat(fe): rebuild APS view from XD design with interactive flow)
   </div>
 </template>
 
-<style scoped>
-.panel {
-  background: var(--p-content-background);
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.panel-head {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--p-content-border-color);
-}
-.panel-title {
-  font-size: 14px;
-  font-weight: 700;
-}
-.panel-sub {
-  font-size: 11px;
-  color: var(--p-text-muted-color);
-  margin-top: 2px;
-}
-.ml-1 {
-  margin-left: 4px;
-}
-</style>

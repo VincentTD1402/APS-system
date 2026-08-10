@@ -12,6 +12,7 @@ import { i18n } from './i18n/index.ts'
 import 'primeicons/primeicons.css'
 import 'primeflex/primeflex.css'
 import './style.css'
+import './assets/aps.css'
 
 const app = createApp(App)
 
