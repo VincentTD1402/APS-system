@@ -129,7 +129,7 @@ const rows = computed(() => store.filteredWp)
               </td>
               <td class="col-num">{{ row.orderNo }}</td>
               <td>{{ row.itemName }}</td>
-              <td>{{ row.workcenterNo }}</td>
+              <td>{{ row.workcenterName }}</td>
               <td>{{ row.procName }}</td>
               <td class="col-num">{{ row.plannedQty }}</td>
               <td>{{ d(row.planStart) }}</td>

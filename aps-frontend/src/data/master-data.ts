@@ -60,7 +60,7 @@ const DEFAULT_RUNTIME = 480
 
 export const WORK_CENTERS: WorkCenter[] = [
   {
-    code: 'WC001', nameKo: '조립', defaultRuntimeMin: DEFAULT_RUNTIME,
+    code: 'WC001-abqoweirupo', nameKo: '조립', defaultRuntimeMin: DEFAULT_RUNTIME,
     equipments: [
       { code: '설비001-1', wcCode: 'WC001', nameKo: '조립기 1', stRate: 0.80 },
       { code: '설비001-2', wcCode: 'WC001', nameKo: '조립기 2', stRate: 1.30 },

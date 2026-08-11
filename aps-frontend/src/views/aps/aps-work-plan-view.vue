@@ -118,7 +118,9 @@ function syncAiHeight() {
 }
 
 onMounted(() => {
-  masterStore.ensureLoaded()
+  // Auto-run APS lần đầu để panels hiện data ngay khi vào trang.
+  // User vẫn có thể bấm RUN APS để refresh sau đó.
+  store.runAps()
 
   syncAiHeight()
   requestAnimationFrame(syncAiHeight)
