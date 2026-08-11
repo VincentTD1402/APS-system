@@ -9,6 +9,8 @@ import {
 import { useMasterStore } from '@/stores/master-store'
 import { runAps as fetchApsRun, adjustAps as fetchApsAdjust } from '@/api/aps'
 import { fetchMaterialShortages } from '@/api/master'
+import { fetchRiskSummary } from '@/api/llm'
+import type { RiskRecommendation } from '@/types/llm'
 import { toLoadCells, toWorkPlanRows } from '@/data/aps-run-adapter'
 
 interface RunResult {
@@ -72,6 +74,11 @@ export const useApsStore = defineStore('aps', () => {
   const pendingAdjustments = ref<Map<string, PlanAdjustment>>(new Map())
   // Adjustments đã được apply sau simulation (persist qua reruns cho tới next RUN APS)
   const appliedAdjustments = ref<Map<string, PlanAdjustment>>(new Map())
+
+  // AI제안 panel (GET /llm/work-plan-risk-summary)
+  const aiSummary = ref<RiskRecommendation | null>(null)
+  const aiLoading = ref(false)
+  const aiError = ref<string | null>(null)
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
@@ -158,6 +165,32 @@ export const useApsStore = defineStore('aps', () => {
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
+  /**
+   * Phân tích rủi ro cho AI제안 panel.
+   *
+   * KHÔNG truyền filter: `/aps/run` cũng không nhận filter, nên lưới và danh sách
+   * đang hiển thị toàn bộ kế hoạch. Truyền `요청일` vào đây sẽ khiến panel nói về
+   * một tập nhỏ hơn những gì người dùng nhìn thấy. Khi `/aps/run` hỗ trợ filter thì
+   * truyền cùng bộ cho cả hai.
+   *
+   * `refresh=true` vì mọi lần gọi đều đi sau một thao tác vừa làm dữ liệu đổi
+   * (`/aps/run` hoặc `/aps/adjust`) — cache phía server đã lỗi thời.
+   *
+   * Lỗi mạng KHÔNG xoá `aiSummary` cũ: panel giữ nội dung trước đó kèm dấu hiệu,
+   * tốt hơn là trống trơn vì một request hỏng.
+   */
+  async function loadAiSummary(): Promise<void> {
+    aiLoading.value = true
+    aiError.value = null
+    try {
+      aiSummary.value = await fetchRiskSummary({ refresh: true })
+    } catch (e) {
+      aiError.value = e instanceof Error ? e.message : 'AI 분석을 불러오지 못했습니다'
+    } finally {
+      aiLoading.value = false
+    }
+  }
+
   async function runAps(): Promise<void> {
     isRunning.value = true
     // Reset interactive state — RUN là fresh, adjustments cũ bay hết
@@ -167,6 +200,8 @@ export const useApsStore = defineStore('aps', () => {
     dispatchedIds.value = new Set()
     pendingAdjustments.value = new Map()
     appliedAdjustments.value = new Map()
+    aiSummary.value = null
+    aiError.value = null
     try {
       const result = await fetchApsRun()
       // material-shortage được /aps/run rebuild trước khi assemble → fetch sau, không parallel.
@@ -180,6 +215,9 @@ export const useApsStore = defineStore('aps', () => {
     } finally {
       isRunning.value = false
     }
+    // Fire-and-forget: narrative mất 2-3s. `await` sẽ giữ isRunning và chặn lưới
+    // + danh sách hiện ra. Panel tự quản aiLoading của nó.
+    void loadAiSummary()
   }
 
   function setCellSelection(sel: CellSelection | null): void {
@@ -267,6 +305,8 @@ export const useApsStore = defineStore('aps', () => {
     } finally {
       isSimulating.value = false
     }
+    // /aps/adjust vừa re-backward-fill aps_daily_plan → phân tích cũ đã lỗi thời.
+    void loadAiSummary()
   }
 
   const pendingCount = computed(() => pendingAdjustments.value.size)
@@ -292,9 +332,13 @@ export const useApsStore = defineStore('aps', () => {
     totalSum,
     filteredWp,
     pendingCount,
+    aiSummary,
+    aiLoading,
+    aiError,
     rowKey,
     badgeStateOf,
     runAps,
+    loadAiSummary,
     setCellSelection,
     selectRow,
     stageConfirm,
