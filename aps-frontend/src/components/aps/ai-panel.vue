@@ -1,3 +1,42 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useApsStore } from '@/stores/aps-store'
+
+const store = useApsStore()
+
+const facts = computed(() => store.aiSummary?.facts ?? null)
+const narrative = computed(() => store.aiSummary?.narrative ?? null)
+
+/** 영향받는 작업장 — every overloaded workcenter, not just the worst one. */
+const workcenterList = computed(() =>
+  (facts.value?.workcenters ?? []).map((w) => w.workcenterNo ?? '-').join(', ')
+)
+
+// The prompt asks the model to open root_cause with "[SEVERITY] ", but a model is
+// not a guarantee: strip the tag if present and render the badge from
+// facts.severity, which is computed server-side and always right.
+const ROOT_CAUSE_TAG = /^\[[A-Z]+\]\s*/
+
+const rootCauseText = computed(() =>
+  (narrative.value?.rootCause ?? '').replace(ROOT_CAUSE_TAG, '')
+)
+
+const severityClass = computed(() => {
+  switch (facts.value?.severity) {
+    case 'CRITICAL': return 'sev-critical'
+    case 'WARNING': return 'sev-warning'
+    default: return 'sev-low'
+  }
+})
+
+const numberFormat = new Intl.NumberFormat('en-US')
+const fmt = (n: number): string => numberFormat.format(n)
+
+// A stale reading is worth showing — with a marker — rather than blanking the
+// panel because one request failed.
+const showStale = computed(() => Boolean(store.aiError) && Boolean(store.aiSummary))
+</script>
+
 <template>
   <div class="ai-panel area-ai">
     <div class="ai-header">
@@ -5,41 +44,111 @@
       AI제안
     </div>
     <div class="ai-body">
-      <div class="ai-content">
+      <!-- Nothing loaded yet: this panel is driven by RUN APS. -->
+      <div v-if="!store.hasData" class="ai-content ai-placeholder">
+        데이터를 불러오면 리스크 분석이 표시됩니다.
+      </div>
+
+      <div v-else-if="store.aiLoading && !store.aiSummary" class="ai-content" aria-busy="true">
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk sk-line short"></div>
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk sk-line short"></div>
+      </div>
+
+      <div v-else-if="store.aiError && !store.aiSummary" class="ai-content ai-error">
+        <p>AI 분석을 불러오지 못했습니다.</p>
+        <button type="button" class="ai-retry" @click="store.loadAiSummary()">다시 시도</button>
+      </div>
+
+      <div v-else-if="facts && narrative" class="ai-content">
         <div class="ai-doc-title">계획 리스크 및 권고 사항</div>
+        <p v-if="showStale" class="ai-stale">※ 최신 분석을 불러오지 못해 이전 결과를 표시합니다.</p>
+
         <p class="ai-num"><b>1. 영향(Impact)의 근본 원인</b></p>
-        <p><span class="ai-crit">[CRITICAL]</span> Workcenter Overload 작업장(WC001, WC002, WC003)의 과도한 작업 부하가 진행중인 문제로 확인되었습니다.</p>
-        <p>근본 원인은 작업장의 계획된 작업량이 허용량을 초과하여 발생한 과부하로, 2일 내에 작업량이 200%에 달하고 있습니다.</p>
+        <p>
+          <span class="ai-sev" :class="severityClass">[{{ facts.severity }}]</span>
+          {{ rootCauseText }}
+        </p>
+
         <p class="ai-num"><b>2. 영향받는 오더 및 작업장(WO) 및 심각도</b></p>
-        <p>영향받는 작업장: WC001, WC002, WC003</p>
-        <p>영향받는 오더: 총 11개의 작업이 영향을 받고 있으며, 작업량이 5% 이상 증가하고 있습니다.</p>
-        <p>심각도: HIGH IMPACT (긴급도: DUE TODAY)</p>
+        <!-- Figures come from `facts`; the prose below only describes them. -->
+        <p v-if="facts.workcenters.length">영향받는 작업장: {{ workcenterList }}</p>
+        <p>영향받는 오더: 총 {{ facts.affected.count }}개의 작업이 영향을 받고 있습니다.</p>
+        <p>심각도: {{ facts.severity }} (긴급도: {{ facts.urgency }})</p>
+        <p v-for="s in facts.shortages" :key="`${s.parentItemNo}-${s.itemNo}`">
+          자재 부족: {{ s.itemName ?? s.itemNo }} — 현재고 {{ fmt(s.availableQty) }},
+          부족수량 {{ fmt(s.shortageQty) }}
+        </p>
+        <p>{{ narrative.impactSummary }}</p>
+
         <p class="ai-num"><b>3. 해결 및 완화 권고</b></p>
-        <p>우선순위 1: 작업장 과부하를 해소하기 위해 작업 일정을 조정하거나 작업을 다른 작업장으로 분배해야 합니다. 특히 8/5~8/7 기간의 배정 물량 일부를 WC-004, WC-005 등 여유 캐파가 있는 작업장으로 이동해야 합니다.</p>
-        <p>우선순위 2: 작업량이 많은 11개의 작업을 우선순위에 따라 재조정하여, 향후 일정에 영향을 최소화해야 합니다. 납기일자가 가장 임박한 오더부터 순차적으로 처리하며, 필요 시 야간조 편성을 검토합니다.</p>
-        <p>우선순위 3: 작업장의 활용량을 정기적으로 점검하여, 향후 과부하를 방지할 수 있도록 관리합니다. 실시간 부하 모니터링 대시보드를 통해 임계치 80%를 초과하는 경우 자동으로 경고를 발생시키는 시스템을 도입할 것을 권장합니다.</p>
-
-        <p class="ai-num"><b>4. 자재 부족 리스크 분석</b></p>
-        <p>현재 NGOC-1707 원자재의 재고가 부족한 상태로, 336개의 추가 발주가 필요합니다. 부족한 자재로 인해 최소 3개의 작업 오더가 지연될 위험이 있으며, 이는 전체 계획 납기 준수율에 영향을 미칠 수 있습니다.</p>
-        <p>공급업체 리드타임: 평균 5일. 즉시 발주 시 8/12까지 입고 예상.</p>
-        <p>대체 자재: NGOC-1708 (호환성 검증 필요), NGOC-1710 (재고 800개 보유).</p>
-
-        <p class="ai-num"><b>5. 캐파 재분배 시뮬레이션</b></p>
-        <p>WC-001 → WC-004 재분배 시나리오: 예상 부하 감소율 24%, 납기 준수율 유지 가능. 추가 이동 비용 발생 없음.</p>
-        <p>WC-002 → WC-005 재분배 시나리오: 예상 부하 감소율 18%, 세팅 시간 30분 추가 발생. 총 처리 시간 +2%.</p>
-        <p>WC-003 부분 야간조 편성 시나리오: 인력 비용 15% 증가, 부하 해소율 40%. ROI 긍정적.</p>
-
-        <p class="ai-num"><b>6. 예상 KPI 변화</b></p>
-        <p>조치 전: 납기 준수율 100.0%, 부하율 초과 2건, 자재 부족 13.3%, 리스크 3건.</p>
-        <p>조치 후: 납기 준수율 99.8%, 부하율 초과 0건, 자재 부족 0.0%, 리스크 1건.</p>
-        <p>총 리스크 감소율: <span class="ai-crit">66.7%</span> — 즉시 조치 권고.</p>
-
-        <p class="ai-num"><b>7. 액션 아이템 요약</b></p>
-        <p>① 8/8 09:00까지 WC-001, WC-002, WC-003 재분배 계획 승인 필요.</p>
-        <p>② 8/8 12:00까지 NGOC-1707 336개 구매요청 승인 필요.</p>
-        <p>③ 8/9 이후 일일 부하 리포트 자동 발송 설정 권고.</p>
-        <p>④ 이번 주 내에 캐파 확대 검토 회의 소집 필요.</p>
+        <p v-for="r in narrative.recommendations" :key="r.priority">
+          우선순위 {{ r.priority }}: {{ r.text }}
+        </p>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.ai-placeholder,
+.ai-error {
+  color: #8a8a94;
+}
+.ai-stale {
+  color: #B26A00;
+  font-size: 12px;
+}
+.ai-sev {
+  font-weight: 700;
+}
+.sev-critical { color: #DC3044; }
+.sev-warning  { color: #B26A00; }
+.sev-low      { color: #2E7D32; }
+
+.ai-retry {
+  margin-top: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #222222;
+  background: #ffffff;
+  border: 1px solid #dedede;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ai-retry:hover {
+  background: #f5f5f7;
+}
+
+/* Skeleton — sized close to the real block so the panel does not jump. */
+.sk {
+  background: linear-gradient(90deg, #f0f0f3 25%, #e6e6ea 37%, #f0f0f3 63%);
+  background-size: 400% 100%;
+  border-radius: 3px;
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+.sk-title {
+  height: 13px;
+  width: 45%;
+  margin: 10px 0 8px;
+}
+.sk-line {
+  height: 11px;
+  margin-bottom: 7px;
+}
+.sk-line.short {
+  width: 70%;
+}
+@keyframes sk-shimmer {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; }
+}
+</style>
