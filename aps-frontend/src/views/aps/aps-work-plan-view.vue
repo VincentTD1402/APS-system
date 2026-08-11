@@ -117,8 +117,11 @@ function syncAiHeight() {
   aiEl.style.height = `${kpiH + ROW_GAP + lmH}px`
 }
 
-onMounted(() => {
-  // Auto-run APS lần đầu để panels hiện data ngay khi vào trang.
+onMounted(async () => {
+  // Load master data (workCenters/items/routings/bom/inventory) trước — load-matrix
+  // render rows từ workCenters. Nếu không load, matrix rỗng.
+  await masterStore.ensureLoaded()
+  // Auto-run APS để panels hiện data ngay khi vào trang.
   // User vẫn có thể bấm RUN APS để refresh sau đó.
   store.runAps()
 
