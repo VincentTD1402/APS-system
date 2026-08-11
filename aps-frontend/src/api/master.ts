@@ -37,3 +37,10 @@ export async function fetchMaterialShortageByParent(parentItemNo: string): Promi
   const { data } = await http.get<MaterialShortageRow[]>('/material-shortage', { params: { parentItemNo } })
   return data
 }
+
+// Full list — used by the APS work-plan view to build per-plan shortage breakdown
+// after /aps/run or /aps/adjust (those endpoints only return the aggregate shortageQty).
+export async function fetchMaterialShortages(): Promise<MaterialShortageRow[]> {
+  const { data } = await http.get<MaterialShortageRow[]>('/material-shortage')
+  return data
+}

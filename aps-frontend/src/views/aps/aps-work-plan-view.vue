@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useApsStore } from '@/stores/aps-store'
+import { useMasterStore } from '@/stores/master-store'
 import FilterBar from '@/components/aps/filter-bar.vue'
 import KpiRow from '@/components/aps/kpi-row.vue'
 import LoadMatrix from '@/components/aps/load-matrix.vue'
@@ -11,6 +12,7 @@ import Toast from '@/components/aps/toast.vue'
 import type { WorkPlanRow } from '@/data/mock-scheduler'
 
 const store = useApsStore()
+const masterStore = useMasterStore()
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 const toastMessage = ref('')
@@ -58,9 +60,23 @@ function onCancel() {
   if (wasConfirmed) showToast('취소되었습니다')
 }
 
+// ── RUN APS button ─────────────────────────────────────────────────────────────
+async function onRunAps() {
+  try {
+    await store.runAps()
+  } catch {
+    showToast('데이터 조회 실패 · 다시 시도해주세요')
+  }
+}
+
 // ── 시뮬레이션 button ──────────────────────────────────────────────────────────
-function onSimulate() {
-  store.runSimulation()
+async function onSimulate() {
+  try {
+    await store.runSimulation()
+  } catch {
+    showToast('시뮬레이션 실패 · 다시 시도해주세요')
+    return
+  }
   // Selection sau simulation có thể trỏ tới data cũ — clear để user chọn lại
   selectedRow.value = null
   selectedKey.value = null
@@ -102,6 +118,8 @@ function syncAiHeight() {
 }
 
 onMounted(() => {
+  masterStore.ensureLoaded()
+
   syncAiHeight()
   requestAnimationFrame(syncAiHeight)
   setTimeout(syncAiHeight, 100)
@@ -138,7 +156,7 @@ onUnmounted(() => {
         type="button"
         aria-label="데이터 불러오기"
         :disabled="store.isRunning"
-        @click="store.runAps()"
+        @click="onRunAps"
       >
         <span v-if="store.isRunning">불러오는 중…</span>
         <template v-else>▶ 데이터 불러오기</template>
@@ -164,8 +182,8 @@ onUnmounted(() => {
           <button
             class="btn-sim"
             type="button"
-            :disabled="store.pendingCount === 0"
-            :class="{ 'is-disabled': store.pendingCount === 0 }"
+            :disabled="store.pendingCount === 0 || store.isSimulating"
+            :class="{ 'is-disabled': store.pendingCount === 0 || store.isSimulating }"
             @click="onSimulate"
           >
             시뮬레이션

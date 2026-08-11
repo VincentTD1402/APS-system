@@ -1,13 +1,27 @@
-// Pinia store — pure mock, gọi `runMockAps()` mỗi lần user bấm RUN APS.
+// Pinia store — RUN/시뮬레이션 gọi thẳng BE (`POST /aps/run`, `POST /aps/adjust`).
 // Contract khớp `aps-backend/app/schemas/aps.py::ApsRunResult`.
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
-  runMockAps, enumerateDates,
-  type ApsRunResult, type LoadCellOut, type WorkPlanRow, type Kpi,
-  type AdjustmentOverride,
+  enumerateDates,
+  type LoadCellOut, type WorkPlanRow, type Kpi,
 } from '@/data/mock-scheduler'
-import { WORK_CENTERS } from '@/data/master-data'
+import { useMasterStore } from '@/stores/master-store'
+import { runAps as fetchApsRun, adjustAps as fetchApsAdjust } from '@/api/aps'
+import { fetchMaterialShortages } from '@/api/master'
+import { toLoadCells, toWorkPlanRows } from '@/data/aps-run-adapter'
+
+interface RunResult {
+  workPlans: WorkPlanRow[]
+  loadCells: LoadCellOut[]
+  kpi: Kpi
+}
+
+/** Adjustment pending/applied cho 1 plan (일정조정 dialog) — cần cả 2 đầu window để gọi /aps/adjust. */
+interface PlanAdjustment {
+  dateStart: string
+  dateEnd: string
+}
 
 export interface CellSelection { wc: string; date: string; dayIdx: number }
 
@@ -31,10 +45,12 @@ const EMPTY_KPI: Kpi = {
 }
 
 export const useApsStore = defineStore('aps', () => {
+  const masterStore = useMasterStore()
   const isRunning = ref(false)
+  const isSimulating = ref(false)
   // hasData = false trước RUN → panels rỗng nhưng vẫn thấy cột date của range
   const hasData = ref(false)
-  const runResult = ref<ApsRunResult | null>(null)
+  const runResult = ref<RunResult | null>(null)
 
   const filter = ref<FilterState>({
     businessUnit: '전체',
@@ -52,10 +68,10 @@ export const useApsStore = defineStore('aps', () => {
   const selectedRowKey = ref<string | null>(null)
   const confirmedRows = ref<Set<string>>(new Set())
   const dispatchedIds = ref<Set<string>>(new Set())
-  // Adjustments pending simulation (key = orderId)
-  const pendingAdjustments = ref<Map<string, AdjustmentOverride>>(new Map())
+  // Adjustments pending simulation (key = orderId = WorkPlan.id)
+  const pendingAdjustments = ref<Map<string, PlanAdjustment>>(new Map())
   // Adjustments đã được apply sau simulation (persist qua reruns cho tới next RUN APS)
-  const appliedAdjustments = ref<Map<string, AdjustmentOverride>>(new Map())
+  const appliedAdjustments = ref<Map<string, PlanAdjustment>>(new Map())
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
@@ -64,8 +80,8 @@ export const useApsStore = defineStore('aps', () => {
     enumerateDates(filter.value.dateFrom, filter.value.dateTo),
   )
 
-  /** Danh sách WC hiển thị matrix — luôn hiện đầy đủ từ master data. */
-  const workCenters = computed(() => WORK_CENTERS)
+  /** Danh sách WC hiển thị matrix — luôn hiện đầy đủ từ master data (GET /master/work-centers). */
+  const workCenters = computed(() => masterStore.workCenters)
 
   const workPlans = computed<WorkPlanRow[]>(() =>
     hasData.value && runResult.value ? runResult.value.workPlans : [],
@@ -151,11 +167,19 @@ export const useApsStore = defineStore('aps', () => {
     dispatchedIds.value = new Set()
     pendingAdjustments.value = new Map()
     appliedAdjustments.value = new Map()
-    // Delay giả cho có cảm giác call BE
-    await new Promise<void>((res) => setTimeout(res, 400))
-    runResult.value = runMockAps(filter.value.dateFrom, filter.value.dateTo)
-    hasData.value = true
-    isRunning.value = false
+    try {
+      const result = await fetchApsRun()
+      // material-shortage được /aps/run rebuild trước khi assemble → fetch sau, không parallel.
+      const shortages = await fetchMaterialShortages()
+      runResult.value = {
+        workPlans: toWorkPlanRows(result.workPlans, shortages),
+        loadCells: toLoadCells(result.loadCells),
+        kpi: result.kpi,
+      }
+      hasData.value = true
+    } finally {
+      isRunning.value = false
+    }
   }
 
   function setCellSelection(sel: CellSelection | null): void {
@@ -179,12 +203,12 @@ export const useApsStore = defineStore('aps', () => {
   }
 
   function stageConfirm(payload: ConfirmPayload): void {
-    // Chỉ mode adjust / both mới đổi lịch backward (dateEnd = new deliveryDate).
+    // Chỉ mode adjust / both mới đổi lịch backward (window [dateStart, dateEnd] mới).
     // Mode shortage tạo purchase request, không đổi lịch → không thêm override.
-    if ((payload.mode === 'adjust' || payload.mode === 'both') && payload.data.dateEnd) {
+    if ((payload.mode === 'adjust' || payload.mode === 'both') && payload.data.dateStart && payload.data.dateEnd) {
       pendingAdjustments.value = new Map([
         ...pendingAdjustments.value,
-        [payload.orderId, { deliveryDate: payload.data.dateEnd }],
+        [payload.orderId, { dateStart: payload.data.dateStart, dateEnd: payload.data.dateEnd }],
       ])
     }
     confirmedRows.value = new Set([...confirmedRows.value, payload.rowKey])
@@ -213,25 +237,43 @@ export const useApsStore = defineStore('aps', () => {
   }
 
   /**
-   * Re-run backward algorithm với toàn bộ pending adjustments + adjustments đã apply
-   * trước đó. Sau sim: pending → applied, matrix + plans + KPI refresh.
+   * Re-backward-fill (POST /aps/adjust) toàn bộ pending adjustments + adjustments đã
+   * apply trước đó. Sau sim: pending → applied, matrix + plans + KPI refresh.
    */
-  function runSimulation(): void {
+  async function runSimulation(): Promise<void> {
     if (!hasData.value) return
-    // Merge applied cũ + pending mới. Pending thắng nếu đụng key.
-    const merged = new Map<string, AdjustmentOverride>(appliedAdjustments.value)
-    for (const [k, v] of pendingAdjustments.value) merged.set(k, v)
-    runResult.value = runMockAps(filter.value.dateFrom, filter.value.dateTo, merged)
-    appliedAdjustments.value = merged
-    pendingAdjustments.value = new Map()
-    // Adjustments đã simulate xong → user có thể muốn re-confirm cho phần khác.
-    // Giữ confirmedRows để 작업지시 생성 vẫn enable cho row đã confirm.
+    isSimulating.value = true
+    try {
+      // Merge applied cũ + pending mới. Pending thắng nếu đụng key.
+      const merged = new Map<string, PlanAdjustment>(appliedAdjustments.value)
+      for (const [k, v] of pendingAdjustments.value) merged.set(k, v)
+      const adjustments = Array.from(merged, ([planId, a]) => ({
+        planId,
+        newStart: a.dateStart,
+        newEnd: a.dateEnd,
+      }))
+      const result = await fetchApsAdjust(null, adjustments)
+      // material-shortage được /aps/adjust rebuild trước khi assemble → fetch sau.
+      const shortages = await fetchMaterialShortages()
+      runResult.value = {
+        workPlans: toWorkPlanRows(result.workPlans, shortages),
+        loadCells: toLoadCells(result.loadCells),
+        kpi: result.kpi,
+      }
+      appliedAdjustments.value = merged
+      pendingAdjustments.value = new Map()
+      // Adjustments đã simulate xong → user có thể muốn re-confirm cho phần khác.
+      // Giữ confirmedRows để 작업지시 생성 vẫn enable cho row đã confirm.
+    } finally {
+      isSimulating.value = false
+    }
   }
 
   const pendingCount = computed(() => pendingAdjustments.value.size)
 
   return {
     isRunning,
+    isSimulating,
     hasData,
     filter,
     cellSelection,
