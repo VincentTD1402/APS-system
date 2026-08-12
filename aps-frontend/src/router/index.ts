@@ -5,7 +5,11 @@ export const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/aps',
+      // Redirect string đơn giản KHÔNG giữ query — nếu MES nhúng iframe ở path '/'
+      // (thay vì '/aps' trực tiếp) kèm ?embed=1&lang=...&parentOrigin=..., redirect
+      // sẽ âm thầm xoá mất các param đó trước khi mes-bridge đọc được. Forward
+      // nguyên query + hash để không mất context.
+      redirect: (to) => ({ path: '/aps', query: to.query, hash: to.hash }),
     },
     {
       path: '/aps',

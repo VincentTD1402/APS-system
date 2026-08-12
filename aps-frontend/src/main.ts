@@ -15,6 +15,11 @@ import 'primeflex/primeflex.css'
 import './style.css'
 import './assets/aps.css'
 
+// Đọc query gốc (embed/lang/parentOrigin) + bắt tay MES TRƯỚC khi router chạy —
+// route '/' → '/aps' rewrite URL qua History API, initMesBridge() gọi sau đó sẽ
+// đọc `location.search` đã bị đổi/mất query nếu MES nhúng ở path '/' thay vì '/aps'.
+initMesBridge()
+
 const app = createApp(App)
 
 app.use(createPinia())
@@ -32,5 +37,3 @@ app.use(ToastService)
 app.use(ConfirmationService)
 
 app.mount('#app')
-
-initMesBridge()
