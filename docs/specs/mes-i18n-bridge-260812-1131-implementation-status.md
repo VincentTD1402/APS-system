@@ -12,21 +12,49 @@ bỏ hẳn `'ko'/'vi'` ISO làm identifier — thay vì maintain song song 2 h�
 |---|---|
 | `aps-frontend/src/i18n/index.ts` | Khoá locale đổi từ `'ko'\|'vi'` → mã GSystem (`GSYSTEM_LOCALE.KO='10121001'`, `.VI='10121003'`). `ko.json`/`vi.json` (nhãn riêng APS) đăng ký dưới đúng mã đó. Thêm `applyLanguage(code)` (không throw nếu mã lạ), `registerGsystemMessages(messages)` (`mergeLocaleMessage` mỗi mã), `registerAvailableLocales(codes)` (đảm bảo mã MES công bố luôn "available" dù chưa có dict riêng của APS). `lang` attribute của `<html>` map riêng qua `HTML_LANG_BY_GSYSTEM` (chuyện hiển thị, không phải locale key). |
 | `aps-frontend/src/services/mes-bridge.ts` (mới) | `MES_ORIGIN_PATTERNS = ['https://*.gsystem.ai']`, `isTrustedMesOrigin`/`resolveMesOrigin` (param `parentOrigin` ưu tiên, fallback `document.referrer`, đối chiếu whitelist pattern — đúng mẫu trong tài liệu). `initMesBridge()`: đọc `embed`/`lang` từ query lúc khởi động (set locale ngay, không chờ postMessage), gửi `APS_READY` tới `parent` nếu đang nhúng + origin tin cậy, lắng nghe `GSYSTEM_I18N_INIT`/`GSYSTEM_I18N_CHANGE`. Export `isEmbedded` ref cho UI dùng sau. |
-| `aps-frontend/src/main.ts` | Gọi `initMesBridge()` sau `app.mount()`. |
+| `aps-frontend/src/main.ts` | Gọi `initMesBridge()` — hiện TRƯỚC `app.use(router)`/`app.mount()` (xem mục "Test thật lần đầu" dưới, lúc đầu để sau mount gây bug mất query). |
 
 Build + `vue-tsc --noEmit` pass. **Chưa test với MES thật** (chưa có môi trường nhúng
 để verify handshake + áp dụng ngôn ngữ runtime).
 
+## Test thật lần đầu (260812, sau khi lên `feat/count-risk`)
+
+MES đã load APS thật qua TabManager (`[TabManager] activeTab changed: {from: 'Home',
+to: 'https://aps-fe.gsystem.ai/aps'}`). Log `[mes-bridge]` cho thấy:
+
+```
+[mes-bridge] init — embed: false query:
+[mes-bridge] không ở embed mode — bỏ qua handshake với MES
+```
+
+`location.search` RỖNG lúc `initMesBridge()` chạy → bridge tắt luôn, chưa từng gửi
+`APS_READY`. Root cause tìm được (bug ở phía APS, không phải MES):
+
+- Route `'/' → '/aps'` dùng redirect string đơn giản — vue-router resolve kiểu này
+  KHÔNG tự forward query string. Nếu MES nhúng iframe ở path `/` (thay vì `/aps`
+  thẳng) kèm `?embed=1&lang=...&parentOrigin=...`, redirect xoá mất param trước khi
+  code nào đọc được.
+- `initMesBridge()` cũ gọi SAU `app.mount()` → dù route đích đúng là `/aps` ngay từ
+  đầu, thời điểm đọc `location.search` vẫn trễ hơn lúc router có thể đã
+  `history.replaceState` xong.
+
+**Đã fix (commit `a754541`):**
+- `router/index.ts`: redirect `/` → `/aps` đổi thành hàm `(to) => ({ path: '/aps',
+  query: to.query, hash: to.hash })` — forward nguyên query/hash.
+- `main.ts`: `initMesBridge()` dời lên gọi TRƯỚC `app.use(router)`/`app.mount()`,
+  đọc URL gốc trước khi bất kỳ redirect nào kịp chạy.
+
+**Chưa xác nhận lại** — cần MES load lại APS 1 lần nữa (test thật) để xem log
+`[mes-bridge]` có báo `embed: true` và tiếp tục nhận được `GSYSTEM_I18N_INIT` hay
+không. Nếu vẫn `embed: false` sau fix này → nghĩa là MES thực sự không gửi
+`?embed=1&lang=...` (khác với tài liệu bàn giao mô tả), cần báo lại team MES kiểm
+tra `src` của iframe/tab thật đang set (xem DOM `<iframe>`/tab config, không chỉ tin
+vào log `[TabManager]` vì log đó có thể đã bỏ query khi hiển thị).
+
 ## Tồn đọng — cần làm tiếp
 
-1. **Test thật/giả lập** — chưa chạy qua môi trường nhúng MES thật. Cách giả lập
-   nhanh: mở APS ở `?embed=1&lang=10121003&parentOrigin=<origin gsystem.ai bất kỳ>`,
-   trong DevTools console gọi `window.postMessage({type:'GSYSTEM_I18N_INIT', current:'10121003', languages:[...], messages:{...}}, location.origin)`
-   — lưu ý phải giả origin nằm trong `https://*.gsystem.ai` thì `isTrustedMesOrigin`
-   mới nhận (đứng từ trang APS gọi `postMessage` lên chính `window` thì `event.origin`
-   sẽ là origin của APS chứ không giả được origin MES qua devtools console thông
-   thường — cần 1 trang HTML nhúng iframe thật để test đúng, hoặc tạm sửa
-   `MES_ORIGIN_PATTERNS` để thêm origin APS chính nó lúc test cục bộ rồi đổi lại).
+1. **Re-test sau fix query-stripping** (xem mục ngay trên) — ưu tiên cao nhất, chưa
+   biết còn lỗi khác phía sau (INIT/CHANGE) hay không vì chưa từng tới được đó.
 2. **Domain dev cụ thể** — nếu APS test qua `localhost`/IP nội bộ (ngoài `*.gsystem.ai`),
    cần thêm origin đó vào `MES_ORIGIN_PATTERNS` trong `mes-bridge.ts` (dòng comment
    đã ghi rõ chỗ sửa). Hiện để đúng 1 dòng theo tài liệu, chưa thêm gì thêm.
