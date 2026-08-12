@@ -205,8 +205,21 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .btn-sim {
   background: #0052AF;
   color: #ffffff;
+  border: 1px solid #0052AF;
 }
-.btn-sim:hover  { background: #024796; }
+.btn-sim:hover:not(:disabled) { background: #024796; border-color: #024796; }
+.btn-wo {
+  background: #1AB56F;
+  color: #ffffff;
+  border: 1px solid #1AB56F;
+}
+.btn-wo:hover:not(:disabled) { background: #00c26f; border-color: #00c26f; }
+.btn-sim:disabled, .btn-wo:disabled {
+  background: #ffffff;
+  color: #D3D3D3;
+  border: 1px solid #e0e2e6;
+  cursor: not-allowed;
+}
 .btn-badge {
   display: inline-flex;
   align-items: center;
@@ -217,12 +230,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   color: #0052AF;
   font-size: 13px;
   font-weight: 700;
-}
-.btn-wo {
-  background: #ffffff;
-  color: #D3D3D3;
-  border: 1px solid #e0e2e6;
-  cursor: not-allowed;
 }
 
 /* AI제안 panel */

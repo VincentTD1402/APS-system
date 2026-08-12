@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { ref, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useApsStore } from '@/stores/aps-store'
 import { useMasterStore } from '@/stores/master-store'
 import FilterBar from '@/components/aps/filter-bar.vue'
@@ -39,7 +39,7 @@ function onWpSelect(row: WorkPlanRow, key: string) {
 function onConfirm(payload: {
   rowKey: string
   mode: string
-  data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number }
+  data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number; itemNo?: string }
 }) {
   if (!selectedRow.value) return
   store.stageConfirm({
@@ -71,8 +71,13 @@ async function onRunAps() {
 
 // ── 시뮬레이션 button ──────────────────────────────────────────────────────────
 async function onSimulate() {
+  if (!store.hasData) {
+    showToast('먼저 데이터를 불러오세요')
+    return
+  }
+  let purchaseRequestFailed = false
   try {
-    await store.runSimulation()
+    ;({ purchaseRequestFailed } = await store.runSimulation())
   } catch {
     showToast('시뮬레이션 실패 · 다시 시도해주세요')
     return
@@ -81,22 +86,31 @@ async function onSimulate() {
   selectedRow.value = null
   selectedKey.value = null
   store.selectRow(null)
-  showToast('시뮬레이션 완료 · 스케줄 재계산됨')
+  showToast(
+    purchaseRequestFailed
+      ? '시뮬레이션 완료 · 구매요청 일부 전송 실패 (재시도 필요)'
+      : '시뮬레이션 완료 · 스케줄 재계산됨',
+  )
 }
 
 // ── 작업지시 생성 button ───────────────────────────────────────────────────────
-const canDispatch = computed(() => {
-  if (!selectedKey.value || !selectedRow.value) return false
-  // Chỉ cho dispatch khi row ở state 'solved' (đã simulate xong + risk hết).
-  if (store.badgeStateOf(selectedRow.value, selectedKey.value) !== 'solved') return false
-  if (store.dispatchedIds.has(selectedKey.value)) return false
-  return true
-})
-
-function onDispatch() {
-  if (!selectedKey.value || !canDispatch.value) return
-  store.dispatchWorkOrder(selectedKey.value)
-  showToast('작업지시가 생성되었습니다')
+// Nút luôn enable — chỉ chặn bấm trùng lúc đang gọi API (isDispatching), không
+// gate theo business state nữa. Thiếu selection / đã dispatch rồi thì báo toast.
+async function onDispatch() {
+  if (!selectedKey.value || !selectedRow.value) {
+    showToast('먼저 작업계획을 선택하세요')
+    return
+  }
+  if (store.dispatchedIds.has(selectedKey.value)) {
+    showToast('이미 작업지시가 생성된 계획입니다')
+    return
+  }
+  try {
+    const { pushed } = await store.dispatchWorkOrder(selectedRow.value.id, selectedKey.value)
+    showToast(pushed ? '작업지시가 생성되었습니다' : '작업지시 생성 실패 · G-System 전송 실패 (재시도 필요)')
+  } catch {
+    showToast('작업지시 생성 실패 · 다시 시도해주세요')
+  }
 }
 
 // ── Height sync (KPI + LoadMatrix → AiPanel) ──────────────────────────────────
@@ -187,20 +201,19 @@ onUnmounted(() => {
           <button
             class="btn-sim"
             type="button"
-            :disabled="store.pendingCount === 0 || store.isSimulating"
-            :class="{ 'is-disabled': store.pendingCount === 0 || store.isSimulating }"
+            :disabled="store.isSimulating"
             @click="onSimulate"
           >
-            시뮬레이션
+            {{ store.isSimulating ? '계산 중…' : '시뮬레이션' }}
             <span class="btn-badge">{{ store.pendingCount }}</span>
           </button>
           <button
             class="btn-wo"
             type="button"
-            :disabled="!canDispatch"
+            :disabled="store.isDispatching"
             @click="onDispatch"
           >
-            작업지시 생성
+            {{ store.isDispatching ? '생성 중…' : '작업지시 생성' }}
           </button>
         </div>
       </div>
