@@ -1,0 +1,274 @@
+# [Bàn giao] MES → APS: Đồng bộ đa ngôn ngữ qua iframe postMessage
+
+> Gửi team APS. Tài liệu này mô tả (1) MES đã làm gì, (2) APS cần làm gì để nhận và dùng dữ liệu ngôn ngữ.
+> Có thể dán trực tiếp làm prompt cho Claude Code / AI agent phía APS.
+
+---
+
+## 1. Bối cảnh
+
+APS (`https://aps-fe.gsystem.ai/aps`) được nhúng **bên trong TabManager của MES bằng iframe**, không mở tab trình duyệt mới.
+Người dùng đổi ngôn ngữ ở header của MES → APS phải **đổi ngôn ngữ theo, ngay lập tức, KHÔNG reload iframe**.
+
+Kênh giao tiếp: `window.postMessage` giữa MES (parent) và APS (iframe child).
+
+---
+
+## 2. MES đã làm gì (đã xong, đang chạy)
+
+### 2.1. Thêm query param vào src của iframe
+MES nạp APS bằng URL đã được gắn thêm 3 tham số:
+
+```
+https://aps-fe.gsystem.ai/aps?embed=1&lang=10121003&parentOrigin=https://mes-dev.gsystem.ai
+```
+
+| Param   | Ý nghĩa |
+|---------|---------|
+| `embed=1` | Báo cho APS biết đang chạy nhúng trong MES (dùng để ẩn header/nav riêng của APS nếu cần). |
+| `lang`    | Mã ngôn ngữ nội bộ của GSystem tại thời điểm mở tab (giá trị ban đầu). |
+| `parentOrigin` | Origin thật của MES đang nhúng (`window.location.origin`). **Có để APS không phải hardcode domain** — mỗi môi trường một domain khác nhau (`mes.gsystem.ai`, `mes-dev.gsystem.ai`, …). |
+
+**Lưu ý:** khi người dùng đổi ngôn ngữ, MES **cố tình KHÔNG đổi `src`** — nếu đổi thì iframe reload và APS mất hết trạng thái đang thao tác. Việc đổi ngôn ngữ chỉ đi qua postMessage.
+
+### 2.2. Handshake + broadcast qua postMessage
+
+```
+APS (iframe)                         MES (parent)
+     |                                    |
+     |  ── { type: 'APS_READY' } ──────►  |   (APS chủ động gửi khi đã mount xong)
+     |                                    |
+     |  ◄──── GSYSTEM_I18N_INIT ────────  |   (danh sách ngôn ngữ + ngôn ngữ hiện tại
+     |                                    |    + TOÀN BỘ từ điển dịch của mọi ngôn ngữ)
+     |                                    |
+     |         ... user đổi ngôn ngữ ở header MES ...
+     |                                    |
+     |  ◄──── GSYSTEM_I18N_CHANGE ──────  |   (mỗi lần đổi, MES đều gửi)
+```
+
+### 2.3. Định dạng dữ liệu MES gửi đi
+
+**A. `GSYSTEM_I18N_INIT`** — gửi 1 lần, ngay sau khi nhận `APS_READY`.
+Payload này chứa **toàn bộ bộ từ điển dịch (message pack) của tất cả ngôn ngữ**, không chỉ mã ngôn ngữ:
+
+```json
+{
+  "type": "GSYSTEM_I18N_INIT",
+  "version": 1,
+  "current": "10121003",
+  "languages": [
+    { "code": "10121001", "flag": "/img/flag_kr.png" },
+    { "code": "10121002", "flag": "/img/flag_us.png" },
+    { "code": "10121003", "flag": "/img/flag_vn.png" },
+    { "code": "10121004", "flag": "/img/flag_cn.png" },
+    { "code": "10121005", "flag": "/img/flag_ja.png" }
+  ],
+  "messages": {
+    "10121001": {
+      "sy_lb_multilingual": "다국어",
+      "sy_bt_save": "저장",
+      "...": "..."
+    },
+    "10121002": {
+      "sy_lb_multilingual": "Multilingual",
+      "sy_bt_save": "Save",
+      "...": "..."
+    },
+    "10121003": {
+      "sy_lb_multilingual": "Đa ngôn ngữ",
+      "sy_bt_save": "Lưu",
+      "...": "..."
+    }
+  }
+}
+```
+
+- `current`: mã ngôn ngữ đang được chọn.
+- `languages`: **chỉ những ngôn ngữ DB thực sự trả về** cho tenant/site đó — mảng này có thể ít hơn 5 phần tử, **đừng hardcode 5 ngôn ngữ**.
+- `messages`: **đây là phần quan trọng nhất.** Cấu trúc `{ mã ngôn ngữ: { msgCode: chuỗi đã dịch } }`, là bản dịch lấy từ DB GSystem (màn hình quản lý đa ngôn ngữ), giống hệt bộ mà MES đang dùng. Dict là **phẳng 1 cấp**, key là `msgCode` (vd `sy_lb_multilingual`), không lồng nhau.
+  - Chỉ chứa các ngôn ngữ có trong `languages`.
+  - APS **register cả bộ này 1 lần lúc INIT** → sau đó đổi ngôn ngữ là tức thời, không cần truyền lại gì.
+- `flag`: đường dẫn ảnh cờ **tương đối theo origin của MES**. Nếu APS muốn hiển thị, phải ghép: `https://<MES_ORIGIN>` + `flag`.
+
+> :warning: **Không dùng mã ISO (`ko`/`en`/`vi`…) ở bất kỳ đâu.** Định danh ngôn ngữ trong toàn hệ thống là **mã GSystem** (`10121001`…). APS phải dùng chính chuỗi mã này làm locale key, không convert sang ISO.
+
+**B. `GSYSTEM_I18N_CHANGE`** — gửi mỗi lần người dùng đổi ngôn ngữ:
+
+```json
+{
+  "type": "GSYSTEM_I18N_CHANGE",
+  "version": 1,
+  "current": "10121003"
+}
+```
+
+> **Message này KHÔNG chứa `messages`** — vì toàn bộ từ điển đã được gửi ở INIT rồi. APS chỉ cần đổi locale đang active sang `current`.
+
+### 2.4. Bảng ánh xạ mã ngôn ngữ
+
+| GSystem code | Ngôn ngữ |
+|--------------|----------|
+| 10121001 | 한국어 |
+| 10121002 | English |
+| 10121003 | Tiếng Việt |
+| 10121004 | 中文 |
+| 10121005 | 日本語 |
+
+Bảng này **chỉ để tham khảo khi hiển thị/debug**. Không hardcode danh sách này trong code — danh sách ngôn ngữ thực tế luôn lấy từ `languages` trong payload INIT.
+
+### 2.5. Bảo mật (MES đã áp dụng)
+- MES **không dùng `targetOrigin: '*'`**. Chỉ gửi tới origin khớp pattern whitelist — hiện là `https://*.gsystem.ai`, nên `aps-fe.gsystem.ai` và `aps-fe-dev.gsystem.ai` đều chạy được **mà không phải sửa code theo từng môi trường**.
+- MES **kiểm tra `event.origin`** bằng đúng pattern đó trước khi xử lý mọi message nhận được. Message từ origin lạ bị bỏ qua.
+- Wildcard `*` chỉ thay **một cấp subdomain**, nên `https://aps-fe.gsystem.ai.evil.com` bị chặn.
+- Nếu APS chạy dev ở địa chỉ ngoài `*.gsystem.ai` (vd `http://192.168.x.x:3000`) → **báo lại để MES thêm vào mảng pattern**, nếu không postMessage sẽ bị chặn khi test nội bộ.
+
+### 2.6. File liên quan phía MES
+| File | Vai trò |
+|------|---------|
+| `composables/i18nBridge.js` | Bảng map cờ theo mã ngôn ngữ, hàm build payload INIT / CHANGE, đọc message pack |
+| `components/IframeTab.vue` | Gắn `embed`/`lang`/`parentOrigin` vào src, lắng nghe `APS_READY`, gửi postMessage |
+| `components/Header.vue` | Đổi ngôn ngữ → phát event `gsystem:lang-change` |
+| `composables/embeddedExternalUrls.js` | Whitelist URL + pattern origin tin cậy + hàm `isTrustedOrigin()` |
+
+---
+
+## 3. APS CẦN LÀM GÌ
+
+### Bước 1 — Đọc query param lúc khởi động
+- `embed=1` → bật chế độ nhúng (ẩn header/menu/logo riêng của APS nếu thiết kế yêu cầu).
+- `lang=<code>` → set ngôn ngữ khởi tạo ngay, **không chờ postMessage**. Đây là fallback để tránh nháy ngôn ngữ sai lúc mới load.
+
+### Bước 2 — Xác định origin của MES (KHÔNG hardcode)
+
+Domain MES khác nhau theo môi trường (`mes.gsystem.ai`, `mes-dev.gsystem.ai`, staging, IP nội bộ…), nên **không được hardcode một origin cố định**. Cách làm:
+
+1. Lấy origin ứng viên từ param `parentOrigin` (MES đã truyền sẵn), fallback sang `document.referrer`.
+2. **Đối chiếu với pattern cho phép** — bước này mới là bảo mật thật, vì query param có thể bị giả mạo bởi site khác nhúng APS.
+
+```js
+// Chỉ 1 dòng config duy nhất, dùng chung cho mọi môi trường.
+// '*' thay thế ĐÚNG một cấp subdomain (không chứa dấu chấm).
+const MES_ORIGIN_PATTERNS = ['https://*.gsystem.ai'];
+
+function matchPattern(origin, pattern) {
+  const source = pattern
+    .split('*')
+    .map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^./]+');
+  return new RegExp(`^${source}$`).test(origin);
+}
+
+function isTrustedMesOrigin(origin) {
+  return !!origin && MES_ORIGIN_PATTERNS.some(p => matchPattern(origin, p));
+}
+
+function resolveMesOrigin() {
+  const fromParam = new URLSearchParams(location.search).get('parentOrigin');
+  let fromReferrer = '';
+  try { fromReferrer = document.referrer ? new URL(document.referrer).origin : ''; }
+  catch { /* ignore */ }
+
+  // Ưu tiên param, nhưng CHỈ dùng nếu qua được whitelist pattern.
+  return [fromParam, fromReferrer].find(isTrustedMesOrigin) || null;
+}
+```
+
+> Pattern `https://*.gsystem.ai` khớp `mes.gsystem.ai`, `mes-dev.gsystem.ai`, nhưng **chặn** `https://aps.gsystem.ai.evil.com` và `http://` (không TLS). Nếu môi trường dev dùng IP (`http://192.168.0.10:3000`) thì thêm nguyên chuỗi đó vào mảng — vẫn là config, không phải hardcode rải rác trong code.
+
+### Bước 3 — Gửi `APS_READY` lên parent
+Ngay sau khi app mount xong (i18n đã sẵn sàng nhận lệnh đổi ngôn ngữ):
+
+```js
+const MES_ORIGIN = resolveMesOrigin();
+
+if (window.parent !== window && MES_ORIGIN) {
+  window.parent.postMessage({ type: 'APS_READY' }, MES_ORIGIN);
+}
+```
+
+> **Bắt buộc:** MES chỉ gửi `GSYSTEM_I18N_INIT` **sau khi** nhận được `APS_READY`. Không gửi → không bao giờ nhận được từ điển đa ngôn ngữ.
+> :x: Không dùng `targetOrigin: '*'` kể cả khi dev — hãy thêm origin dev vào `MES_ORIGIN_PATTERNS`.
+
+### Bước 4 — Lắng nghe message từ MES
+
+```js
+window.addEventListener('message', (event) => {
+  if (!isTrustedMesOrigin(event.origin)) return;   // BẮT BUỘC kiểm tra origin
+
+  const data = event.data;
+  if (!data || typeof data !== 'object') return;
+
+  switch (data.type) {
+    case 'GSYSTEM_I18N_INIT':
+      registerMessages(data.messages);        // :star: nạp toàn bộ từ điển dịch từ MES
+      setAvailableLanguages(data.languages);  // dựng danh sách ngôn ngữ khả dụng
+      applyLanguage(data.current);            // áp dụng ngôn ngữ hiện tại
+      break;
+
+    case 'GSYSTEM_I18N_CHANGE':
+      applyLanguage(data.current);
+      break;
+  }
+});
+```
+
+### Bước 5 — Nạp từ điển dịch vào i18n của APS
+
+Đây là bước quan trọng nhất: MES gửi sang **nội dung bản dịch thật**, APS phải merge vào bộ message của mình.
+
+```js
+function registerMessages(messages) {
+  if (!messages) return;
+  Object.entries(messages).forEach(([code, dict]) => {
+    if (!dict) return;
+    // locale key = CHÍNH mã GSystem ('10121003'), không convert sang ISO.
+    // mergeLocaleMessage: GIỮ message sẵn có của APS, bổ sung/ghi đè bằng message từ MES.
+    // Nếu muốn message riêng của APS thắng, đảo thứ tự merge lại.
+    i18n.global.mergeLocaleMessage(code, dict);
+  });
+}
+```
+
+- Nếu APS **không dùng vue-i18n**: chỉ cần lưu `messages` vào store và tra cứu `messages[currentCode][msgCode]`.
+- Từ điển là **phẳng 1 cấp**, key có dấu `_` (vd `sy_lb_multilingual`) — **không phải** key lồng kiểu `sy.lb.multilingual`. Nếu i18n của APS bật `flatJson`/nested parsing, phải tắt hoặc escape để dấu `.` không bị hiểu nhầm (các key hiện tại dùng `_` nên thường không vấn đề).
+- Nếu APS đang có key trùng tên với MES nhưng nghĩa khác → cần chốt namespace với team MES trước.
+
+### Bước 6 — Áp dụng ngôn ngữ **không reload trang**
+
+```js
+function applyLanguage(code) {
+  if (!code) return;
+  const key = String(code);
+  // Chưa nạp được từ điển cho mã này → giữ nguyên ngôn ngữ hiện tại, không crash, không hiện key thô.
+  if (!i18n.global.availableLocales.includes(key)) return;
+  i18n.global.locale.value = key;  // ví dụ với vue-i18n
+}
+```
+
+**Yêu cầu bắt buộc:**
+- :x: **Không** `location.reload()`, không đổi `window.location` để đổi ngôn ngữ — sẽ mất trạng thái người dùng đang thao tác.
+- :white_check_mark: Đổi locale reactive tại chỗ. Nếu có text đã render từ API response, cần re-fetch hoặc re-render phần đó.
+
+### Bước 7 — Ẩn UI chọn ngôn ngữ của riêng APS khi `embed=1`
+Khi nhúng trong MES, ngôn ngữ do MES điều khiển. Nếu APS vẫn hiện dropdown ngôn ngữ riêng, người dùng sẽ thấy 2 nơi chọn ngôn ngữ mâu thuẫn nhau. → Ẩn nó ở chế độ embed.
+
+### Bước 8 — Cung cấp thông tin ngược lại cho team MES
+1. **Origin của APS ở mọi môi trường** (dev / staging / prod). Nếu đều nằm trong `*.gsystem.ai` thì MES không cần sửa gì; nếu có địa chỉ ngoài (IP nội bộ, localhost port) → báo để thêm vào pattern.
+2. **Pattern origin MES mà APS whitelist** — 2 bên chốt khớp nhau (hiện MES đề xuất `https://*.gsystem.ai` cho cả 2 chiều).
+3. Ngôn ngữ nào APS không hiển thị được thì fallback về mã nào (khuyến nghị: `10121001` — 한국어).
+4. **Danh sách `msgCode` mà APS cần** — nếu màn hình APS có nhãn chưa nằm trong bộ đa ngôn ngữ của GSystem, phải đăng ký thêm vào DB (màn hình quản lý đa ngôn ngữ) thì MES mới đẩy sang được.
+
+---
+
+## 4. Checklist nghiệm thu
+
+- [ ] Mở tab APS trong MES → APS hiển thị đúng ngôn ngữ đang chọn ở MES (từ param `lang`).
+- [ ] Nhận được `GSYSTEM_I18N_INIT` có `messages` khác rỗng; log `Object.keys(data.messages)` ra đúng danh sách mã ngôn ngữ.
+- [ ] Nhãn dùng `msgCode` của GSystem trong APS hiển thị đúng bản dịch (không hiện ra chuỗi key thô như `sy_lb_multilingual`).
+- [ ] DevTools console không có lỗi cross-origin / blocked postMessage.
+- [ ] Đổi ngôn ngữ ở header MES → chữ trong APS đổi ngay, **iframe không reload**, dữ liệu đang nhập không mất.
+- [ ] Đổi ngôn ngữ nhiều lần liên tiếp → luôn đúng, không lệch.
+- [ ] Trường hợp DB chỉ trả về 2–3 ngôn ngữ → APS hoạt động bình thường, không lỗi.
+- [ ] Gửi message giả từ origin lạ → APS bỏ qua, không đổi ngôn ngữ.
+- [ ] **Chạy được trên CẢ 2 môi trường (dev và prod) mà không phải sửa dòng code nào** — origin lấy từ `parentOrigin`/`document.referrer`, không hardcode.
+- [ ] Mở APS trực tiếp (không nhúng, không có `embed=1`) → vẫn chạy như cũ với UI chọn ngôn ngữ riêng.

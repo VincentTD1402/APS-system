@@ -8,6 +8,7 @@ import ConfirmationService from 'primevue/confirmationservice'
 import App from './App.vue'
 import { router } from './router/index.ts'
 import { i18n } from './i18n/index.ts'
+import { initMesBridge } from './services/mes-bridge.ts'
 
 import 'primeicons/primeicons.css'
 import 'primeflex/primeflex.css'
@@ -31,3 +32,5 @@ app.use(ToastService)
 app.use(ConfirmationService)
 
 app.mount('#app')
+
+initMesBridge()
