@@ -49,20 +49,36 @@ function resolveMesOrigin(): string | null {
 /** true khi APS đang chạy nhúng trong MES (`?embed=1`) — layout dùng để ẩn UI riêng. */
 export const isEmbedded = ref(false)
 
+// TODO(debug): log tạm để verify handshake với MES thật lần đầu — gỡ sau khi đã
+// xác nhận chạy đúng trên môi trường nhúng thật (xem docs/specs/mes-i18n-bridge-*).
+const DEBUG_TAG = '[mes-bridge]'
+
 function handleMessage(event: MessageEvent): void {
-  if (!isTrustedMesOrigin(event.origin)) return
+  if (!isTrustedMesOrigin(event.origin)) {
+    console.warn(DEBUG_TAG, 'message bỏ qua — origin không tin cậy:', event.origin)
+    return
+  }
   const data = event.data as GsystemI18nInit | GsystemI18nChange | undefined
   if (!data || typeof data !== 'object') return
 
   switch (data.type) {
     case 'GSYSTEM_I18N_INIT':
+      console.log(DEBUG_TAG, 'GSYSTEM_I18N_INIT nhận được:', {
+        current: data.current,
+        languages: data.languages,
+        messageCodes: data.messages ? Object.keys(data.messages) : [],
+      })
       registerAvailableLocales(data.languages?.map((l) => l.code))
       registerGsystemMessages(data.messages)
       applyLanguage(data.current)
+      console.log(DEBUG_TAG, 'đã applyLanguage sau INIT:', data.current)
       break
     case 'GSYSTEM_I18N_CHANGE':
+      console.log(DEBUG_TAG, 'GSYSTEM_I18N_CHANGE nhận được:', data.current)
       applyLanguage(data.current)
       break
+    default:
+      console.log(DEBUG_TAG, 'message type không xử lý:', data)
   }
 }
 
@@ -73,16 +89,39 @@ function handleMessage(event: MessageEvent): void {
 export function initMesBridge(): void {
   const params = new URLSearchParams(location.search)
   isEmbedded.value = params.get('embed') === '1'
+  console.log(DEBUG_TAG, 'init — embed:', isEmbedded.value, 'query:', location.search)
 
   const initialLang = params.get('lang')
-  if (initialLang) applyLanguage(initialLang)
+  if (initialLang) {
+    applyLanguage(initialLang)
+    console.log(DEBUG_TAG, 'applyLanguage từ query param lang:', initialLang)
+  }
 
-  if (!isEmbedded.value || window.parent === window) return
+  if (!isEmbedded.value) {
+    console.log(DEBUG_TAG, 'không ở embed mode — bỏ qua handshake với MES')
+    return
+  }
+  if (window.parent === window) {
+    console.warn(DEBUG_TAG, 'embed=1 nhưng không nằm trong iframe (window.parent === window)')
+    return
+  }
 
   const mesOrigin = resolveMesOrigin()
-  if (!mesOrigin) return
+  if (!mesOrigin) {
+    console.warn(
+      DEBUG_TAG,
+      'không xác định được MES origin tin cậy — parentOrigin param:',
+      params.get('parentOrigin'),
+      'referrer:',
+      document.referrer,
+      'patterns:',
+      MES_ORIGIN_PATTERNS,
+    )
+    return
+  }
 
   window.addEventListener('message', handleMessage)
   // MES chỉ gửi GSYSTEM_I18N_INIT SAU KHI nhận được APS_READY.
   window.parent.postMessage({ type: 'APS_READY' }, mesOrigin)
+  console.log(DEBUG_TAG, 'đã gửi APS_READY tới', mesOrigin)
 }
