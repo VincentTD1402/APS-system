@@ -44,3 +44,9 @@ export async function fetchMaterialShortages(): Promise<MaterialShortageRow[]> {
   const { data } = await http.get<MaterialShortageRow[]>('/material-shortage')
   return data
 }
+
+// Wipe + rewrite aps_material_shortage (required/available/shortage per component) —
+// /aps/adjust doesn't call this, so a post-purchase-request refresh needs it explicitly.
+export async function rebuildMaterialShortage(): Promise<void> {
+  await http.post('/material-shortage/rebuild')
+}

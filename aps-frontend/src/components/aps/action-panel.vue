@@ -14,7 +14,7 @@ const emit = defineEmits<{
   confirm: [payload: {
     rowKey: string
     mode: string
-    data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number }
+    data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number; itemNo?: string }
   }]
   cancel: []
 }>()
@@ -82,7 +82,7 @@ watch(
     if (!r) return
     if (mode.value === 'adjust' || mode.value === 'both') {
       dateStart.value = r.planStart
-      dateEnd.value   = r.deliveryDate
+      dateEnd.value   = r.planEnd
       memo.value      = ''
     }
     if (mode.value === 'shortage' || mode.value === 'both') {
@@ -96,8 +96,8 @@ function onConfirm() {
   if (!props.rowKey) return
   const data =
     mode.value === 'adjust'   ? { dateStart: dateStart.value, dateEnd: dateEnd.value, memo: memo.value } :
-    mode.value === 'shortage' ? { reqQty: reqQty.value } :
-    { dateStart: dateStart.value, dateEnd: dateEnd.value, memo: memo.value, reqQty: reqQty.value }
+    mode.value === 'shortage' ? { reqQty: reqQty.value, itemNo: materialInfo.value.materialName } :
+    { dateStart: dateStart.value, dateEnd: dateEnd.value, memo: memo.value, reqQty: reqQty.value, itemNo: materialInfo.value.materialName }
 
   emit('confirm', { rowKey: props.rowKey, mode: mode.value, data })
 }
@@ -106,7 +106,7 @@ function onCancel() {
   if (props.row) {
     if (mode.value === 'adjust' || mode.value === 'both') {
       dateStart.value = props.row.planStart
-      dateEnd.value   = props.row.deliveryDate
+      dateEnd.value   = props.row.planEnd
       memo.value      = ''
     }
     if (mode.value === 'shortage' || mode.value === 'both') {

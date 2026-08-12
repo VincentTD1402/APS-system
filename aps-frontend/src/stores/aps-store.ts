@@ -8,10 +8,12 @@ import {
 } from '@/data/mock-scheduler'
 import { useMasterStore } from '@/stores/master-store'
 import { runAps as fetchApsRun, adjustAps as fetchApsAdjust } from '@/api/aps'
-import { fetchMaterialShortages } from '@/api/master'
+import { fetchMaterialShortages, rebuildMaterialShortage } from '@/api/master'
+import { createPurchaseRequest, createWorkOrder } from '@/api/erp'
 import { fetchRiskSummary } from '@/api/llm'
 import type { RiskRecommendation } from '@/types/llm'
 import { toLoadCells, toWorkPlanRows } from '@/data/aps-run-adapter'
+import type { WorkPlan, LoadCell } from '@/types/planning'
 
 interface RunResult {
   workPlans: WorkPlanRow[]
@@ -19,8 +21,22 @@ interface RunResult {
   kpi: Kpi
 }
 
-/** Adjustment pending/applied cho 1 plan (일정조정 dialog) — cần cả 2 đầu window để gọi /aps/adjust. */
+/** Purchase request đang chờ 시뮬레이션 — chỉ được push (POST /erp/purchase-requests) 1 lần lúc simulate. */
+interface PendingPurchaseRequest {
+  itemNo: string
+  qty: number
+  note?: string
+}
+
+/** Adjustment pending cho 1 plan (일정조정/구매요청 dialog) — gộp cả 2 loại thay đổi 1 plan có thể có. */
 interface PlanAdjustment {
+  dateStart?: string
+  dateEnd?: string
+  purchaseRequest?: PendingPurchaseRequest
+}
+
+/** Adjustment đã simulate (persist qua reruns) — chỉ còn phần lịch, PR là one-shot nên không giữ lại. */
+interface AppliedAdjustment {
   dateStart: string
   dateEnd: string
 }
@@ -50,6 +66,7 @@ export const useApsStore = defineStore('aps', () => {
   const masterStore = useMasterStore()
   const isRunning = ref(false)
   const isSimulating = ref(false)
+  const isDispatching = ref(false)
   // hasData = false trước RUN → panels rỗng nhưng vẫn thấy cột date của range
   const hasData = ref(false)
   const runResult = ref<RunResult | null>(null)
@@ -73,7 +90,7 @@ export const useApsStore = defineStore('aps', () => {
   // Adjustments pending simulation (key = orderId = WorkPlan.id)
   const pendingAdjustments = ref<Map<string, PlanAdjustment>>(new Map())
   // Adjustments đã được apply sau simulation (persist qua reruns cho tới next RUN APS)
-  const appliedAdjustments = ref<Map<string, PlanAdjustment>>(new Map())
+  const appliedAdjustments = ref<Map<string, AppliedAdjustment>>(new Map())
 
   // AI제안 panel (GET /llm/work-plan-risk-summary)
   const aiSummary = ref<RiskRecommendation | null>(null)
@@ -191,6 +208,16 @@ export const useApsStore = defineStore('aps', () => {
     }
   }
 
+  /** Fetch material-shortage sau khi BE vừa rebuild (/aps/run|/aps/adjust) rồi remap vào runResult. */
+  async function applyAssembled(result: { workPlans: WorkPlan[]; loadCells: LoadCell[]; kpi: Kpi }): Promise<void> {
+    const shortages = await fetchMaterialShortages()
+    runResult.value = {
+      workPlans: toWorkPlanRows(result.workPlans, shortages),
+      loadCells: toLoadCells(result.loadCells),
+      kpi: result.kpi,
+    }
+  }
+
   async function runAps(): Promise<void> {
     isRunning.value = true
     // Reset interactive state — RUN là fresh, adjustments cũ bay hết
@@ -204,13 +231,7 @@ export const useApsStore = defineStore('aps', () => {
     aiError.value = null
     try {
       const result = await fetchApsRun()
-      // material-shortage được /aps/run rebuild trước khi assemble → fetch sau, không parallel.
-      const shortages = await fetchMaterialShortages()
-      runResult.value = {
-        workPlans: toWorkPlanRows(result.workPlans, shortages),
-        loadCells: toLoadCells(result.loadCells),
-        kpi: result.kpi,
-      }
+      await applyAssembled(result)
       hasData.value = true
     } finally {
       isRunning.value = false
@@ -237,23 +258,50 @@ export const useApsStore = defineStore('aps', () => {
     rowKey: string
     orderId: string
     mode: string
-    data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number }
+    data: { dateStart?: string; dateEnd?: string; memo?: string; reqQty?: number; itemNo?: string }
   }
 
+  /**
+   * Chỉ stage local (giống 일정조정) — CHƯA gọi API nào. Cả 2 loại thay đổi (lịch +
+   * purchase request) đều chờ tới lúc bấm 시뮬레이션 mới thật sự gửi lên BE. Nhờ vậy
+   * ✕ 취소 hoặc bấm lại "데이터 불러오기" trước khi simulate sẽ huỷ sạch, không để lại
+   * side-effect nào (không PR nào đã được tạo).
+   */
   function stageConfirm(payload: ConfirmPayload): void {
-    // Chỉ mode adjust / both mới đổi lịch backward (window [dateStart, dateEnd] mới).
-    // Mode shortage tạo purchase request, không đổi lịch → không thêm override.
+    const prev = pendingAdjustments.value.get(payload.orderId) ?? {}
+    const next: PlanAdjustment = { ...prev }
     if ((payload.mode === 'adjust' || payload.mode === 'both') && payload.data.dateStart && payload.data.dateEnd) {
-      pendingAdjustments.value = new Map([
-        ...pendingAdjustments.value,
-        [payload.orderId, { dateStart: payload.data.dateStart, dateEnd: payload.data.dateEnd }],
-      ])
+      next.dateStart = payload.data.dateStart
+      next.dateEnd = payload.data.dateEnd
     }
+    if ((payload.mode === 'shortage' || payload.mode === 'both') && payload.data.itemNo && payload.data.reqQty) {
+      next.purchaseRequest = { itemNo: payload.data.itemNo, qty: payload.data.reqQty, note: payload.data.memo }
+    }
+    pendingAdjustments.value = new Map([...pendingAdjustments.value, [payload.orderId, next]])
     confirmedRows.value = new Set([...confirmedRows.value, payload.rowKey])
   }
 
-  function dispatchWorkOrder(key: string): void {
-    dispatchedIds.value = new Set([...dispatchedIds.value, key])
+  /**
+   * POST /erp/work-orders thật — dispatch 1 planId (= WorkPlanRow.id), push G-System.
+   * Chỉ mark `dispatchedIds` (khoá nút, tô badge) khi push THÀNH CÔNG — push fail thì
+   * để nguyên, cho phép user bấm lại thay vì kẹt ở trạng thái "đã dispatch" giả.
+   */
+  async function dispatchWorkOrder(orderId: string, rowKey: string): Promise<{ pushed: boolean }> {
+    isDispatching.value = true
+    try {
+      const outbox = await createWorkOrder(orderId)
+      const pushed = outbox.status === 'PUSHED'
+      if (pushed) {
+        dispatchedIds.value = new Set([...dispatchedIds.value, rowKey])
+        // wo.status/work_order_no vừa đổi ở BE (PLANNED/tmp_plan_no → CONFIRMED/work_order_no
+        // thật) — reassemble để Work Plan List hiện đúng ngay, không cần RUN lại.
+        const result = await fetchApsAdjust(null, [])
+        await applyAssembled(result)
+      }
+      return { pushed }
+    } finally {
+      isDispatching.value = false
+    }
   }
 
   /**
@@ -275,38 +323,60 @@ export const useApsStore = defineStore('aps', () => {
   }
 
   /**
-   * Re-backward-fill (POST /aps/adjust) toàn bộ pending adjustments + adjustments đã
-   * apply trước đó. Sau sim: pending → applied, matrix + plans + KPI refresh.
+   * Thực thi TOÀN BỘ pending: push purchase request thật (1 lần/plan) rồi
+   * re-backward-fill (POST /aps/adjust) lịch. Sau sim: pending → applied, matrix +
+   * plans + KPI refresh.
+   *
+   * `purchaseRequestFailed`: true nếu có PR push G-System fail (row vẫn được lưu
+   * local nhưng available_qty chưa tăng tới khi retry) — view dùng để chọn toast.
    */
-  async function runSimulation(): Promise<void> {
-    if (!hasData.value) return
+  async function runSimulation(): Promise<{ purchaseRequestFailed: boolean }> {
+    if (!hasData.value) return { purchaseRequestFailed: false }
     isSimulating.value = true
+    // Working copy — mỗi PR gửi thành công (hoặc fail, vẫn đã gửi) bị strip khỏi đây
+    // ngay, để nếu 1 plan khác trong batch throw giữa chừng, catch dưới không gửi lại
+    // PR đã gửi rồi.
+    const remainingPending = new Map(pendingAdjustments.value)
+    let anyPrPushed = false
+    let purchaseRequestFailed = false
     try {
-      // Merge applied cũ + pending mới. Pending thắng nếu đụng key.
-      const merged = new Map<string, PlanAdjustment>(appliedAdjustments.value)
-      for (const [k, v] of pendingAdjustments.value) merged.set(k, v)
+      for (const [planId, adj] of pendingAdjustments.value) {
+        if (!adj.purchaseRequest) continue
+        const outbox = await createPurchaseRequest(planId, adj.purchaseRequest.note ?? '', [
+          { itemNo: adj.purchaseRequest.itemNo, qty: adj.purchaseRequest.qty },
+        ])
+        if (outbox.status === 'PUSHED') anyPrPushed = true
+        else purchaseRequestFailed = true
+        const { purchaseRequest: _pr, ...rest } = adj
+        remainingPending.set(planId, rest)
+      }
+      if (anyPrPushed) await rebuildMaterialShortage()
+
+      // Merge applied cũ + phần lịch còn lại của pending. Pending thắng nếu đụng key.
+      const merged = new Map<string, AppliedAdjustment>(appliedAdjustments.value)
+      for (const [k, v] of remainingPending) {
+        if (v.dateStart && v.dateEnd) merged.set(k, { dateStart: v.dateStart, dateEnd: v.dateEnd })
+      }
       const adjustments = Array.from(merged, ([planId, a]) => ({
         planId,
         newStart: a.dateStart,
         newEnd: a.dateEnd,
       }))
       const result = await fetchApsAdjust(null, adjustments)
-      // material-shortage được /aps/adjust rebuild trước khi assemble → fetch sau.
-      const shortages = await fetchMaterialShortages()
-      runResult.value = {
-        workPlans: toWorkPlanRows(result.workPlans, shortages),
-        loadCells: toLoadCells(result.loadCells),
-        kpi: result.kpi,
-      }
+      await applyAssembled(result)
       appliedAdjustments.value = merged
       pendingAdjustments.value = new Map()
       // Adjustments đã simulate xong → user có thể muốn re-confirm cho phần khác.
       // Giữ confirmedRows để 작업지시 생성 vẫn enable cho row đã confirm.
+    } catch (err) {
+      pendingAdjustments.value = remainingPending
+      throw err
     } finally {
       isSimulating.value = false
     }
     // /aps/adjust vừa re-backward-fill aps_daily_plan → phân tích cũ đã lỗi thời.
     void loadAiSummary()
+    return { purchaseRequestFailed }
   }
 
   const pendingCount = computed(() => pendingAdjustments.value.size)
@@ -314,6 +384,7 @@ export const useApsStore = defineStore('aps', () => {
   return {
     isRunning,
     isSimulating,
+    isDispatching,
     hasData,
     filter,
     cellSelection,
