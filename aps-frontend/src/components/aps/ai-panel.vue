@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
 
 const store = useApsStore()
+const { t } = useI18n()
 
 const facts = computed(() => store.aiSummary?.facts ?? null)
 const narrative = computed(() => store.aiSummary?.narrative ?? null)
@@ -41,12 +43,12 @@ const showStale = computed(() => Boolean(store.aiError) && Boolean(store.aiSumma
   <div class="ai-panel area-ai">
     <div class="ai-header">
       <svg class="ic-bulb" aria-hidden="true"><use href="#ic-bulb"/></svg>
-      AI제안
+      {{ t('aiPanel.header') }}
     </div>
     <div class="ai-body">
       <!-- Nothing loaded yet: this panel is driven by RUN APS. -->
       <div v-if="!store.hasData" class="ai-content ai-placeholder">
-        데이터를 불러오면 리스크 분석이 표시됩니다.
+        {{ t('aiPanel.placeholder') }}
       </div>
 
       <div v-else-if="store.aiLoading && !store.aiSummary" class="ai-content" aria-busy="true">
@@ -60,34 +62,33 @@ const showStale = computed(() => Boolean(store.aiError) && Boolean(store.aiSumma
       </div>
 
       <div v-else-if="store.aiError && !store.aiSummary" class="ai-content ai-error">
-        <p>AI 분석을 불러오지 못했습니다.</p>
-        <button type="button" class="ai-retry" @click="store.loadAiSummary()">다시 시도</button>
+        <p>{{ t('aiPanel.errorMsg') }}</p>
+        <button type="button" class="ai-retry" @click="store.loadAiSummary()">{{ t('aiPanel.retry') }}</button>
       </div>
 
       <div v-else-if="facts && narrative" class="ai-content">
-        <div class="ai-doc-title">계획 리스크 및 권고 사항</div>
-        <p v-if="showStale" class="ai-stale">※ 최신 분석을 불러오지 못해 이전 결과를 표시합니다.</p>
+        <div class="ai-doc-title">{{ t('aiPanel.docTitle') }}</div>
+        <p v-if="showStale" class="ai-stale">{{ t('aiPanel.stale') }}</p>
 
-        <p class="ai-num"><b>1. 영향(Impact)의 근본 원인</b></p>
+        <p class="ai-num"><b>{{ t('aiPanel.section1') }}</b></p>
         <p>
           <span class="ai-sev" :class="severityClass">[{{ facts.severity }}]</span>
           {{ rootCauseText }}
         </p>
 
-        <p class="ai-num"><b>2. 영향받는 오더 및 작업장(WO) 및 심각도</b></p>
+        <p class="ai-num"><b>{{ t('aiPanel.section2') }}</b></p>
         <!-- Figures come from `facts`; the prose below only describes them. -->
-        <p v-if="facts.workcenters.length">영향받는 작업장: {{ workcenterList }}</p>
-        <p>영향받는 오더: 총 {{ facts.affected.count }}개의 작업이 영향을 받고 있습니다.</p>
-        <p>심각도: {{ facts.severity }} (긴급도: {{ facts.urgency }})</p>
+        <p v-if="facts.workcenters.length">{{ t('aiPanel.affectedWc', { list: workcenterList }) }}</p>
+        <p>{{ t('aiPanel.affectedOrder', { count: facts.affected.count }) }}</p>
+        <p>{{ t('aiPanel.severityLine', { severity: facts.severity, urgency: facts.urgency }) }}</p>
         <p v-for="s in facts.shortages" :key="`${s.parentItemNo}-${s.itemNo}`">
-          자재 부족: {{ s.itemName ?? s.itemNo }} — 현재고 {{ fmt(s.availableQty) }},
-          부족수량 {{ fmt(s.shortageQty) }}
+          {{ t('aiPanel.materialShort', { name: s.itemName ?? s.itemNo, onHand: fmt(s.availableQty), shortage: fmt(s.shortageQty) }) }}
         </p>
         <p>{{ narrative.impactSummary }}</p>
 
-        <p class="ai-num"><b>3. 해결 및 완화 권고</b></p>
+        <p class="ai-num"><b>{{ t('aiPanel.section3') }}</b></p>
         <p v-for="r in narrative.recommendations" :key="r.priority">
-          우선순위 {{ r.priority }}: {{ r.text }}
+          {{ t('aiPanel.priorityLine', { priority: r.priority, text: r.text }) }}
         </p>
       </div>
     </div>

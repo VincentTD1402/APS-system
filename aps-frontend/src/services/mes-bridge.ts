@@ -62,17 +62,25 @@ function handleMessage(event: MessageEvent): void {
   if (!data || typeof data !== 'object') return
 
   switch (data.type) {
-    case 'GSYSTEM_I18N_INIT':
-      console.log(DEBUG_TAG, 'GSYSTEM_I18N_INIT nhận được:', {
-        current: data.current,
-        languages: data.languages,
-        messageCodes: data.messages ? Object.keys(data.messages) : [],
-      })
+    case 'GSYSTEM_I18N_INIT': {
+      // Log RAW event.data trước (JSON round-trip để có snapshot tĩnh, tránh console
+      // lười — object reference có thể bị code khác mutate trước khi mình mở ra xem)
+      // — không dựng lại object tóm tắt, để thấy đúng type/version MES gửi thật.
+      console.log(DEBUG_TAG, 'INIT raw:', JSON.parse(JSON.stringify(data)))
+      const firstLangCode = data.languages?.[0]?.code
+      if (firstLangCode && data.messages?.[firstLangCode]) {
+        const dict = data.messages[firstLangCode]
+        console.log(DEBUG_TAG, `số msgCode (${firstLangCode}):`, Object.keys(dict).length)
+        console.log(DEBUG_TAG, 'mẫu 5 msgCode đầu:', Object.entries(dict).slice(0, 5))
+      } else {
+        console.warn(DEBUG_TAG, 'data.messages rỗng hoặc thiếu mã ngôn ngữ đầu tiên:', data.messages)
+      }
       registerAvailableLocales(data.languages?.map((l) => l.code))
       registerGsystemMessages(data.messages)
       applyLanguage(data.current)
       console.log(DEBUG_TAG, 'đã applyLanguage sau INIT:', data.current)
       break
+    }
     case 'GSYSTEM_I18N_CHANGE':
       console.log(DEBUG_TAG, 'GSYSTEM_I18N_CHANGE nhận được:', data.current)
       applyLanguage(data.current)

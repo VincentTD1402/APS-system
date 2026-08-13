@@ -1,21 +1,24 @@
 <script setup lang="ts">
 // Badge 3-state cho 1 row đã 확인: 대기중 (chưa sim) / 해결됨 (sim + risk hết) / 미해결 (sim + risk còn).
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   state: 'pending' | 'solved' | 'unresolved' | null | undefined
 }
 const props = defineProps<Props>()
 
-const LABEL: Record<'pending' | 'solved' | 'unresolved', string> = {
-  pending: '대기중',
-  solved: '해결됨',
-  unresolved: '미해결',
+const { t } = useI18n()
+
+const LABEL_KEY: Record<'pending' | 'solved' | 'unresolved', string> = {
+  pending: 'badge.pending',
+  solved: 'badge.solved',
+  unresolved: 'badge.unresolved',
 }
 </script>
 
 <template>
   <span v-if="props.state" :class="['badge-tag', `badge-${props.state}`]">
-    {{ LABEL[props.state] }}
+    {{ t(LABEL_KEY[props.state]) }}
   </span>
 </template>
 

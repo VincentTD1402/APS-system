@@ -1,0 +1,255 @@
+{
+  "app": {
+    "title": "APS系统",
+    "language": "语言"
+  },
+  "nav": {
+    "aps": "APS作业计划",
+    "masters": "主数据",
+    "workCenters": "工作中心 / 设备",
+    "items": "品项 / 工艺路线",
+    "bom": "BOM",
+    "inventory": "库存",
+    "mps": "生产计划 (MPS)"
+  },
+  "common": {
+    "run": "运行APS",
+    "apply": "应用 (Apply)",
+    "showAll": "查看全部",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "close": "关闭",
+    "detail": "详情",
+    "all": "全部",
+    "select": "选择",
+    "search": "搜索",
+    "loading": "加载中...",
+    "noData": "无数据",
+    "invalidDateRange": "结束日期不能早于开始日期"
+  },
+  "filter": {
+    "dateRange": "期间",
+    "completionFrom": "生产完成日 (开始)",
+    "completionTo": "生产完成日 (结束)",
+    "workCenter": "工作中心",
+    "item": "品项",
+    "risk": "风险"
+  },
+  "filterBar": {
+    "businessUnit": "事业部",
+    "planType": "计划类型",
+    "requestDate": "请求日期",
+    "apsDocNo": "APS单据编号",
+    "rev": "Rev.",
+    "status": "处理状态",
+    "owner": "负责人",
+    "dept": "部门"
+  },
+  "kpi": {
+    "onTime": "按期交货率",
+    "materialShort": "投入物料短缺",
+    "overloadWc": "工作中心超负荷",
+    "planRisk": "预期计划风险",
+    "unitPct": "%",
+    "unitCase": "件",
+    "unitWc": "%WC"
+  },
+  "loadMatrix": {
+    "title": "负荷明细",
+    "subtitle": "工作中心 × 日期",
+    "legend": {
+      "normal": "正常",
+      "materialShort": "物料短缺",
+      "overload": "超负荷",
+      "both": "物料短缺+超负荷",
+      "empty": "未分配"
+    },
+    "col": {
+      "wc": "工作中心",
+      "count": "指示件数",
+      "qtySum": "指示总量"
+    },
+    "total": "合计"
+  },
+  "matrix": {
+    "aggregate": "WC汇总",
+    "detail": "计划明细"
+  },
+  "planMatrix": {
+    "title": "按计划的负荷明细",
+    "subtitle": "每行 = 1个计划 · 单元格数值 = 每日生产数量",
+    "col": {
+      "wc": "WC",
+      "item": "品项",
+      "qty": "计划数量"
+    }
+  },
+  "workPlanList": {
+    "title": "作业计划列表",
+    "subtitle": "共 {total}件 · 风险 {risk}件 · 延迟 {delay}件",
+    "unit": "件",
+    "col": {
+      "workOrderNo": "作业指示编号",
+      "tmpPlanNo": "(临时)作业计划编号",
+      "orderNo": "订单",
+      "item": "品项",
+      "wc": "工作中心",
+      "process": "工序",
+      "planQty": "计划数量",
+      "planStart": "计划开始",
+      "planEnd": "计划完成",
+      "deliveryDate": "交货日期",
+      "sourceType": "来源类型",
+      "riskType": "风险类型",
+      "action": "操作"
+    }
+  },
+  "risk": {
+    "normal": "正常",
+    "materialShort": "物料短缺",
+    "overload": "超负荷",
+    "both": "物料短缺+超负荷"
+  },
+  "detail": {
+    "title": "按类型详情",
+    "selectPlan": "请从左侧列表中选择一个计划",
+    "purchaseRequest": "采购请求",
+    "purchaseRequestDone": "已采购请求",
+    "cancelPurchaseRequest": "取消采购请求",
+    "scheduleAdjust": "日程调整",
+    "scheduleAdjustDone": "已调整日程",
+    "cancelScheduleAdjust": "取消日程调整",
+    "createWorkOrder": "创建作业指示",
+    "adjustedBadge": "已应用调整",
+    "info": {
+      "item": "品项",
+      "wc": "工作中心",
+      "planQty": "计划数量",
+      "delivery": "交货日期",
+      "start": "开始",
+      "end": "结束",
+      "source": "来源"
+    },
+    "source": {
+      "workOrder": "作业指示",
+      "mps": "MPS"
+    }
+  },
+  "actionPanel": {
+    "header": "Action",
+    "titleBoth": "日程调整+采购请求",
+    "selectRow": "请选择一行",
+    "materialName": "物料名称",
+    "onHand": "当前库存",
+    "shortageQty": "短缺数量",
+    "requestQty": "请求数量",
+    "memoPlaceholder": "请输入备注"
+  },
+  "badge": {
+    "pending": "待处理",
+    "solved": "已解决",
+    "unresolved": "未解决"
+  },
+  "dialog": {
+    "purchase": {
+      "title": "采购请求",
+      "shortageQty": "短缺数量",
+      "onHandQty": "当前库存",
+      "requestQty": "请求数量",
+      "note": "备注",
+      "stagedNote": "已临时保存 — 仅在为该计划创建作业指示时才会发送。",
+      "noShortage": "该产品没有短缺的物料。"
+    },
+    "adjust": {
+      "title": "日程调整",
+      "newStart": "新开始日期",
+      "newEnd": "新结束日期",
+      "note": "保存后请点击Apply按钮以反映到矩阵中。"
+    },
+    "dispatch": {
+      "title": "创建生产指示",
+      "noPlans": "没有可创建生产指示的计划。",
+      "confirmHeader": "确认创建生产指示",
+      "confirmMessage": "发送后将创建生产指示，且无法再修改。请确认。"
+    }
+  },
+  "master": {
+    "wc": {
+      "code": "代码",
+      "name": "名称",
+      "defaultRuntime": "默认运行时间(分钟)",
+      "totalRuntime": "总运行时间(分钟)",
+      "equipmentCount": "设备数量"
+    },
+    "equipment": {
+      "code": "设备代码",
+      "stRate": "ST换算率",
+      "runtime": "运行时间(分钟)"
+    },
+    "item": {
+      "code": "品项代码",
+      "name": "名称",
+      "uom": "单位"
+    },
+    "routing": {
+      "step": "工序步骤",
+      "wc": "工作中心",
+      "process": "工序",
+      "standardSt": "标准S/T(分钟)"
+    },
+    "bom": {
+      "parent": "上级品项",
+      "child": "下级品项",
+      "qtyPer": "用量"
+    },
+    "inventory": {
+      "warehouse": "仓库",
+      "onHand": "库存量",
+      "asOf": "基准日期"
+    }
+  },
+  "mps": {
+    "list": "MPS列表",
+    "add": "添加",
+    "orderNo": "订单编号",
+    "endDate": "结束日期",
+    "status": "状态",
+    "statusDraft": "已编制"
+  },
+  "aiPanel": {
+    "header": "AI建议",
+    "placeholder": "加载数据后将显示风险分析。",
+    "errorMsg": "无法加载AI分析。",
+    "retry": "重试",
+    "docTitle": "计划风险及建议事项",
+    "stale": "※ 无法加载最新分析，显示之前的结果。",
+    "section1": "1. 影响(Impact)的根本原因",
+    "section2": "2. 受影响的订单及工作中心(WO)及严重程度",
+    "affectedWc": "受影响的工作中心: {list}",
+    "affectedOrder": "受影响的订单: 共{count}个作业受到影响。",
+    "severityLine": "严重程度: {severity} (紧急度: {urgency})",
+    "materialShort": "物料短缺: {name} — 当前库存 {onHand}，短缺数量 {shortage}",
+    "section3": "3. 解决及缓解建议",
+    "priorityLine": "优先级 {priority}: {text}"
+  },
+  "apsView": {
+    "runIdle": "▶ 加载数据",
+    "runLoading": "加载中…",
+    "simIdle": "模拟",
+    "simLoading": "计算中…",
+    "dispatchLoading": "创建中…",
+    "toastConfirmSaved": "已保存 · 等待模拟",
+    "toastCancelled": "已取消",
+    "toastRunFailed": "加载数据失败 · 请重试",
+    "toastSimDone": "模拟完成 · 已重新计算日程",
+    "toastSimPrFailed": "模拟完成 · 部分采购请求发送失败(需重试)",
+    "toastSimFailed": "模拟失败 · 请重试",
+    "toastNeedRun": "请先加载数据",
+    "toastDispatchDone": "已创建作业指示",
+    "toastDispatchFailed": "创建作业指示失败 · G-System发送失败(需重试)",
+    "toastDispatchError": "创建作业指示失败 · 请重试",
+    "toastNeedSelect": "请先选择一个计划",
+    "toastAlreadyDispatched": "该计划已创建作业指示"
+  }
+}

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDragScroll } from '@/composables/use-drag-scroll'
 import { useApsStore } from '@/stores/aps-store'
 import BadgeTag from '@/components/aps/badge-tag.vue'
 import type { WorkPlanRow, RiskKind } from '@/data/mock-scheduler'
 
 const store = useApsStore()
+const { t } = useI18n()
 
 const emit = defineEmits<{
   select: [row: WorkPlanRow, key: string]
@@ -32,10 +34,10 @@ interface Chip { code: string; label: string }
 function riskChip(rt: RiskKind[]): Chip {
   const hasOver = rt.includes('overload')
   const hasShort = rt.includes('material_short')
-  if (hasOver && hasShort) return { code: 'both', label: '자재부족+부하초과' }
-  if (hasOver) return { code: 'overload', label: '부하초과' }
-  if (hasShort) return { code: 'shortage', label: '자재부족' }
-  return { code: 'normal', label: '정상' }
+  if (hasOver && hasShort) return { code: 'both', label: t('risk.both') }
+  if (hasOver) return { code: 'overload', label: t('risk.overload') }
+  if (hasShort) return { code: 'shortage', label: t('risk.materialShort') }
+  return { code: 'normal', label: t('risk.normal') }
 }
 
 // ── Custom vertical scrollbar ─────────────────────────────────────────────────
@@ -74,10 +76,10 @@ const rows = computed(() => store.filteredWp)
     <div class="wp-header">
       <div class="wp-title">
         <svg class="ic-list" aria-hidden="true"><use href="#ic-list"/></svg>
-        작업계획 리스트
+        {{ t('workPlanList.title') }}
       </div>
     </div>
-    <div class="wp-subheader"><b>{{ rows.length }}</b> 건</div>
+    <div class="wp-subheader"><b>{{ rows.length }}</b> {{ t('workPlanList.unit') }}</div>
     <div class="wp-body">
       <div class="wp-scroll-inner" ref="scrollInner">
         <table class="wp-table">
@@ -86,18 +88,18 @@ const rows = computed(() => store.filteredWp)
               <th class="col-gear">
                 <svg class="ic-gear" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><use href="#ic-gear"/></svg>
               </th>
-              <th>작업지시번호</th>
-              <th>(임시)작업계획번호</th>
-              <th class="col-num">오더</th>
-              <th>품목</th>
-              <th>워크센터</th>
-              <th>공정</th>
-              <th class="col-num">계획수량</th>
-              <th>계획시작</th>
-              <th>계획완료</th>
-              <th>납기일자</th>
-              <th>리스트유형</th>
-              <th>리스크유형</th>
+              <th>{{ t('workPlanList.col.workOrderNo') }}</th>
+              <th>{{ t('workPlanList.col.tmpPlanNo') }}</th>
+              <th class="col-num">{{ t('workPlanList.col.orderNo') }}</th>
+              <th>{{ t('workPlanList.col.item') }}</th>
+              <th>{{ t('workPlanList.col.wc') }}</th>
+              <th>{{ t('workPlanList.col.process') }}</th>
+              <th class="col-num">{{ t('workPlanList.col.planQty') }}</th>
+              <th>{{ t('workPlanList.col.planStart') }}</th>
+              <th>{{ t('workPlanList.col.planEnd') }}</th>
+              <th>{{ t('workPlanList.col.deliveryDate') }}</th>
+              <th>{{ t('workPlanList.col.sourceType') }}</th>
+              <th>{{ t('workPlanList.col.riskType') }}</th>
             </tr>
           </thead>
           <tbody>

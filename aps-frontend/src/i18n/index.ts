@@ -1,11 +1,15 @@
 import { createI18n } from 'vue-i18n'
 import ko from './ko.json'
 import vi from './vi.json'
+import en from './en.json'
+import zh from './zh.json'
 
 // Khoá locale = mã ngôn ngữ GSystem (không dùng ISO 'ko'/'vi') — theo giao thức
 // postMessage với MES (docs/# [Bàn giao] MES → APS Đồng bộ đa ngôn ngữ qua iframe
-// postMessage.txt). ko.json/vi.json vẫn là bộ nhãn RIÊNG của APS (nav, common...),
-// đăng ký sẵn dưới đúng mã GSystem tương ứng để 2 hệ dùng chung 1 khoá.
+// postMessage.txt). ko/vi/en/zh.json vẫn là bộ nhãn RIÊNG của APS (nav, common...),
+// đăng ký sẵn dưới đúng mã GSystem tương ứng để 2 hệ dùng chung 1 khoá — đồng thời
+// làm fallback tự có nếu MES chưa gửi msgCode tương ứng (ja chưa có dict riêng,
+// dùng nguyên FALLBACK_LOCALE cho tới khi MES gửi hoặc APS tự dịch thêm).
 export const GSYSTEM_LOCALE = {
   KO: '10121001',
   EN: '10121002',
@@ -38,6 +42,8 @@ export const i18n = createI18n({
   messages: {
     [GSYSTEM_LOCALE.KO]: ko,
     [GSYSTEM_LOCALE.VI]: vi,
+    [GSYSTEM_LOCALE.EN]: en,
+    [GSYSTEM_LOCALE.ZH]: zh,
   },
 })
 

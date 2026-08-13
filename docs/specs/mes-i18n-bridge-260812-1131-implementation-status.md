@@ -51,33 +51,79 @@ không. Nếu vẫn `embed: false` sau fix này → nghĩa là MES thực sự k
 tra `src` của iframe/tab thật đang set (xem DOM `<iframe>`/tab config, không chỉ tin
 vào log `[TabManager]` vì log đó có thể đã bỏ query khi hiển thị).
 
+## Handshake xác nhận OK (260812, sau fix query-stripping)
+
+User xác nhận "đã làm được rồi" — MES load APS đúng `embed=1`, `mes-bridge` gửi
+`APS_READY` và nhận `GSYSTEM_I18N_INIT`/`CHANGE` thành công. Handshake postMessage
+coi như xong, không còn mở.
+
+## Wiring toàn bộ màn hình chính vào i18n + đăng ký msgCode (260813)
+
+Phát hiện lúc làm: **chỉ 5 view Masters/MPS gọi `t()` thật** (`work-center-list-view`,
+`item-list-view`, `bom-view`, `inventory-view`, `mps-list-view`, ~30 key). Màn hình
+작업계획 chính (Action Panel, Work Plan List, Load Matrix, KPI Row, Filter Bar, AI
+Panel, `aps-work-plan-view`) **hardcode chữ Hàn thẳng trong template**, không gọi
+`t()` ở đâu — nên trước đây dù MES đổi ngôn ngữ, màn hình chính vẫn luôn tiếng Hàn.
+
+**Đã làm:**
+- Bổ sung `ko.json`/`vi.json` với toàn bộ key màn hình chính còn thiếu
+  (`filterBar.*`, `loadMatrix.col.*`/`total`, `actionPanel.*`, `aiPanel.*`,
+  `apsView.*` — toast/nút RUN/시뮬레이션/작업지시 생성, `badge.*`), sửa vài chỗ
+  wording lệch giữa JSON cũ và text đang hiển thị thật (kpi.overloadWc/planRisk).
+  Tổng **185 leaf key**, khớp 1:1 giữa 4 ngôn ngữ.
+- **Tạo mới `en.json`/`zh.json`** (dịch đầy đủ 185 key) — APS giờ tự có fallback
+  EN/ZH ngay cả khi MES chưa gửi msgCode tương ứng, không chỉ phụ thuộc MES.
+  Đăng ký cả 4 vào `i18n/index.ts` (`GSYSTEM_LOCALE.KO/VI/EN/ZH`).
+- Wire `t()` vào toàn bộ: `filter-bar.vue`, `load-matrix.vue`, `kpi-row.vue`,
+  `work-plan-list.vue`, `action-panel.vue`, `badge-tag.vue`, `ai-panel.vue` (phần
+  static — xem giới hạn dưới), `aps-work-plan-view.vue` (title, 3 nút, toàn bộ toast).
+- Build + `vue-tsc --noEmit` pass.
+
+**Giới hạn đã biết — KHÔNG dịch được (out of scope, không phải bug):**
+- `ai-panel.vue`: `narrative.impactSummary`, `narrative.recommendations[].text`,
+  `rootCauseText` là **văn xuôi do LLM sinh ra** (backend RiskDetailService), không
+  phải static key — muốn dịch phải prompt LLM sinh bằng ngôn ngữ đích, việc khác hẳn,
+  chưa làm.
+- `work-plan-list.vue`/`load-matrix.vue`: giá trị data thật (`itemName`,
+  `workcenterName`, `procName`, `sourceType`...) lấy từ G-System, không phải label
+  tĩnh — muốn đa ngôn ngữ phải qua multilingual field của item/workcenter trong
+  G-System, không phải việc của `ko.json`/`vi.json`.
+
+**Bảng đăng ký msgCode cho GSystem admin:**
+`docs/specs/aps-msgcode-register-260813.csv` — 740 dòng (185 key × 4 ngôn ngữ:
+한국어/영어/베트남어/중국어), cột `Module Category` để cứng `APS` (bạn xác nhận
+"giữ nguyên" — hiểu là tự chọn/tạo giá trị đúng khi nhập vào GSystem admin, KHÔNG
+lấy nguyên "AI챗봇" trong ảnh ví dụ; đổi lại cột này trong CSV nếu team GSystem cho
+biết giá trị/khoá khác). `Message Category` để cứng `라벨` theo đúng ảnh ví dụ —
+một số dòng thực ra là **toast/thông báo động có `{placeholder}`** (`apsView.toast*`,
+`aiPanel.*Line`) không hẳn là "label" tĩnh, kiểm tra xem GSystem có category riêng
+cho message/thông báo không, đổi lại nếu cần. `Message Code` = `aps_` + key JSON
+(thay `.` bằng `_`), cột cuối `Source Key` chỉ để đối chiếu, không nhập vào GSystem.
+**740 dòng nhập tay là rất nhiều** — hỏi GSystem admin có hỗ trợ import CSV/Excel
+bulk không, đừng nhập tay từng dòng nếu tránh được.
+
 ## Tồn đọng — cần làm tiếp
 
-1. **Re-test sau fix query-stripping** (xem mục ngay trên) — ưu tiên cao nhất, chưa
-   biết còn lỗi khác phía sau (INIT/CHANGE) hay không vì chưa từng tới được đó.
-2. **Domain dev cụ thể** — nếu APS test qua `localhost`/IP nội bộ (ngoài `*.gsystem.ai`),
-   cần thêm origin đó vào `MES_ORIGIN_PATTERNS` trong `mes-bridge.ts` (dòng comment
-   đã ghi rõ chỗ sửa). Hiện để đúng 1 dòng theo tài liệu, chưa thêm gì thêm.
-3. **`isEmbedded` chưa được dùng ở UI** — layout hiện tại (`default-layout.vue`)
+1. **Nhập 740 dòng vào GSystem admin** (hoặc bulk import) — chưa làm, đây là thao
+   tác tay/ngoài code.
+2. **Xác nhận lại `Module Category` giá trị đúng** trước khi nhập — xem mục ngay
+   trên, tôi để `APS` làm placeholder trong CSV, chưa được GSystem admin xác nhận.
+3. **`ja.json` (일본어) chưa có** — GSYSTEM_LOCALE.JA chưa có dict riêng của APS,
+   vẫn fallback về `10121001` (Korean) nếu MES chọn tiếng Nhật. Không nằm trong ảnh
+   ví dụ (chỉ có 4 ngôn ngữ: 한국어/영어/베트남어/중국어) nên tạm bỏ qua, làm sau
+   nếu cần.
+4. **`isEmbedded` chưa được dùng ở UI** — layout hiện tại (`default-layout.vue`)
    không có header/nav/dropdown ngôn ngữ nào để ẩn khi `embed=1` (đã kiểm tra, chưa
    tồn tại). Nếu sau này thêm UI chọn ngôn ngữ riêng cho APS, phải bọc bằng
    `v-if="!isEmbedded"` (import từ `@/services/mes-bridge`).
-4. **msgCode riêng của APS chưa đăng ký vào DB GSystem** — nhãn của APS
-   (`nav.aps`, `common.*`, các label khác trong `ko.json`/`vi.json`) chỉ đổi theo
-   MES khi mã là `10121001`(KO)/`10121003`(VI) — vì đó là 2 dict APS tự có. Với
-   `10121002`(EN)/`10121004`(ZH)/`10121005`(JA), APS chỉ có đúng những gì MES gửi
-   qua `GSYSTEM_I18N_INIT.messages`; nhãn riêng của APS không nằm trong bộ đó sẽ
-   fallback về `10121001` (Korean, theo `FALLBACK_LOCALE`) — hiện KHÔNG fallback về
-   tiếng Việt. Nếu cần APS hiển thị đủ EN/ZH/JA cho cả nhãn riêng, phải: (a) tự dịch
-   thêm `en.json`/`zh.json`/`ja.json`, hoặc (b) đăng ký các msgCode đó vào DB
-   GSystem để MES gửi sang — chưa chốt với team MES việc này (mục 8.4 trong tài
-   liệu bàn giao).
-5. **Chưa báo ngược cho team MES** (mục 8 trong tài liệu bàn giao):
+5. **Domain dev cụ thể** — nếu APS test qua `localhost`/IP nội bộ (ngoài `*.gsystem.ai`),
+   cần thêm origin đó vào `MES_ORIGIN_PATTERNS` trong `mes-bridge.ts`.
+6. **Chưa báo ngược cho team MES** (mục 8 trong tài liệu bàn giao):
    - Origin thật của APS ở dev/staging/prod.
    - Xác nhận pattern `https://*.gsystem.ai` đủ dùng 2 chiều.
-   - Ngôn ngữ fallback đã chọn: `10121001` (한국어) — cần MES biết để không bất ngờ
-     khi DB thiếu 1 ngôn ngữ nào đó.
-   - Danh sách msgCode APS cần bổ sung (nếu chọn hướng (b) ở mục 4).
+   - Ngôn ngữ fallback đã chọn: `10121001` (한국어).
+   - Danh sách msgCode APS cần bổ sung — chính là file CSV ở trên, sau khi chốt
+     `Module Category`.
 
 ## Cách resume nếu có lỗi
 

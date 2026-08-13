@@ -22,6 +22,7 @@
     "close": "닫기",
     "detail": "상세",
     "all": "전체",
+    "select": "선택",
     "search": "검색",
     "loading": "로딩중...",
     "noData": "데이터 없음",
@@ -35,11 +36,21 @@
     "item": "품목",
     "risk": "리스크"
   },
+  "filterBar": {
+    "businessUnit": "사업부",
+    "planType": "계획구분",
+    "requestDate": "요청일",
+    "apsDocNo": "APS전표번호",
+    "rev": "Rev.",
+    "status": "처리상태",
+    "owner": "담당자",
+    "dept": "부서"
+  },
   "kpi": {
     "onTime": "계획납기 준수율",
     "materialShort": "공정 투입 자재 부족",
-    "overloadWc": "공정부하율 초과",
-    "planRisk": "계획 수립 예상 리스크",
+    "overloadWc": "공정 부하율 초과",
+    "planRisk": "계획수립 예상 리스크",
     "unitPct": "%",
     "unitCase": "건",
     "unitWc": "%WC"
@@ -53,7 +64,13 @@
       "overload": "부하초과",
       "both": "자재부족+부하초과",
       "empty": "미배정"
-    }
+    },
+    "col": {
+      "wc": "워크센터",
+      "count": "지시건수",
+      "qtySum": "지시량계"
+    },
+    "total": "합계"
   },
   "matrix": {
     "aggregate": "WC 집계",
@@ -71,6 +88,7 @@
   "workPlanList": {
     "title": "작업계획 리스트",
     "subtitle": "총 {total}건 · 위험 {risk}건 · 지연 {delay}건",
+    "unit": "건",
     "col": {
       "workOrderNo": "작업지시번호",
       "tmpPlanNo": "(임시)작업계획번호",
@@ -117,6 +135,21 @@
       "workOrder": "작업지시",
       "mps": "MPS"
     }
+  },
+  "actionPanel": {
+    "header": "Action",
+    "titleBoth": "일정조정+구매요청",
+    "selectRow": "행을 선택하세요",
+    "materialName": "자재명",
+    "onHand": "현재고",
+    "shortageQty": "부족수량",
+    "requestQty": "요청수량",
+    "memoPlaceholder": "메모를 입력하세요"
+  },
+  "badge": {
+    "pending": "대기중",
+    "solved": "해결됨",
+    "unresolved": "미해결"
   },
   "dialog": {
     "purchase": {
@@ -183,5 +216,40 @@
     "endDate": "종료일자",
     "status": "상태",
     "statusDraft": "작성"
+  },
+  "aiPanel": {
+    "header": "AI제안",
+    "placeholder": "데이터를 불러오면 리스크 분석이 표시됩니다.",
+    "errorMsg": "AI 분석을 불러오지 못했습니다.",
+    "retry": "다시 시도",
+    "docTitle": "계획 리스크 및 권고 사항",
+    "stale": "※ 최신 분석을 불러오지 못해 이전 결과를 표시합니다.",
+    "section1": "1. 영향(Impact)의 근본 원인",
+    "section2": "2. 영향받는 오더 및 작업장(WO) 및 심각도",
+    "affectedWc": "영향받는 작업장: {list}",
+    "affectedOrder": "영향받는 오더: 총 {count}개의 작업이 영향을 받고 있습니다.",
+    "severityLine": "심각도: {severity} (긴급도: {urgency})",
+    "materialShort": "자재 부족: {name} — 현재고 {onHand}, 부족수량 {shortage}",
+    "section3": "3. 해결 및 완화 권고",
+    "priorityLine": "우선순위 {priority}: {text}"
+  },
+  "apsView": {
+    "runIdle": "▶ 데이터 불러오기",
+    "runLoading": "불러오는 중…",
+    "simIdle": "시뮬레이션",
+    "simLoading": "계산 중…",
+    "dispatchLoading": "생성 중…",
+    "toastConfirmSaved": "저장되었습니다 · 시뮬레이션 대기",
+    "toastCancelled": "취소되었습니다",
+    "toastRunFailed": "데이터 조회 실패 · 다시 시도해주세요",
+    "toastSimDone": "시뮬레이션 완료 · 스케줄 재계산됨",
+    "toastSimPrFailed": "시뮬레이션 완료 · 구매요청 일부 전송 실패 (재시도 필요)",
+    "toastSimFailed": "시뮬레이션 실패 · 다시 시도해주세요",
+    "toastNeedRun": "먼저 데이터를 불러오세요",
+    "toastDispatchDone": "작업지시가 생성되었습니다",
+    "toastDispatchFailed": "작업지시 생성 실패 · G-System 전송 실패 (재시도 필요)",
+    "toastDispatchError": "작업지시 생성 실패 · 다시 시도해주세요",
+    "toastNeedSelect": "먼저 작업계획을 선택하세요",
+    "toastAlreadyDispatched": "이미 작업지시가 생성된 계획입니다"
   }
 }

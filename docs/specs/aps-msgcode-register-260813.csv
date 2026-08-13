@@ -1,0 +1,741 @@
+Module Category,Country,Message Category,Message Code,Message Content,"Source Key (tham khảo, khong nhap)"
+APS,한국어,라벨,aps_actionPanel_header,Action,actionPanel.header
+APS,영어,라벨,aps_actionPanel_header,Action,actionPanel.header
+APS,베트남어,라벨,aps_actionPanel_header,Action,actionPanel.header
+APS,중국어,라벨,aps_actionPanel_header,Action,actionPanel.header
+APS,한국어,라벨,aps_actionPanel_materialName,자재명,actionPanel.materialName
+APS,영어,라벨,aps_actionPanel_materialName,Material Name,actionPanel.materialName
+APS,베트남어,라벨,aps_actionPanel_materialName,Tên vật liệu,actionPanel.materialName
+APS,중국어,라벨,aps_actionPanel_materialName,物料名称,actionPanel.materialName
+APS,한국어,라벨,aps_actionPanel_memoPlaceholder,메모를 입력하세요,actionPanel.memoPlaceholder
+APS,영어,라벨,aps_actionPanel_memoPlaceholder,Enter memo,actionPanel.memoPlaceholder
+APS,베트남어,라벨,aps_actionPanel_memoPlaceholder,Nhập ghi chú,actionPanel.memoPlaceholder
+APS,중국어,라벨,aps_actionPanel_memoPlaceholder,请输入备注,actionPanel.memoPlaceholder
+APS,한국어,라벨,aps_actionPanel_onHand,현재고,actionPanel.onHand
+APS,영어,라벨,aps_actionPanel_onHand,On-hand Stock,actionPanel.onHand
+APS,베트남어,라벨,aps_actionPanel_onHand,Tồn hiện tại,actionPanel.onHand
+APS,중국어,라벨,aps_actionPanel_onHand,当前库存,actionPanel.onHand
+APS,한국어,라벨,aps_actionPanel_requestQty,요청수량,actionPanel.requestQty
+APS,영어,라벨,aps_actionPanel_requestQty,Request Qty,actionPanel.requestQty
+APS,베트남어,라벨,aps_actionPanel_requestQty,SL yêu cầu,actionPanel.requestQty
+APS,중국어,라벨,aps_actionPanel_requestQty,请求数量,actionPanel.requestQty
+APS,한국어,라벨,aps_actionPanel_selectRow,행을 선택하세요,actionPanel.selectRow
+APS,영어,라벨,aps_actionPanel_selectRow,Select a row,actionPanel.selectRow
+APS,베트남어,라벨,aps_actionPanel_selectRow,Chọn 1 dòng,actionPanel.selectRow
+APS,중국어,라벨,aps_actionPanel_selectRow,请选择一行,actionPanel.selectRow
+APS,한국어,라벨,aps_actionPanel_shortageQty,부족수량,actionPanel.shortageQty
+APS,영어,라벨,aps_actionPanel_shortageQty,Shortage Qty,actionPanel.shortageQty
+APS,베트남어,라벨,aps_actionPanel_shortageQty,SL thiếu,actionPanel.shortageQty
+APS,중국어,라벨,aps_actionPanel_shortageQty,短缺数量,actionPanel.shortageQty
+APS,한국어,라벨,aps_actionPanel_titleBoth,일정조정+구매요청,actionPanel.titleBoth
+APS,영어,라벨,aps_actionPanel_titleBoth,Schedule Adjustment + Purchase Request,actionPanel.titleBoth
+APS,베트남어,라벨,aps_actionPanel_titleBoth,Điều chỉnh lịch + Yêu cầu mua hàng,actionPanel.titleBoth
+APS,중국어,라벨,aps_actionPanel_titleBoth,日程调整+采购请求,actionPanel.titleBoth
+APS,한국어,라벨,aps_aiPanel_affectedOrder,영향받는 오더: 총 {count}개의 작업이 영향을 받고 있습니다.,aiPanel.affectedOrder
+APS,영어,라벨,aps_aiPanel_affectedOrder,Affected orders: {count} operations impacted in total.,aiPanel.affectedOrder
+APS,베트남어,라벨,aps_aiPanel_affectedOrder,Đơn hàng bị ảnh hưởng: tổng {count} công việc bị ảnh hưởng.,aiPanel.affectedOrder
+APS,중국어,라벨,aps_aiPanel_affectedOrder,受影响的订单: 共{count}个作业受到影响。,aiPanel.affectedOrder
+APS,한국어,라벨,aps_aiPanel_affectedWc,영향받는 작업장: {list},aiPanel.affectedWc
+APS,영어,라벨,aps_aiPanel_affectedWc,Affected workcenters: {list},aiPanel.affectedWc
+APS,베트남어,라벨,aps_aiPanel_affectedWc,Khu vực bị ảnh hưởng: {list},aiPanel.affectedWc
+APS,중국어,라벨,aps_aiPanel_affectedWc,受影响的工作中心: {list},aiPanel.affectedWc
+APS,한국어,라벨,aps_aiPanel_docTitle,계획 리스크 및 권고 사항,aiPanel.docTitle
+APS,영어,라벨,aps_aiPanel_docTitle,Plan Risk & Recommendations,aiPanel.docTitle
+APS,베트남어,라벨,aps_aiPanel_docTitle,Rủi ro kế hoạch và khuyến nghị,aiPanel.docTitle
+APS,중국어,라벨,aps_aiPanel_docTitle,计划风险及建议事项,aiPanel.docTitle
+APS,한국어,라벨,aps_aiPanel_errorMsg,AI 분석을 불러오지 못했습니다.,aiPanel.errorMsg
+APS,영어,라벨,aps_aiPanel_errorMsg,Failed to load AI analysis.,aiPanel.errorMsg
+APS,베트남어,라벨,aps_aiPanel_errorMsg,Không tải được phân tích AI.,aiPanel.errorMsg
+APS,중국어,라벨,aps_aiPanel_errorMsg,无法加载AI分析。,aiPanel.errorMsg
+APS,한국어,라벨,aps_aiPanel_header,AI제안,aiPanel.header
+APS,영어,라벨,aps_aiPanel_header,AI Suggestion,aiPanel.header
+APS,베트남어,라벨,aps_aiPanel_header,AI đề xuất,aiPanel.header
+APS,중국어,라벨,aps_aiPanel_header,AI建议,aiPanel.header
+APS,한국어,라벨,aps_aiPanel_materialShort,"자재 부족: {name} — 현재고 {onHand}, 부족수량 {shortage}",aiPanel.materialShort
+APS,영어,라벨,aps_aiPanel_materialShort,"Material shortage: {name} — on-hand {onHand}, shortage {shortage}",aiPanel.materialShort
+APS,베트남어,라벨,aps_aiPanel_materialShort,"Thiếu vật liệu: {name} — tồn hiện tại {onHand}, thiếu {shortage}",aiPanel.materialShort
+APS,중국어,라벨,aps_aiPanel_materialShort,物料短缺: {name} — 当前库存 {onHand}，短缺数量 {shortage},aiPanel.materialShort
+APS,한국어,라벨,aps_aiPanel_placeholder,데이터를 불러오면 리스크 분석이 표시됩니다.,aiPanel.placeholder
+APS,영어,라벨,aps_aiPanel_placeholder,Load data to see the risk analysis.,aiPanel.placeholder
+APS,베트남어,라벨,aps_aiPanel_placeholder,Tải dữ liệu để xem phân tích rủi ro.,aiPanel.placeholder
+APS,중국어,라벨,aps_aiPanel_placeholder,加载数据后将显示风险分析。,aiPanel.placeholder
+APS,한국어,라벨,aps_aiPanel_priorityLine,우선순위 {priority}: {text},aiPanel.priorityLine
+APS,영어,라벨,aps_aiPanel_priorityLine,Priority {priority}: {text},aiPanel.priorityLine
+APS,베트남어,라벨,aps_aiPanel_priorityLine,Ưu tiên {priority}: {text},aiPanel.priorityLine
+APS,중국어,라벨,aps_aiPanel_priorityLine,优先级 {priority}: {text},aiPanel.priorityLine
+APS,한국어,라벨,aps_aiPanel_retry,다시 시도,aiPanel.retry
+APS,영어,라벨,aps_aiPanel_retry,Retry,aiPanel.retry
+APS,베트남어,라벨,aps_aiPanel_retry,Thử lại,aiPanel.retry
+APS,중국어,라벨,aps_aiPanel_retry,重试,aiPanel.retry
+APS,한국어,라벨,aps_aiPanel_section1,1. 영향(Impact)의 근본 원인,aiPanel.section1
+APS,영어,라벨,aps_aiPanel_section1,1. Root Cause of Impact,aiPanel.section1
+APS,베트남어,라벨,aps_aiPanel_section1,1. Nguyên nhân gốc của tác động (Impact),aiPanel.section1
+APS,중국어,라벨,aps_aiPanel_section1,1. 影响(Impact)的根本原因,aiPanel.section1
+APS,한국어,라벨,aps_aiPanel_section2,2. 영향받는 오더 및 작업장(WO) 및 심각도,aiPanel.section2
+APS,영어,라벨,aps_aiPanel_section2,"2. Affected Orders, Workcenters (WO) & Severity",aiPanel.section2
+APS,베트남어,라벨,aps_aiPanel_section2,"2. Đơn hàng và khu vực (WO) bị ảnh hưởng, mức độ nghiêm trọng",aiPanel.section2
+APS,중국어,라벨,aps_aiPanel_section2,2. 受影响的订单及工作中心(WO)及严重程度,aiPanel.section2
+APS,한국어,라벨,aps_aiPanel_section3,3. 해결 및 완화 권고,aiPanel.section3
+APS,영어,라벨,aps_aiPanel_section3,3. Resolution & Mitigation Recommendations,aiPanel.section3
+APS,베트남어,라벨,aps_aiPanel_section3,3. Khuyến nghị xử lý và giảm thiểu,aiPanel.section3
+APS,중국어,라벨,aps_aiPanel_section3,3. 解决及缓解建议,aiPanel.section3
+APS,한국어,라벨,aps_aiPanel_severityLine,심각도: {severity} (긴급도: {urgency}),aiPanel.severityLine
+APS,영어,라벨,aps_aiPanel_severityLine,Severity: {severity} (Urgency: {urgency}),aiPanel.severityLine
+APS,베트남어,라벨,aps_aiPanel_severityLine,Mức độ: {severity} (mức khẩn cấp: {urgency}),aiPanel.severityLine
+APS,중국어,라벨,aps_aiPanel_severityLine,严重程度: {severity} (紧急度: {urgency}),aiPanel.severityLine
+APS,한국어,라벨,aps_aiPanel_stale,※ 최신 분석을 불러오지 못해 이전 결과를 표시합니다.,aiPanel.stale
+APS,영어,라벨,aps_aiPanel_stale,※ Could not load the latest analysis — showing the previous result.,aiPanel.stale
+APS,베트남어,라벨,aps_aiPanel_stale,※ Không tải được phân tích mới nhất — đang hiển thị kết quả cũ.,aiPanel.stale
+APS,중국어,라벨,aps_aiPanel_stale,※ 无法加载最新分析，显示之前的结果。,aiPanel.stale
+APS,한국어,라벨,aps_app_language,언어,app.language
+APS,영어,라벨,aps_app_language,Language,app.language
+APS,베트남어,라벨,aps_app_language,Ngôn ngữ,app.language
+APS,중국어,라벨,aps_app_language,语言,app.language
+APS,한국어,라벨,aps_app_title,APS 시스템,app.title
+APS,영어,라벨,aps_app_title,APS System,app.title
+APS,베트남어,라벨,aps_app_title,Hệ thống APS,app.title
+APS,중국어,라벨,aps_app_title,APS系统,app.title
+APS,한국어,라벨,aps_apsView_dispatchLoading,생성 중…,apsView.dispatchLoading
+APS,영어,라벨,aps_apsView_dispatchLoading,Creating…,apsView.dispatchLoading
+APS,베트남어,라벨,aps_apsView_dispatchLoading,Đang tạo…,apsView.dispatchLoading
+APS,중국어,라벨,aps_apsView_dispatchLoading,创建中…,apsView.dispatchLoading
+APS,한국어,라벨,aps_apsView_runIdle,▶ 데이터 불러오기,apsView.runIdle
+APS,영어,라벨,aps_apsView_runIdle,▶ Load Data,apsView.runIdle
+APS,베트남어,라벨,aps_apsView_runIdle,▶ Tải dữ liệu,apsView.runIdle
+APS,중국어,라벨,aps_apsView_runIdle,▶ 加载数据,apsView.runIdle
+APS,한국어,라벨,aps_apsView_runLoading,불러오는 중…,apsView.runLoading
+APS,영어,라벨,aps_apsView_runLoading,Loading…,apsView.runLoading
+APS,베트남어,라벨,aps_apsView_runLoading,Đang tải…,apsView.runLoading
+APS,중국어,라벨,aps_apsView_runLoading,加载中…,apsView.runLoading
+APS,한국어,라벨,aps_apsView_simIdle,시뮬레이션,apsView.simIdle
+APS,영어,라벨,aps_apsView_simIdle,Simulate,apsView.simIdle
+APS,베트남어,라벨,aps_apsView_simIdle,Mô phỏng,apsView.simIdle
+APS,중국어,라벨,aps_apsView_simIdle,模拟,apsView.simIdle
+APS,한국어,라벨,aps_apsView_simLoading,계산 중…,apsView.simLoading
+APS,영어,라벨,aps_apsView_simLoading,Calculating…,apsView.simLoading
+APS,베트남어,라벨,aps_apsView_simLoading,Đang tính…,apsView.simLoading
+APS,중국어,라벨,aps_apsView_simLoading,计算中…,apsView.simLoading
+APS,한국어,라벨,aps_apsView_toastAlreadyDispatched,이미 작업지시가 생성된 계획입니다,apsView.toastAlreadyDispatched
+APS,영어,라벨,aps_apsView_toastAlreadyDispatched,This plan already has a work order,apsView.toastAlreadyDispatched
+APS,베트남어,라벨,aps_apsView_toastAlreadyDispatched,Kế hoạch này đã được tạo chỉ thị sản xuất,apsView.toastAlreadyDispatched
+APS,중국어,라벨,aps_apsView_toastAlreadyDispatched,该计划已创建作业指示,apsView.toastAlreadyDispatched
+APS,한국어,라벨,aps_apsView_toastCancelled,취소되었습니다,apsView.toastCancelled
+APS,영어,라벨,aps_apsView_toastCancelled,Cancelled,apsView.toastCancelled
+APS,베트남어,라벨,aps_apsView_toastCancelled,Đã hủy,apsView.toastCancelled
+APS,중국어,라벨,aps_apsView_toastCancelled,已取消,apsView.toastCancelled
+APS,한국어,라벨,aps_apsView_toastConfirmSaved,저장되었습니다 · 시뮬레이션 대기,apsView.toastConfirmSaved
+APS,영어,라벨,aps_apsView_toastConfirmSaved,Saved · pending simulation,apsView.toastConfirmSaved
+APS,베트남어,라벨,aps_apsView_toastConfirmSaved,Đã lưu · chờ mô phỏng,apsView.toastConfirmSaved
+APS,중국어,라벨,aps_apsView_toastConfirmSaved,已保存 · 等待模拟,apsView.toastConfirmSaved
+APS,한국어,라벨,aps_apsView_toastDispatchDone,작업지시가 생성되었습니다,apsView.toastDispatchDone
+APS,영어,라벨,aps_apsView_toastDispatchDone,Work order created,apsView.toastDispatchDone
+APS,베트남어,라벨,aps_apsView_toastDispatchDone,Đã tạo chỉ thị sản xuất,apsView.toastDispatchDone
+APS,중국어,라벨,aps_apsView_toastDispatchDone,已创建作业指示,apsView.toastDispatchDone
+APS,한국어,라벨,aps_apsView_toastDispatchError,작업지시 생성 실패 · 다시 시도해주세요,apsView.toastDispatchError
+APS,영어,라벨,aps_apsView_toastDispatchError,Failed to create work order · please try again,apsView.toastDispatchError
+APS,베트남어,라벨,aps_apsView_toastDispatchError,Tạo chỉ thị sản xuất thất bại · vui lòng thử lại,apsView.toastDispatchError
+APS,중국어,라벨,aps_apsView_toastDispatchError,创建作业指示失败 · 请重试,apsView.toastDispatchError
+APS,한국어,라벨,aps_apsView_toastDispatchFailed,작업지시 생성 실패 · G-System 전송 실패 (재시도 필요),apsView.toastDispatchFailed
+APS,영어,라벨,aps_apsView_toastDispatchFailed,Failed to create work order · G-System push failed (retry needed),apsView.toastDispatchFailed
+APS,베트남어,라벨,aps_apsView_toastDispatchFailed,Tạo chỉ thị sản xuất thất bại · gửi G-System thất bại (cần thử lại),apsView.toastDispatchFailed
+APS,중국어,라벨,aps_apsView_toastDispatchFailed,创建作业指示失败 · G-System发送失败(需重试),apsView.toastDispatchFailed
+APS,한국어,라벨,aps_apsView_toastNeedRun,먼저 데이터를 불러오세요,apsView.toastNeedRun
+APS,영어,라벨,aps_apsView_toastNeedRun,Please load data first,apsView.toastNeedRun
+APS,베트남어,라벨,aps_apsView_toastNeedRun,Vui lòng tải dữ liệu trước,apsView.toastNeedRun
+APS,중국어,라벨,aps_apsView_toastNeedRun,请先加载数据,apsView.toastNeedRun
+APS,한국어,라벨,aps_apsView_toastNeedSelect,먼저 작업계획을 선택하세요,apsView.toastNeedSelect
+APS,영어,라벨,aps_apsView_toastNeedSelect,Please select a plan first,apsView.toastNeedSelect
+APS,베트남어,라벨,aps_apsView_toastNeedSelect,Vui lòng chọn 1 kế hoạch trước,apsView.toastNeedSelect
+APS,중국어,라벨,aps_apsView_toastNeedSelect,请先选择一个计划,apsView.toastNeedSelect
+APS,한국어,라벨,aps_apsView_toastRunFailed,데이터 조회 실패 · 다시 시도해주세요,apsView.toastRunFailed
+APS,영어,라벨,aps_apsView_toastRunFailed,Failed to load data · please try again,apsView.toastRunFailed
+APS,베트남어,라벨,aps_apsView_toastRunFailed,Tải dữ liệu thất bại · vui lòng thử lại,apsView.toastRunFailed
+APS,중국어,라벨,aps_apsView_toastRunFailed,加载数据失败 · 请重试,apsView.toastRunFailed
+APS,한국어,라벨,aps_apsView_toastSimDone,시뮬레이션 완료 · 스케줄 재계산됨,apsView.toastSimDone
+APS,영어,라벨,aps_apsView_toastSimDone,Simulation complete · schedule recalculated,apsView.toastSimDone
+APS,베트남어,라벨,aps_apsView_toastSimDone,Mô phỏng hoàn tất · đã tính lại lịch,apsView.toastSimDone
+APS,중국어,라벨,aps_apsView_toastSimDone,模拟完成 · 已重新计算日程,apsView.toastSimDone
+APS,한국어,라벨,aps_apsView_toastSimFailed,시뮬레이션 실패 · 다시 시도해주세요,apsView.toastSimFailed
+APS,영어,라벨,aps_apsView_toastSimFailed,Simulation failed · please try again,apsView.toastSimFailed
+APS,베트남어,라벨,aps_apsView_toastSimFailed,Mô phỏng thất bại · vui lòng thử lại,apsView.toastSimFailed
+APS,중국어,라벨,aps_apsView_toastSimFailed,模拟失败 · 请重试,apsView.toastSimFailed
+APS,한국어,라벨,aps_apsView_toastSimPrFailed,시뮬레이션 완료 · 구매요청 일부 전송 실패 (재시도 필요),apsView.toastSimPrFailed
+APS,영어,라벨,aps_apsView_toastSimPrFailed,Simulation complete · some purchase requests failed to send (retry needed),apsView.toastSimPrFailed
+APS,베트남어,라벨,aps_apsView_toastSimPrFailed,Mô phỏng hoàn tất · một số yêu cầu mua hàng gửi thất bại (cần thử lại),apsView.toastSimPrFailed
+APS,중국어,라벨,aps_apsView_toastSimPrFailed,模拟完成 · 部分采购请求发送失败(需重试),apsView.toastSimPrFailed
+APS,한국어,라벨,aps_badge_pending,대기중,badge.pending
+APS,영어,라벨,aps_badge_pending,Pending,badge.pending
+APS,베트남어,라벨,aps_badge_pending,Đang chờ,badge.pending
+APS,중국어,라벨,aps_badge_pending,待处理,badge.pending
+APS,한국어,라벨,aps_badge_solved,해결됨,badge.solved
+APS,영어,라벨,aps_badge_solved,Resolved,badge.solved
+APS,베트남어,라벨,aps_badge_solved,Đã giải quyết,badge.solved
+APS,중국어,라벨,aps_badge_solved,已解决,badge.solved
+APS,한국어,라벨,aps_badge_unresolved,미해결,badge.unresolved
+APS,영어,라벨,aps_badge_unresolved,Unresolved,badge.unresolved
+APS,베트남어,라벨,aps_badge_unresolved,Chưa giải quyết,badge.unresolved
+APS,중국어,라벨,aps_badge_unresolved,未解决,badge.unresolved
+APS,한국어,라벨,aps_common_all,전체,common.all
+APS,영어,라벨,aps_common_all,All,common.all
+APS,베트남어,라벨,aps_common_all,Tất cả,common.all
+APS,중국어,라벨,aps_common_all,全部,common.all
+APS,한국어,라벨,aps_common_apply,적용 (Apply),common.apply
+APS,영어,라벨,aps_common_apply,Apply,common.apply
+APS,베트남어,라벨,aps_common_apply,Áp dụng (Apply),common.apply
+APS,중국어,라벨,aps_common_apply,应用 (Apply),common.apply
+APS,한국어,라벨,aps_common_cancel,취소,common.cancel
+APS,영어,라벨,aps_common_cancel,Cancel,common.cancel
+APS,베트남어,라벨,aps_common_cancel,Hủy,common.cancel
+APS,중국어,라벨,aps_common_cancel,取消,common.cancel
+APS,한국어,라벨,aps_common_close,닫기,common.close
+APS,영어,라벨,aps_common_close,Close,common.close
+APS,베트남어,라벨,aps_common_close,Đóng,common.close
+APS,중국어,라벨,aps_common_close,关闭,common.close
+APS,한국어,라벨,aps_common_confirm,확인,common.confirm
+APS,영어,라벨,aps_common_confirm,Confirm,common.confirm
+APS,베트남어,라벨,aps_common_confirm,Xác nhận,common.confirm
+APS,중국어,라벨,aps_common_confirm,确认,common.confirm
+APS,한국어,라벨,aps_common_detail,상세,common.detail
+APS,영어,라벨,aps_common_detail,Detail,common.detail
+APS,베트남어,라벨,aps_common_detail,Chi tiết,common.detail
+APS,중국어,라벨,aps_common_detail,详情,common.detail
+APS,한국어,라벨,aps_common_invalidDateRange,종료일은 시작일보다 빠를 수 없습니다,common.invalidDateRange
+APS,영어,라벨,aps_common_invalidDateRange,End date cannot be earlier than start date,common.invalidDateRange
+APS,베트남어,라벨,aps_common_invalidDateRange,Ngày kết thúc không được nhỏ hơn ngày bắt đầu,common.invalidDateRange
+APS,중국어,라벨,aps_common_invalidDateRange,结束日期不能早于开始日期,common.invalidDateRange
+APS,한국어,라벨,aps_common_loading,로딩중...,common.loading
+APS,영어,라벨,aps_common_loading,Loading...,common.loading
+APS,베트남어,라벨,aps_common_loading,Đang tải...,common.loading
+APS,중국어,라벨,aps_common_loading,加载中...,common.loading
+APS,한국어,라벨,aps_common_noData,데이터 없음,common.noData
+APS,영어,라벨,aps_common_noData,No data,common.noData
+APS,베트남어,라벨,aps_common_noData,Không có dữ liệu,common.noData
+APS,중국어,라벨,aps_common_noData,无数据,common.noData
+APS,한국어,라벨,aps_common_run,RUN APS,common.run
+APS,영어,라벨,aps_common_run,RUN APS,common.run
+APS,베트남어,라벨,aps_common_run,Chạy APS,common.run
+APS,중국어,라벨,aps_common_run,运行APS,common.run
+APS,한국어,라벨,aps_common_save,저장,common.save
+APS,영어,라벨,aps_common_save,Save,common.save
+APS,베트남어,라벨,aps_common_save,Lưu,common.save
+APS,중국어,라벨,aps_common_save,保存,common.save
+APS,한국어,라벨,aps_common_search,검색,common.search
+APS,영어,라벨,aps_common_search,Search,common.search
+APS,베트남어,라벨,aps_common_search,Tìm kiếm,common.search
+APS,중국어,라벨,aps_common_search,搜索,common.search
+APS,한국어,라벨,aps_common_select,선택,common.select
+APS,영어,라벨,aps_common_select,Select,common.select
+APS,베트남어,라벨,aps_common_select,Chọn,common.select
+APS,중국어,라벨,aps_common_select,选择,common.select
+APS,한국어,라벨,aps_common_showAll,전체보기,common.showAll
+APS,영어,라벨,aps_common_showAll,Show All,common.showAll
+APS,베트남어,라벨,aps_common_showAll,Xem tất cả,common.showAll
+APS,중국어,라벨,aps_common_showAll,查看全部,common.showAll
+APS,한국어,라벨,aps_detail_adjustedBadge,조정 적용됨,detail.adjustedBadge
+APS,영어,라벨,aps_detail_adjustedBadge,Adjustment Applied,detail.adjustedBadge
+APS,베트남어,라벨,aps_detail_adjustedBadge,Đã áp dụng chỉnh,detail.adjustedBadge
+APS,중국어,라벨,aps_detail_adjustedBadge,已应用调整,detail.adjustedBadge
+APS,한국어,라벨,aps_detail_cancelPurchaseRequest,구매요청 취소,detail.cancelPurchaseRequest
+APS,영어,라벨,aps_detail_cancelPurchaseRequest,Cancel Purchase Request,detail.cancelPurchaseRequest
+APS,베트남어,라벨,aps_detail_cancelPurchaseRequest,Huỷ yêu cầu mua hàng,detail.cancelPurchaseRequest
+APS,중국어,라벨,aps_detail_cancelPurchaseRequest,取消采购请求,detail.cancelPurchaseRequest
+APS,한국어,라벨,aps_detail_cancelScheduleAdjust,일정조정 취소,detail.cancelScheduleAdjust
+APS,영어,라벨,aps_detail_cancelScheduleAdjust,Cancel Schedule Adjustment,detail.cancelScheduleAdjust
+APS,베트남어,라벨,aps_detail_cancelScheduleAdjust,Huỷ điều chỉnh lịch,detail.cancelScheduleAdjust
+APS,중국어,라벨,aps_detail_cancelScheduleAdjust,取消日程调整,detail.cancelScheduleAdjust
+APS,한국어,라벨,aps_detail_createWorkOrder,작업지시 생성,detail.createWorkOrder
+APS,영어,라벨,aps_detail_createWorkOrder,Create Work Order,detail.createWorkOrder
+APS,베트남어,라벨,aps_detail_createWorkOrder,Tạo chỉ thị SX,detail.createWorkOrder
+APS,중국어,라벨,aps_detail_createWorkOrder,创建作业指示,detail.createWorkOrder
+APS,한국어,라벨,aps_detail_info_delivery,납기일자,detail.info.delivery
+APS,영어,라벨,aps_detail_info_delivery,Delivery Date,detail.info.delivery
+APS,베트남어,라벨,aps_detail_info_delivery,Ngày giao,detail.info.delivery
+APS,중국어,라벨,aps_detail_info_delivery,交货日期,detail.info.delivery
+APS,한국어,라벨,aps_detail_info_end,종료,detail.info.end
+APS,영어,라벨,aps_detail_info_end,End,detail.info.end
+APS,베트남어,라벨,aps_detail_info_end,Kết thúc,detail.info.end
+APS,중국어,라벨,aps_detail_info_end,结束,detail.info.end
+APS,한국어,라벨,aps_detail_info_item,품목,detail.info.item
+APS,영어,라벨,aps_detail_info_item,Item,detail.info.item
+APS,베트남어,라벨,aps_detail_info_item,Item,detail.info.item
+APS,중국어,라벨,aps_detail_info_item,品项,detail.info.item
+APS,한국어,라벨,aps_detail_info_planQty,계획수량,detail.info.planQty
+APS,영어,라벨,aps_detail_info_planQty,Plan Qty,detail.info.planQty
+APS,베트남어,라벨,aps_detail_info_planQty,SL kế hoạch,detail.info.planQty
+APS,중국어,라벨,aps_detail_info_planQty,计划数量,detail.info.planQty
+APS,한국어,라벨,aps_detail_info_source,출처,detail.info.source
+APS,영어,라벨,aps_detail_info_source,Source,detail.info.source
+APS,베트남어,라벨,aps_detail_info_source,Nguồn,detail.info.source
+APS,중국어,라벨,aps_detail_info_source,来源,detail.info.source
+APS,한국어,라벨,aps_detail_info_start,시작,detail.info.start
+APS,영어,라벨,aps_detail_info_start,Start,detail.info.start
+APS,베트남어,라벨,aps_detail_info_start,Bắt đầu,detail.info.start
+APS,중국어,라벨,aps_detail_info_start,开始,detail.info.start
+APS,한국어,라벨,aps_detail_info_wc,워크센터,detail.info.wc
+APS,영어,라벨,aps_detail_info_wc,Work Center,detail.info.wc
+APS,베트남어,라벨,aps_detail_info_wc,Work Center,detail.info.wc
+APS,중국어,라벨,aps_detail_info_wc,工作中心,detail.info.wc
+APS,한국어,라벨,aps_detail_purchaseRequest,구매요청,detail.purchaseRequest
+APS,영어,라벨,aps_detail_purchaseRequest,Purchase Request,detail.purchaseRequest
+APS,베트남어,라벨,aps_detail_purchaseRequest,Yêu cầu mua hàng,detail.purchaseRequest
+APS,중국어,라벨,aps_detail_purchaseRequest,采购请求,detail.purchaseRequest
+APS,한국어,라벨,aps_detail_purchaseRequestDone,구매요청됨,detail.purchaseRequestDone
+APS,영어,라벨,aps_detail_purchaseRequestDone,Purchase Requested,detail.purchaseRequestDone
+APS,베트남어,라벨,aps_detail_purchaseRequestDone,Đã yêu cầu mua hàng,detail.purchaseRequestDone
+APS,중국어,라벨,aps_detail_purchaseRequestDone,已采购请求,detail.purchaseRequestDone
+APS,한국어,라벨,aps_detail_scheduleAdjust,일정조정,detail.scheduleAdjust
+APS,영어,라벨,aps_detail_scheduleAdjust,Schedule Adjustment,detail.scheduleAdjust
+APS,베트남어,라벨,aps_detail_scheduleAdjust,Điều chỉnh lịch,detail.scheduleAdjust
+APS,중국어,라벨,aps_detail_scheduleAdjust,日程调整,detail.scheduleAdjust
+APS,한국어,라벨,aps_detail_scheduleAdjustDone,일정조정됨,detail.scheduleAdjustDone
+APS,영어,라벨,aps_detail_scheduleAdjustDone,Schedule Adjusted,detail.scheduleAdjustDone
+APS,베트남어,라벨,aps_detail_scheduleAdjustDone,Đã điều chỉnh lịch,detail.scheduleAdjustDone
+APS,중국어,라벨,aps_detail_scheduleAdjustDone,已调整日程,detail.scheduleAdjustDone
+APS,한국어,라벨,aps_detail_selectPlan,왼쪽 리스트에서 계획을 선택하세요,detail.selectPlan
+APS,영어,라벨,aps_detail_selectPlan,Select a plan from the list on the left,detail.selectPlan
+APS,베트남어,라벨,aps_detail_selectPlan,Chọn 1 kế hoạch từ danh sách bên trái,detail.selectPlan
+APS,중국어,라벨,aps_detail_selectPlan,请从左侧列表中选择一个计划,detail.selectPlan
+APS,한국어,라벨,aps_detail_source_mps,MPS,detail.source.mps
+APS,영어,라벨,aps_detail_source_mps,MPS,detail.source.mps
+APS,베트남어,라벨,aps_detail_source_mps,MPS,detail.source.mps
+APS,중국어,라벨,aps_detail_source_mps,MPS,detail.source.mps
+APS,한국어,라벨,aps_detail_source_workOrder,작업지시,detail.source.workOrder
+APS,영어,라벨,aps_detail_source_workOrder,Work Order,detail.source.workOrder
+APS,베트남어,라벨,aps_detail_source_workOrder,Chỉ thị SX,detail.source.workOrder
+APS,중국어,라벨,aps_detail_source_workOrder,作业指示,detail.source.workOrder
+APS,한국어,라벨,aps_detail_title,유형별 상세,detail.title
+APS,영어,라벨,aps_detail_title,Detail by Type,detail.title
+APS,베트남어,라벨,aps_detail_title,Chi tiết theo loại,detail.title
+APS,중국어,라벨,aps_detail_title,按类型详情,detail.title
+APS,한국어,라벨,aps_dialog_adjust_newEnd,새 종료일,dialog.adjust.newEnd
+APS,영어,라벨,aps_dialog_adjust_newEnd,New End Date,dialog.adjust.newEnd
+APS,베트남어,라벨,aps_dialog_adjust_newEnd,Ngày kết thúc mới,dialog.adjust.newEnd
+APS,중국어,라벨,aps_dialog_adjust_newEnd,新结束日期,dialog.adjust.newEnd
+APS,한국어,라벨,aps_dialog_adjust_newStart,새 시작일,dialog.adjust.newStart
+APS,영어,라벨,aps_dialog_adjust_newStart,New Start Date,dialog.adjust.newStart
+APS,베트남어,라벨,aps_dialog_adjust_newStart,Ngày bắt đầu mới,dialog.adjust.newStart
+APS,중국어,라벨,aps_dialog_adjust_newStart,新开始日期,dialog.adjust.newStart
+APS,한국어,라벨,aps_dialog_adjust_note,저장 후 Apply 버튼을 클릭하여 매트릭스에 반영하세요.,dialog.adjust.note
+APS,영어,라벨,aps_dialog_adjust_note,"After saving, click Apply to reflect the change on the matrix.",dialog.adjust.note
+APS,베트남어,라벨,aps_dialog_adjust_note,"Sau khi lưu, bấm nút Apply để phản ánh chỉnh sửa vào matrix.",dialog.adjust.note
+APS,중국어,라벨,aps_dialog_adjust_note,保存后请点击Apply按钮以反映到矩阵中。,dialog.adjust.note
+APS,한국어,라벨,aps_dialog_adjust_title,일정조정,dialog.adjust.title
+APS,영어,라벨,aps_dialog_adjust_title,Schedule Adjustment,dialog.adjust.title
+APS,베트남어,라벨,aps_dialog_adjust_title,Điều chỉnh lịch trình,dialog.adjust.title
+APS,중국어,라벨,aps_dialog_adjust_title,日程调整,dialog.adjust.title
+APS,한국어,라벨,aps_dialog_dispatch_confirmHeader,생산지시 생성 확인,dialog.dispatch.confirmHeader
+APS,영어,라벨,aps_dialog_dispatch_confirmHeader,Confirm Work Order Creation,dialog.dispatch.confirmHeader
+APS,베트남어,라벨,aps_dialog_dispatch_confirmHeader,Xác nhận tạo chỉ thị sản xuất,dialog.dispatch.confirmHeader
+APS,중국어,라벨,aps_dialog_dispatch_confirmHeader,确认创建生产指示,dialog.dispatch.confirmHeader
+APS,한국어,라벨,aps_dialog_dispatch_confirmMessage,전송 시 생산지시가 생성되며 더 이상 수정할 수 없습니다. 확인해 주세요.,dialog.dispatch.confirmMessage
+APS,영어,라벨,aps_dialog_dispatch_confirmMessage,"Once sent, the work order will be created and can no longer be edited. Please confirm.",dialog.dispatch.confirmMessage
+APS,베트남어,라벨,aps_dialog_dispatch_confirmMessage,"Khi gửi sẽ tạo chỉ thị sản xuất, không thể chỉnh sửa lại nữa. Vui lòng xác nhận.",dialog.dispatch.confirmMessage
+APS,중국어,라벨,aps_dialog_dispatch_confirmMessage,发送后将创建生产指示，且无法再修改。请确认。,dialog.dispatch.confirmMessage
+APS,한국어,라벨,aps_dialog_dispatch_noPlans,생산지시를 생성할 계획이 없습니다.,dialog.dispatch.noPlans
+APS,영어,라벨,aps_dialog_dispatch_noPlans,No plans available to create a work order.,dialog.dispatch.noPlans
+APS,베트남어,라벨,aps_dialog_dispatch_noPlans,Không có kế hoạch nào để tạo chỉ thị.,dialog.dispatch.noPlans
+APS,중국어,라벨,aps_dialog_dispatch_noPlans,没有可创建生产指示的计划。,dialog.dispatch.noPlans
+APS,한국어,라벨,aps_dialog_dispatch_title,생산지시 생성,dialog.dispatch.title
+APS,영어,라벨,aps_dialog_dispatch_title,Create Work Order,dialog.dispatch.title
+APS,베트남어,라벨,aps_dialog_dispatch_title,Tạo chỉ thị sản xuất,dialog.dispatch.title
+APS,중국어,라벨,aps_dialog_dispatch_title,创建生产指示,dialog.dispatch.title
+APS,한국어,라벨,aps_dialog_purchase_noShortage,이 제품에 부족한 자재가 없습니다.,dialog.purchase.noShortage
+APS,영어,라벨,aps_dialog_purchase_noShortage,No material shortage for this product.,dialog.purchase.noShortage
+APS,베트남어,라벨,aps_dialog_purchase_noShortage,Không có nguyên liệu nào thiếu cho sản phẩm này.,dialog.purchase.noShortage
+APS,중국어,라벨,aps_dialog_purchase_noShortage,该产品没有短缺的物料。,dialog.purchase.noShortage
+APS,한국어,라벨,aps_dialog_purchase_note,메모,dialog.purchase.note
+APS,영어,라벨,aps_dialog_purchase_note,Memo,dialog.purchase.note
+APS,베트남어,라벨,aps_dialog_purchase_note,Ghi chú,dialog.purchase.note
+APS,중국어,라벨,aps_dialog_purchase_note,备注,dialog.purchase.note
+APS,한국어,라벨,aps_dialog_purchase_onHandQty,현재 재고,dialog.purchase.onHandQty
+APS,영어,라벨,aps_dialog_purchase_onHandQty,Current Stock,dialog.purchase.onHandQty
+APS,베트남어,라벨,aps_dialog_purchase_onHandQty,Tồn kho hiện có,dialog.purchase.onHandQty
+APS,중국어,라벨,aps_dialog_purchase_onHandQty,当前库存,dialog.purchase.onHandQty
+APS,한국어,라벨,aps_dialog_purchase_requestQty,요청 수량,dialog.purchase.requestQty
+APS,영어,라벨,aps_dialog_purchase_requestQty,Request Qty,dialog.purchase.requestQty
+APS,베트남어,라벨,aps_dialog_purchase_requestQty,SL yêu cầu mua,dialog.purchase.requestQty
+APS,중국어,라벨,aps_dialog_purchase_requestQty,请求数量,dialog.purchase.requestQty
+APS,한국어,라벨,aps_dialog_purchase_shortageQty,부족 수량,dialog.purchase.shortageQty
+APS,영어,라벨,aps_dialog_purchase_shortageQty,Shortage Qty,dialog.purchase.shortageQty
+APS,베트남어,라벨,aps_dialog_purchase_shortageQty,SL thiếu,dialog.purchase.shortageQty
+APS,중국어,라벨,aps_dialog_purchase_shortageQty,短缺数量,dialog.purchase.shortageQty
+APS,한국어,라벨,aps_dialog_purchase_stagedNote,임시 저장됨 — 해당 계획의 생산지시 생성 시에만 전송됩니다.,dialog.purchase.stagedNote
+APS,영어,라벨,aps_dialog_purchase_stagedNote,Staged — will only be sent when the work order for this plan is created.,dialog.purchase.stagedNote
+APS,베트남어,라벨,aps_dialog_purchase_stagedNote,Đã lưu tạm — chỉ gửi khi tạo chỉ thị sản xuất cho kế hoạch này.,dialog.purchase.stagedNote
+APS,중국어,라벨,aps_dialog_purchase_stagedNote,已临时保存 — 仅在为该计划创建作业指示时才会发送。,dialog.purchase.stagedNote
+APS,한국어,라벨,aps_dialog_purchase_title,구매요청,dialog.purchase.title
+APS,영어,라벨,aps_dialog_purchase_title,Purchase Request,dialog.purchase.title
+APS,베트남어,라벨,aps_dialog_purchase_title,Yêu cầu mua hàng,dialog.purchase.title
+APS,중국어,라벨,aps_dialog_purchase_title,采购请求,dialog.purchase.title
+APS,한국어,라벨,aps_filter_completionFrom,생산완료일 (시작),filter.completionFrom
+APS,영어,라벨,aps_filter_completionFrom,Completion date (from),filter.completionFrom
+APS,베트남어,라벨,aps_filter_completionFrom,Ngày hoàn thành SX (từ),filter.completionFrom
+APS,중국어,라벨,aps_filter_completionFrom,生产完成日 (开始),filter.completionFrom
+APS,한국어,라벨,aps_filter_completionTo,생산완료일 (종료),filter.completionTo
+APS,영어,라벨,aps_filter_completionTo,Completion date (to),filter.completionTo
+APS,베트남어,라벨,aps_filter_completionTo,Ngày hoàn thành SX (đến),filter.completionTo
+APS,중국어,라벨,aps_filter_completionTo,生产完成日 (结束),filter.completionTo
+APS,한국어,라벨,aps_filter_dateRange,기간,filter.dateRange
+APS,영어,라벨,aps_filter_dateRange,Date range,filter.dateRange
+APS,베트남어,라벨,aps_filter_dateRange,Khoảng ngày,filter.dateRange
+APS,중국어,라벨,aps_filter_dateRange,期间,filter.dateRange
+APS,한국어,라벨,aps_filter_item,품목,filter.item
+APS,영어,라벨,aps_filter_item,Item,filter.item
+APS,베트남어,라벨,aps_filter_item,Item,filter.item
+APS,중국어,라벨,aps_filter_item,品项,filter.item
+APS,한국어,라벨,aps_filter_risk,리스크,filter.risk
+APS,영어,라벨,aps_filter_risk,Risk,filter.risk
+APS,베트남어,라벨,aps_filter_risk,Rủi ro,filter.risk
+APS,중국어,라벨,aps_filter_risk,风险,filter.risk
+APS,한국어,라벨,aps_filter_workCenter,워크센터,filter.workCenter
+APS,영어,라벨,aps_filter_workCenter,Work Center,filter.workCenter
+APS,베트남어,라벨,aps_filter_workCenter,Work Center,filter.workCenter
+APS,중국어,라벨,aps_filter_workCenter,工作中心,filter.workCenter
+APS,한국어,라벨,aps_filterBar_apsDocNo,APS전표번호,filterBar.apsDocNo
+APS,영어,라벨,aps_filterBar_apsDocNo,APS Doc No.,filterBar.apsDocNo
+APS,베트남어,라벨,aps_filterBar_apsDocNo,Số chứng từ APS,filterBar.apsDocNo
+APS,중국어,라벨,aps_filterBar_apsDocNo,APS单据编号,filterBar.apsDocNo
+APS,한국어,라벨,aps_filterBar_businessUnit,사업부,filterBar.businessUnit
+APS,영어,라벨,aps_filterBar_businessUnit,Business Unit,filterBar.businessUnit
+APS,베트남어,라벨,aps_filterBar_businessUnit,Đơn vị KD,filterBar.businessUnit
+APS,중국어,라벨,aps_filterBar_businessUnit,事业部,filterBar.businessUnit
+APS,한국어,라벨,aps_filterBar_dept,부서,filterBar.dept
+APS,영어,라벨,aps_filterBar_dept,Department,filterBar.dept
+APS,베트남어,라벨,aps_filterBar_dept,Phòng ban,filterBar.dept
+APS,중국어,라벨,aps_filterBar_dept,部门,filterBar.dept
+APS,한국어,라벨,aps_filterBar_owner,담당자,filterBar.owner
+APS,영어,라벨,aps_filterBar_owner,Owner,filterBar.owner
+APS,베트남어,라벨,aps_filterBar_owner,Người phụ trách,filterBar.owner
+APS,중국어,라벨,aps_filterBar_owner,负责人,filterBar.owner
+APS,한국어,라벨,aps_filterBar_planType,계획구분,filterBar.planType
+APS,영어,라벨,aps_filterBar_planType,Plan Type,filterBar.planType
+APS,베트남어,라벨,aps_filterBar_planType,Loại kế hoạch,filterBar.planType
+APS,중국어,라벨,aps_filterBar_planType,计划类型,filterBar.planType
+APS,한국어,라벨,aps_filterBar_requestDate,요청일,filterBar.requestDate
+APS,영어,라벨,aps_filterBar_requestDate,Request Date,filterBar.requestDate
+APS,베트남어,라벨,aps_filterBar_requestDate,Ngày yêu cầu,filterBar.requestDate
+APS,중국어,라벨,aps_filterBar_requestDate,请求日期,filterBar.requestDate
+APS,한국어,라벨,aps_filterBar_rev,Rev.,filterBar.rev
+APS,영어,라벨,aps_filterBar_rev,Rev.,filterBar.rev
+APS,베트남어,라벨,aps_filterBar_rev,Rev.,filterBar.rev
+APS,중국어,라벨,aps_filterBar_rev,Rev.,filterBar.rev
+APS,한국어,라벨,aps_filterBar_status,처리상태,filterBar.status
+APS,영어,라벨,aps_filterBar_status,Status,filterBar.status
+APS,베트남어,라벨,aps_filterBar_status,Trạng thái xử lý,filterBar.status
+APS,중국어,라벨,aps_filterBar_status,处理状态,filterBar.status
+APS,한국어,라벨,aps_kpi_materialShort,공정 투입 자재 부족,kpi.materialShort
+APS,영어,라벨,aps_kpi_materialShort,Material Shortage on Input,kpi.materialShort
+APS,베트남어,라벨,aps_kpi_materialShort,Thiếu vật liệu,kpi.materialShort
+APS,중국어,라벨,aps_kpi_materialShort,投入物料短缺,kpi.materialShort
+APS,한국어,라벨,aps_kpi_onTime,계획납기 준수율,kpi.onTime
+APS,영어,라벨,aps_kpi_onTime,On-time Delivery Rate,kpi.onTime
+APS,베트남어,라벨,aps_kpi_onTime,Tỉ lệ giao hàng đúng hạn,kpi.onTime
+APS,중국어,라벨,aps_kpi_onTime,按期交货率,kpi.onTime
+APS,한국어,라벨,aps_kpi_overloadWc,공정 부하율 초과,kpi.overloadWc
+APS,영어,라벨,aps_kpi_overloadWc,Workcenter Overload,kpi.overloadWc
+APS,베트남어,라벨,aps_kpi_overloadWc,WC quá tải,kpi.overloadWc
+APS,중국어,라벨,aps_kpi_overloadWc,工作中心超负荷,kpi.overloadWc
+APS,한국어,라벨,aps_kpi_planRisk,계획수립 예상 리스크,kpi.planRisk
+APS,영어,라벨,aps_kpi_planRisk,Expected Planning Risk,kpi.planRisk
+APS,베트남어,라벨,aps_kpi_planRisk,Rủi ro dự kiến,kpi.planRisk
+APS,중국어,라벨,aps_kpi_planRisk,预期计划风险,kpi.planRisk
+APS,한국어,라벨,aps_kpi_unitCase,건,kpi.unitCase
+APS,영어,라벨,aps_kpi_unitCase,cases,kpi.unitCase
+APS,베트남어,라벨,aps_kpi_unitCase,vụ,kpi.unitCase
+APS,중국어,라벨,aps_kpi_unitCase,件,kpi.unitCase
+APS,한국어,라벨,aps_kpi_unitPct,%,kpi.unitPct
+APS,영어,라벨,aps_kpi_unitPct,%,kpi.unitPct
+APS,베트남어,라벨,aps_kpi_unitPct,%,kpi.unitPct
+APS,중국어,라벨,aps_kpi_unitPct,%,kpi.unitPct
+APS,한국어,라벨,aps_kpi_unitWc,%WC,kpi.unitWc
+APS,영어,라벨,aps_kpi_unitWc,%WC,kpi.unitWc
+APS,베트남어,라벨,aps_kpi_unitWc,%WC,kpi.unitWc
+APS,중국어,라벨,aps_kpi_unitWc,%WC,kpi.unitWc
+APS,한국어,라벨,aps_loadMatrix_col_count,지시건수,loadMatrix.col.count
+APS,영어,라벨,aps_loadMatrix_col_count,Order Count,loadMatrix.col.count
+APS,베트남어,라벨,aps_loadMatrix_col_count,Số chỉ thị,loadMatrix.col.count
+APS,중국어,라벨,aps_loadMatrix_col_count,指示件数,loadMatrix.col.count
+APS,한국어,라벨,aps_loadMatrix_col_qtySum,지시량계,loadMatrix.col.qtySum
+APS,영어,라벨,aps_loadMatrix_col_qtySum,Total Qty,loadMatrix.col.qtySum
+APS,베트남어,라벨,aps_loadMatrix_col_qtySum,Tổng SL,loadMatrix.col.qtySum
+APS,중국어,라벨,aps_loadMatrix_col_qtySum,指示总量,loadMatrix.col.qtySum
+APS,한국어,라벨,aps_loadMatrix_col_wc,워크센터,loadMatrix.col.wc
+APS,영어,라벨,aps_loadMatrix_col_wc,Work Center,loadMatrix.col.wc
+APS,베트남어,라벨,aps_loadMatrix_col_wc,Work Center,loadMatrix.col.wc
+APS,중국어,라벨,aps_loadMatrix_col_wc,工作中心,loadMatrix.col.wc
+APS,한국어,라벨,aps_loadMatrix_legend_both,자재부족+부하초과,loadMatrix.legend.both
+APS,영어,라벨,aps_loadMatrix_legend_both,Shortage + Overload,loadMatrix.legend.both
+APS,베트남어,라벨,aps_loadMatrix_legend_both,Thiếu VL + Quá tải,loadMatrix.legend.both
+APS,중국어,라벨,aps_loadMatrix_legend_both,物料短缺+超负荷,loadMatrix.legend.both
+APS,한국어,라벨,aps_loadMatrix_legend_empty,미배정,loadMatrix.legend.empty
+APS,영어,라벨,aps_loadMatrix_legend_empty,Unassigned,loadMatrix.legend.empty
+APS,베트남어,라벨,aps_loadMatrix_legend_empty,Chưa phân bổ,loadMatrix.legend.empty
+APS,중국어,라벨,aps_loadMatrix_legend_empty,未分配,loadMatrix.legend.empty
+APS,한국어,라벨,aps_loadMatrix_legend_materialShort,자재부족,loadMatrix.legend.materialShort
+APS,영어,라벨,aps_loadMatrix_legend_materialShort,Material Shortage,loadMatrix.legend.materialShort
+APS,베트남어,라벨,aps_loadMatrix_legend_materialShort,Thiếu vật liệu,loadMatrix.legend.materialShort
+APS,중국어,라벨,aps_loadMatrix_legend_materialShort,物料短缺,loadMatrix.legend.materialShort
+APS,한국어,라벨,aps_loadMatrix_legend_normal,정상,loadMatrix.legend.normal
+APS,영어,라벨,aps_loadMatrix_legend_normal,Normal,loadMatrix.legend.normal
+APS,베트남어,라벨,aps_loadMatrix_legend_normal,Bình thường,loadMatrix.legend.normal
+APS,중국어,라벨,aps_loadMatrix_legend_normal,正常,loadMatrix.legend.normal
+APS,한국어,라벨,aps_loadMatrix_legend_overload,부하초과,loadMatrix.legend.overload
+APS,영어,라벨,aps_loadMatrix_legend_overload,Overload,loadMatrix.legend.overload
+APS,베트남어,라벨,aps_loadMatrix_legend_overload,Quá tải,loadMatrix.legend.overload
+APS,중국어,라벨,aps_loadMatrix_legend_overload,超负荷,loadMatrix.legend.overload
+APS,한국어,라벨,aps_loadMatrix_subtitle,워크센터 × 날짜,loadMatrix.subtitle
+APS,영어,라벨,aps_loadMatrix_subtitle,Work Center × Date,loadMatrix.subtitle
+APS,베트남어,라벨,aps_loadMatrix_subtitle,Work Center × Ngày,loadMatrix.subtitle
+APS,중국어,라벨,aps_loadMatrix_subtitle,工作中心 × 日期,loadMatrix.subtitle
+APS,한국어,라벨,aps_loadMatrix_title,부하내역,loadMatrix.title
+APS,영어,라벨,aps_loadMatrix_title,Load Detail,loadMatrix.title
+APS,베트남어,라벨,aps_loadMatrix_title,Chi tiết tải,loadMatrix.title
+APS,중국어,라벨,aps_loadMatrix_title,负荷明细,loadMatrix.title
+APS,한국어,라벨,aps_loadMatrix_total,합계,loadMatrix.total
+APS,영어,라벨,aps_loadMatrix_total,Total,loadMatrix.total
+APS,베트남어,라벨,aps_loadMatrix_total,Tổng cộng,loadMatrix.total
+APS,중국어,라벨,aps_loadMatrix_total,合计,loadMatrix.total
+APS,한국어,라벨,aps_master_bom_child,하위품목,master.bom.child
+APS,영어,라벨,aps_master_bom_child,Child Item,master.bom.child
+APS,베트남어,라벨,aps_master_bom_child,Item con,master.bom.child
+APS,중국어,라벨,aps_master_bom_child,下级品项,master.bom.child
+APS,한국어,라벨,aps_master_bom_parent,상위품목,master.bom.parent
+APS,영어,라벨,aps_master_bom_parent,Parent Item,master.bom.parent
+APS,베트남어,라벨,aps_master_bom_parent,Item cha,master.bom.parent
+APS,중국어,라벨,aps_master_bom_parent,上级品项,master.bom.parent
+APS,한국어,라벨,aps_master_bom_qtyPer,소요량,master.bom.qtyPer
+APS,영어,라벨,aps_master_bom_qtyPer,Qty per Unit,master.bom.qtyPer
+APS,베트남어,라벨,aps_master_bom_qtyPer,Định mức,master.bom.qtyPer
+APS,중국어,라벨,aps_master_bom_qtyPer,用量,master.bom.qtyPer
+APS,한국어,라벨,aps_master_equipment_code,설비코드,master.equipment.code
+APS,영어,라벨,aps_master_equipment_code,Equipment Code,master.equipment.code
+APS,베트남어,라벨,aps_master_equipment_code,Mã thiết bị,master.equipment.code
+APS,중국어,라벨,aps_master_equipment_code,设备代码,master.equipment.code
+APS,한국어,라벨,aps_master_equipment_runtime,가동시간(분),master.equipment.runtime
+APS,영어,라벨,aps_master_equipment_runtime,Runtime (min),master.equipment.runtime
+APS,베트남어,라벨,aps_master_equipment_runtime,Thời gian (phút),master.equipment.runtime
+APS,중국어,라벨,aps_master_equipment_runtime,运行时间(分钟),master.equipment.runtime
+APS,한국어,라벨,aps_master_equipment_stRate,ST환산율,master.equipment.stRate
+APS,영어,라벨,aps_master_equipment_stRate,ST Conversion Rate,master.equipment.stRate
+APS,베트남어,라벨,aps_master_equipment_stRate,Tỉ lệ ST,master.equipment.stRate
+APS,중국어,라벨,aps_master_equipment_stRate,ST换算率,master.equipment.stRate
+APS,한국어,라벨,aps_master_inventory_asOf,기준일,master.inventory.asOf
+APS,영어,라벨,aps_master_inventory_asOf,As-of Date,master.inventory.asOf
+APS,베트남어,라벨,aps_master_inventory_asOf,Ngày chốt,master.inventory.asOf
+APS,중국어,라벨,aps_master_inventory_asOf,基准日期,master.inventory.asOf
+APS,한국어,라벨,aps_master_inventory_onHand,재고량,master.inventory.onHand
+APS,영어,라벨,aps_master_inventory_onHand,On-hand Qty,master.inventory.onHand
+APS,베트남어,라벨,aps_master_inventory_onHand,Tồn,master.inventory.onHand
+APS,중국어,라벨,aps_master_inventory_onHand,库存量,master.inventory.onHand
+APS,한국어,라벨,aps_master_inventory_warehouse,창고,master.inventory.warehouse
+APS,영어,라벨,aps_master_inventory_warehouse,Warehouse,master.inventory.warehouse
+APS,베트남어,라벨,aps_master_inventory_warehouse,Kho,master.inventory.warehouse
+APS,중국어,라벨,aps_master_inventory_warehouse,仓库,master.inventory.warehouse
+APS,한국어,라벨,aps_master_item_code,품목코드,master.item.code
+APS,영어,라벨,aps_master_item_code,Item Code,master.item.code
+APS,베트남어,라벨,aps_master_item_code,Mã Item,master.item.code
+APS,중국어,라벨,aps_master_item_code,品项代码,master.item.code
+APS,한국어,라벨,aps_master_item_name,이름,master.item.name
+APS,영어,라벨,aps_master_item_name,Name,master.item.name
+APS,베트남어,라벨,aps_master_item_name,Tên,master.item.name
+APS,중국어,라벨,aps_master_item_name,名称,master.item.name
+APS,한국어,라벨,aps_master_item_uom,단위,master.item.uom
+APS,영어,라벨,aps_master_item_uom,UoM,master.item.uom
+APS,베트남어,라벨,aps_master_item_uom,Đơn vị,master.item.uom
+APS,중국어,라벨,aps_master_item_uom,单位,master.item.uom
+APS,한국어,라벨,aps_master_routing_process,공정,master.routing.process
+APS,영어,라벨,aps_master_routing_process,Process,master.routing.process
+APS,베트남어,라벨,aps_master_routing_process,Công đoạn,master.routing.process
+APS,중국어,라벨,aps_master_routing_process,工序,master.routing.process
+APS,한국어,라벨,aps_master_routing_standardSt,표준S/T(분),master.routing.standardSt
+APS,영어,라벨,aps_master_routing_standardSt,Standard S/T (min),master.routing.standardSt
+APS,베트남어,라벨,aps_master_routing_standardSt,S/T tiêu chuẩn (phút),master.routing.standardSt
+APS,중국어,라벨,aps_master_routing_standardSt,标准S/T(分钟),master.routing.standardSt
+APS,한국어,라벨,aps_master_routing_step,단계,master.routing.step
+APS,영어,라벨,aps_master_routing_step,Step,master.routing.step
+APS,베트남어,라벨,aps_master_routing_step,Bước,master.routing.step
+APS,중국어,라벨,aps_master_routing_step,工序步骤,master.routing.step
+APS,한국어,라벨,aps_master_routing_wc,워크센터,master.routing.wc
+APS,영어,라벨,aps_master_routing_wc,Work Center,master.routing.wc
+APS,베트남어,라벨,aps_master_routing_wc,Work Center,master.routing.wc
+APS,중국어,라벨,aps_master_routing_wc,工作中心,master.routing.wc
+APS,한국어,라벨,aps_master_wc_code,코드,master.wc.code
+APS,영어,라벨,aps_master_wc_code,Code,master.wc.code
+APS,베트남어,라벨,aps_master_wc_code,Mã,master.wc.code
+APS,중국어,라벨,aps_master_wc_code,代码,master.wc.code
+APS,한국어,라벨,aps_master_wc_defaultRuntime,기본 가동시간(분),master.wc.defaultRuntime
+APS,영어,라벨,aps_master_wc_defaultRuntime,Default Runtime (min),master.wc.defaultRuntime
+APS,베트남어,라벨,aps_master_wc_defaultRuntime,Thời gian mặc định (phút),master.wc.defaultRuntime
+APS,중국어,라벨,aps_master_wc_defaultRuntime,默认运行时间(分钟),master.wc.defaultRuntime
+APS,한국어,라벨,aps_master_wc_equipmentCount,설비 수,master.wc.equipmentCount
+APS,영어,라벨,aps_master_wc_equipmentCount,Equipment Count,master.wc.equipmentCount
+APS,베트남어,라벨,aps_master_wc_equipmentCount,Số thiết bị,master.wc.equipmentCount
+APS,중국어,라벨,aps_master_wc_equipmentCount,设备数量,master.wc.equipmentCount
+APS,한국어,라벨,aps_master_wc_name,이름,master.wc.name
+APS,영어,라벨,aps_master_wc_name,Name,master.wc.name
+APS,베트남어,라벨,aps_master_wc_name,Tên,master.wc.name
+APS,중국어,라벨,aps_master_wc_name,名称,master.wc.name
+APS,한국어,라벨,aps_master_wc_totalRuntime,총 가동시간(분),master.wc.totalRuntime
+APS,영어,라벨,aps_master_wc_totalRuntime,Total Runtime (min),master.wc.totalRuntime
+APS,베트남어,라벨,aps_master_wc_totalRuntime,Tổng thời gian (phút),master.wc.totalRuntime
+APS,중국어,라벨,aps_master_wc_totalRuntime,总运行时间(分钟),master.wc.totalRuntime
+APS,한국어,라벨,aps_matrix_aggregate,WC 집계,matrix.aggregate
+APS,영어,라벨,aps_matrix_aggregate,WC Aggregate,matrix.aggregate
+APS,베트남어,라벨,aps_matrix_aggregate,Tổng hợp WC,matrix.aggregate
+APS,중국어,라벨,aps_matrix_aggregate,WC汇总,matrix.aggregate
+APS,한국어,라벨,aps_matrix_detail,계획 상세,matrix.detail
+APS,영어,라벨,aps_matrix_detail,Plan Detail,matrix.detail
+APS,베트남어,라벨,aps_matrix_detail,Chi tiết Plan,matrix.detail
+APS,중국어,라벨,aps_matrix_detail,计划明细,matrix.detail
+APS,한국어,라벨,aps_mps_add,추가,mps.add
+APS,영어,라벨,aps_mps_add,Add,mps.add
+APS,베트남어,라벨,aps_mps_add,Thêm,mps.add
+APS,중국어,라벨,aps_mps_add,添加,mps.add
+APS,한국어,라벨,aps_mps_endDate,종료일자,mps.endDate
+APS,영어,라벨,aps_mps_endDate,End Date,mps.endDate
+APS,베트남어,라벨,aps_mps_endDate,Ngày kết thúc,mps.endDate
+APS,중국어,라벨,aps_mps_endDate,结束日期,mps.endDate
+APS,한국어,라벨,aps_mps_list,MPS 목록,mps.list
+APS,영어,라벨,aps_mps_list,MPS List,mps.list
+APS,베트남어,라벨,aps_mps_list,Danh sách MPS,mps.list
+APS,중국어,라벨,aps_mps_list,MPS列表,mps.list
+APS,한국어,라벨,aps_mps_orderNo,오더 번호,mps.orderNo
+APS,영어,라벨,aps_mps_orderNo,Order No.,mps.orderNo
+APS,베트남어,라벨,aps_mps_orderNo,Mã Order,mps.orderNo
+APS,중국어,라벨,aps_mps_orderNo,订单编号,mps.orderNo
+APS,한국어,라벨,aps_mps_status,상태,mps.status
+APS,영어,라벨,aps_mps_status,Status,mps.status
+APS,베트남어,라벨,aps_mps_status,Trạng thái,mps.status
+APS,중국어,라벨,aps_mps_status,状态,mps.status
+APS,한국어,라벨,aps_mps_statusDraft,작성,mps.statusDraft
+APS,영어,라벨,aps_mps_statusDraft,Draft,mps.statusDraft
+APS,베트남어,라벨,aps_mps_statusDraft,Đã lập,mps.statusDraft
+APS,중국어,라벨,aps_mps_statusDraft,已编制,mps.statusDraft
+APS,한국어,라벨,aps_nav_aps,APS 작업계획,nav.aps
+APS,영어,라벨,aps_nav_aps,APS Work Plan,nav.aps
+APS,베트남어,라벨,aps_nav_aps,Kế hoạch APS,nav.aps
+APS,중국어,라벨,aps_nav_aps,APS作业计划,nav.aps
+APS,한국어,라벨,aps_nav_bom,BOM,nav.bom
+APS,영어,라벨,aps_nav_bom,BOM,nav.bom
+APS,베트남어,라벨,aps_nav_bom,BOM,nav.bom
+APS,중국어,라벨,aps_nav_bom,BOM,nav.bom
+APS,한국어,라벨,aps_nav_inventory,재고,nav.inventory
+APS,영어,라벨,aps_nav_inventory,Inventory,nav.inventory
+APS,베트남어,라벨,aps_nav_inventory,Tồn kho,nav.inventory
+APS,중국어,라벨,aps_nav_inventory,库存,nav.inventory
+APS,한국어,라벨,aps_nav_items,품목 / 라우팅,nav.items
+APS,영어,라벨,aps_nav_items,Item / Routing,nav.items
+APS,베트남어,라벨,aps_nav_items,Item / Routing,nav.items
+APS,중국어,라벨,aps_nav_items,品项 / 工艺路线,nav.items
+APS,한국어,라벨,aps_nav_masters,마스터 데이터,nav.masters
+APS,영어,라벨,aps_nav_masters,Master Data,nav.masters
+APS,베트남어,라벨,aps_nav_masters,Master data,nav.masters
+APS,중국어,라벨,aps_nav_masters,主数据,nav.masters
+APS,한국어,라벨,aps_nav_mps,생산계획 (MPS),nav.mps
+APS,영어,라벨,aps_nav_mps,Production Plan (MPS),nav.mps
+APS,베트남어,라벨,aps_nav_mps,MPS,nav.mps
+APS,중국어,라벨,aps_nav_mps,生产计划 (MPS),nav.mps
+APS,한국어,라벨,aps_nav_workCenters,작업장 / 설비,nav.workCenters
+APS,영어,라벨,aps_nav_workCenters,Work Center / Equipment,nav.workCenters
+APS,베트남어,라벨,aps_nav_workCenters,Work Center / Thiết bị,nav.workCenters
+APS,중국어,라벨,aps_nav_workCenters,工作中心 / 设备,nav.workCenters
+APS,한국어,라벨,aps_planMatrix_col_item,품목,planMatrix.col.item
+APS,영어,라벨,aps_planMatrix_col_item,Item,planMatrix.col.item
+APS,베트남어,라벨,aps_planMatrix_col_item,Item,planMatrix.col.item
+APS,중국어,라벨,aps_planMatrix_col_item,品项,planMatrix.col.item
+APS,한국어,라벨,aps_planMatrix_col_qty,계획수량,planMatrix.col.qty
+APS,영어,라벨,aps_planMatrix_col_qty,Plan Qty,planMatrix.col.qty
+APS,베트남어,라벨,aps_planMatrix_col_qty,SL kế hoạch,planMatrix.col.qty
+APS,중국어,라벨,aps_planMatrix_col_qty,计划数量,planMatrix.col.qty
+APS,한국어,라벨,aps_planMatrix_col_wc,작업장,planMatrix.col.wc
+APS,영어,라벨,aps_planMatrix_col_wc,WC,planMatrix.col.wc
+APS,베트남어,라벨,aps_planMatrix_col_wc,WC,planMatrix.col.wc
+APS,중국어,라벨,aps_planMatrix_col_wc,WC,planMatrix.col.wc
+APS,한국어,라벨,aps_planMatrix_subtitle,각 행 = 1 계획 · 셀 값 = 일별 생산 수량,planMatrix.subtitle
+APS,영어,라벨,aps_planMatrix_subtitle,Each row = 1 plan · Cell value = daily production qty,planMatrix.subtitle
+APS,베트남어,라벨,aps_planMatrix_subtitle,Mỗi hàng = 1 plan · số trong ô = SL sản xuất trong ngày,planMatrix.subtitle
+APS,중국어,라벨,aps_planMatrix_subtitle,每行 = 1个计划 · 单元格数值 = 每日生产数量,planMatrix.subtitle
+APS,한국어,라벨,aps_planMatrix_title,계획별 부하 상세,planMatrix.title
+APS,영어,라벨,aps_planMatrix_title,Load Detail by Plan,planMatrix.title
+APS,베트남어,라벨,aps_planMatrix_title,Chi tiết tải theo Plan,planMatrix.title
+APS,중국어,라벨,aps_planMatrix_title,按计划的负荷明细,planMatrix.title
+APS,한국어,라벨,aps_risk_both,자재부족+부하초과,risk.both
+APS,영어,라벨,aps_risk_both,Shortage + Overload,risk.both
+APS,베트남어,라벨,aps_risk_both,Thiếu VL + Quá tải,risk.both
+APS,중국어,라벨,aps_risk_both,物料短缺+超负荷,risk.both
+APS,한국어,라벨,aps_risk_materialShort,자재부족,risk.materialShort
+APS,영어,라벨,aps_risk_materialShort,Material Shortage,risk.materialShort
+APS,베트남어,라벨,aps_risk_materialShort,Thiếu vật liệu,risk.materialShort
+APS,중국어,라벨,aps_risk_materialShort,物料短缺,risk.materialShort
+APS,한국어,라벨,aps_risk_normal,정상,risk.normal
+APS,영어,라벨,aps_risk_normal,Normal,risk.normal
+APS,베트남어,라벨,aps_risk_normal,Bình thường,risk.normal
+APS,중국어,라벨,aps_risk_normal,正常,risk.normal
+APS,한국어,라벨,aps_risk_overload,부하초과,risk.overload
+APS,영어,라벨,aps_risk_overload,Overload,risk.overload
+APS,베트남어,라벨,aps_risk_overload,Quá tải,risk.overload
+APS,중국어,라벨,aps_risk_overload,超负荷,risk.overload
+APS,한국어,라벨,aps_workPlanList_col_action,액션,workPlanList.col.action
+APS,영어,라벨,aps_workPlanList_col_action,Action,workPlanList.col.action
+APS,베트남어,라벨,aps_workPlanList_col_action,Thao tác,workPlanList.col.action
+APS,중국어,라벨,aps_workPlanList_col_action,操作,workPlanList.col.action
+APS,한국어,라벨,aps_workPlanList_col_deliveryDate,납기일자,workPlanList.col.deliveryDate
+APS,영어,라벨,aps_workPlanList_col_deliveryDate,Delivery Date,workPlanList.col.deliveryDate
+APS,베트남어,라벨,aps_workPlanList_col_deliveryDate,Ngày giao,workPlanList.col.deliveryDate
+APS,중국어,라벨,aps_workPlanList_col_deliveryDate,交货日期,workPlanList.col.deliveryDate
+APS,한국어,라벨,aps_workPlanList_col_item,품목,workPlanList.col.item
+APS,영어,라벨,aps_workPlanList_col_item,Item,workPlanList.col.item
+APS,베트남어,라벨,aps_workPlanList_col_item,Item,workPlanList.col.item
+APS,중국어,라벨,aps_workPlanList_col_item,品项,workPlanList.col.item
+APS,한국어,라벨,aps_workPlanList_col_orderNo,오더,workPlanList.col.orderNo
+APS,영어,라벨,aps_workPlanList_col_orderNo,Order,workPlanList.col.orderNo
+APS,베트남어,라벨,aps_workPlanList_col_orderNo,Order,workPlanList.col.orderNo
+APS,중국어,라벨,aps_workPlanList_col_orderNo,订单,workPlanList.col.orderNo
+APS,한국어,라벨,aps_workPlanList_col_planEnd,계획완료,workPlanList.col.planEnd
+APS,영어,라벨,aps_workPlanList_col_planEnd,Plan End,workPlanList.col.planEnd
+APS,베트남어,라벨,aps_workPlanList_col_planEnd,Hoàn thành KH,workPlanList.col.planEnd
+APS,중국어,라벨,aps_workPlanList_col_planEnd,计划完成,workPlanList.col.planEnd
+APS,한국어,라벨,aps_workPlanList_col_planQty,계획수량,workPlanList.col.planQty
+APS,영어,라벨,aps_workPlanList_col_planQty,Plan Qty,workPlanList.col.planQty
+APS,베트남어,라벨,aps_workPlanList_col_planQty,SL kế hoạch,workPlanList.col.planQty
+APS,중국어,라벨,aps_workPlanList_col_planQty,计划数量,workPlanList.col.planQty
+APS,한국어,라벨,aps_workPlanList_col_planStart,계획시작,workPlanList.col.planStart
+APS,영어,라벨,aps_workPlanList_col_planStart,Plan Start,workPlanList.col.planStart
+APS,베트남어,라벨,aps_workPlanList_col_planStart,Bắt đầu KH,workPlanList.col.planStart
+APS,중국어,라벨,aps_workPlanList_col_planStart,计划开始,workPlanList.col.planStart
+APS,한국어,라벨,aps_workPlanList_col_process,공정,workPlanList.col.process
+APS,영어,라벨,aps_workPlanList_col_process,Process,workPlanList.col.process
+APS,베트남어,라벨,aps_workPlanList_col_process,Công đoạn,workPlanList.col.process
+APS,중국어,라벨,aps_workPlanList_col_process,工序,workPlanList.col.process
+APS,한국어,라벨,aps_workPlanList_col_riskType,리스크유형,workPlanList.col.riskType
+APS,영어,라벨,aps_workPlanList_col_riskType,Risk Type,workPlanList.col.riskType
+APS,베트남어,라벨,aps_workPlanList_col_riskType,Loại rủi ro,workPlanList.col.riskType
+APS,중국어,라벨,aps_workPlanList_col_riskType,风险类型,workPlanList.col.riskType
+APS,한국어,라벨,aps_workPlanList_col_sourceType,리스트유형,workPlanList.col.sourceType
+APS,영어,라벨,aps_workPlanList_col_sourceType,Source Type,workPlanList.col.sourceType
+APS,베트남어,라벨,aps_workPlanList_col_sourceType,Nguồn,workPlanList.col.sourceType
+APS,중국어,라벨,aps_workPlanList_col_sourceType,来源类型,workPlanList.col.sourceType
+APS,한국어,라벨,aps_workPlanList_col_tmpPlanNo,(임시)작업계획번호,workPlanList.col.tmpPlanNo
+APS,영어,라벨,aps_workPlanList_col_tmpPlanNo,Temp Plan No.,workPlanList.col.tmpPlanNo
+APS,베트남어,라벨,aps_workPlanList_col_tmpPlanNo,Mã KHSX tạm,workPlanList.col.tmpPlanNo
+APS,중국어,라벨,aps_workPlanList_col_tmpPlanNo,(临时)作业计划编号,workPlanList.col.tmpPlanNo
+APS,한국어,라벨,aps_workPlanList_col_wc,워크센터,workPlanList.col.wc
+APS,영어,라벨,aps_workPlanList_col_wc,Work Center,workPlanList.col.wc
+APS,베트남어,라벨,aps_workPlanList_col_wc,Work Center,workPlanList.col.wc
+APS,중국어,라벨,aps_workPlanList_col_wc,工作中心,workPlanList.col.wc
+APS,한국어,라벨,aps_workPlanList_col_workOrderNo,작업지시번호,workPlanList.col.workOrderNo
+APS,영어,라벨,aps_workPlanList_col_workOrderNo,Work Order No.,workPlanList.col.workOrderNo
+APS,베트남어,라벨,aps_workPlanList_col_workOrderNo,Mã chỉ thị SX,workPlanList.col.workOrderNo
+APS,중국어,라벨,aps_workPlanList_col_workOrderNo,作业指示编号,workPlanList.col.workOrderNo
+APS,한국어,라벨,aps_workPlanList_subtitle,총 {total}건 · 위험 {risk}건 · 지연 {delay}건,workPlanList.subtitle
+APS,영어,라벨,aps_workPlanList_subtitle,Total {total} · Risk {risk} · Delay {delay},workPlanList.subtitle
+APS,베트남어,라벨,aps_workPlanList_subtitle,Tổng {total} · Rủi ro {risk} · Trễ {delay},workPlanList.subtitle
+APS,중국어,라벨,aps_workPlanList_subtitle,共 {total}件 · 风险 {risk}件 · 延迟 {delay}件,workPlanList.subtitle
+APS,한국어,라벨,aps_workPlanList_title,작업계획 리스트,workPlanList.title
+APS,영어,라벨,aps_workPlanList_title,Work Plan List,workPlanList.title
+APS,베트남어,라벨,aps_workPlanList_title,Danh sách kế hoạch sản xuất,workPlanList.title
+APS,중국어,라벨,aps_workPlanList_title,作业计划列表,workPlanList.title
+APS,한국어,라벨,aps_workPlanList_unit,건,workPlanList.unit
+APS,영어,라벨,aps_workPlanList_unit,plans,workPlanList.unit
+APS,베트남어,라벨,aps_workPlanList_unit,kế hoạch,workPlanList.unit
+APS,중국어,라벨,aps_workPlanList_unit,件,workPlanList.unit
