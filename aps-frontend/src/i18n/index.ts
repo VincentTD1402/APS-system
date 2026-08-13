@@ -63,6 +63,11 @@ function setHtmlLang(locale: Locale): void {
   document.documentElement.setAttribute('lang', HTML_LANG_BY_GSYSTEM[locale] || locale)
 }
 
+/** Mã ngôn ngữ GSystem đang active — dùng để gửi `lang` cho API cần trả lời đúng ngôn ngữ (VD: AI제안). */
+export function getLocale(): Locale {
+  return globalI18n.locale.value
+}
+
 /** Đổi ngôn ngữ chủ động từ UI riêng của APS (standalone, không nhúng MES). */
 export function setLocale(locale: Locale): void {
   globalI18n.locale.value = locale

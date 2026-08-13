@@ -10,6 +10,8 @@ export interface RiskSummaryParams {
   dateTo?: string
   /** APS전표번호 — matched against tmp_plan_no / work_order_no / order_no. */
   planNo?: string
+  /** GSystem language code — narrative prose is generated in this language. */
+  lang?: string
   /** Skip the server cache and re-run the LLM. Use after the plan data changed. */
   refresh?: boolean
 }
@@ -21,6 +23,7 @@ function compactParams(p: RiskSummaryParams): Record<string, string> {
   if (p.dateFrom) out.date_from = p.dateFrom
   if (p.dateTo) out.date_to = p.dateTo
   if (p.planNo) out.plan_no = p.planNo
+  if (p.lang) out.lang = p.lang
   if (p.refresh) out.refresh = 'true'
   return out
 }

@@ -1,4 +1,4 @@
-"""LLM narrative for the AI제안 panel — Korean prose over deterministic facts.
+"""LLM narrative for the AI제안 panel — prose (per `lang`) over deterministic facts.
 
 Three defences against a hallucinated figure reaching a planner:
 
@@ -32,10 +32,11 @@ from app.services.llm.risk_narrative_guard import (
     find_invented_numbers,
     narrative_text,
 )
+from app.services.llm.risk_narrative_i18n import DEFAULT_LANG, severity_label, template_strings
 from app.services.llm.risk_narrative_prompt import (
     NARRATIVE_JSON_SCHEMA,
-    SYSTEM_PROMPT,
     USER_PROMPT,
+    build_system_prompt,
 )
 
 logger = get_logger(__name__)
@@ -43,59 +44,44 @@ logger = get_logger(__name__)
 _MAX_RECOMMENDATIONS = 3
 
 
-def _severity_ko(severity: str) -> str:
-    return {"CRITICAL": "심각", "WARNING": "주의"}.get(severity, "정상")
-
-
-def build_template_narrative(facts: RiskSummaryFacts) -> RiskNarrative:
-    """Deterministic Korean fallback — used when the LLM is skipped or rejected.
+def build_template_narrative(facts: RiskSummaryFacts, lang: str = DEFAULT_LANG) -> RiskNarrative:
+    """Deterministic fallback in `lang` — used when the LLM is skipped or rejected.
 
     Written from the same facts, so the panel degrades to plainer wording rather
     than to an empty block.
     """
+    t = template_strings(lang)
     if not facts.workcenters and not facts.shortages:
         return RiskNarrative(
-            root_cause="[정상] 현재 조회 범위에서 즉시 조치가 필요한 생산 리스크가 없습니다.",
-            impact_summary="영향받는 작업지시가 없습니다.",
+            root_cause=t["no_risk_root_cause"],
+            impact_summary=t["no_risk_impact"],
             recommendations=[],
         )
 
-    causes: list[str] = [f"[{facts.severity}] 계획 리스크가 확인되었습니다."]
+    severity = severity_label(facts.severity, lang)
+    causes: list[str] = [t["risk_detected"].format(severity=severity)]
     if facts.workcenters:
         worst = facts.workcenters[0]
-        causes.append(
-            f"작업장 {worst.workcenter_no}의 {worst.peak_day} 부하율이 "
-            f"{worst.peak_load_percent}%로 허용량을 초과했습니다."
-        )
+        causes.append(t["overload_cause"].format(
+            wc=worst.workcenter_no, day=worst.peak_day, pct=worst.peak_load_percent,
+        ))
     if facts.shortages:
         short = facts.shortages[0]
-        causes.append(
-            f"자재 {short.item_no}의 현재고는 {short.available_qty}이며 "
-            f"{short.shortage_qty}만큼 부족합니다."
-        )
+        causes.append(t["shortage_cause"].format(
+            item=short.item_no, available=short.available_qty, shortage=short.shortage_qty,
+        ))
 
-    wc_list = ", ".join(w.workcenter_no or "-" for w in facts.workcenters) or "없음"
-    impact = (
-        f"영향받는 작업장: {wc_list}. "
-        f"영향받는 작업지시: {facts.affected.count}건. "
-        f"심각도: {facts.severity} (긴급도: {facts.urgency})."
+    wc_list = ", ".join(w.workcenter_no or "-" for w in facts.workcenters) or t["no_wc"]
+    impact = t["impact_summary"].format(
+        wc_list=wc_list, count=facts.affected.count, severity=severity, urgency=facts.urgency,
     )
 
     recs: list[RecommendationItem] = []
     if facts.workcenters:
-        recs.append(RecommendationItem(
-            priority=len(recs) + 1,
-            text="과부하 작업장의 작업 일정을 조정하거나 여유 있는 작업장으로 재배분하십시오.",
-        ))
+        recs.append(RecommendationItem(priority=len(recs) + 1, text=t["rec_overload"]))
     if facts.shortages:
-        recs.append(RecommendationItem(
-            priority=len(recs) + 1,
-            text="부족 자재의 구매 요청 또는 대체 자재 가능 여부를 확인하십시오.",
-        ))
-    recs.append(RecommendationItem(
-        priority=len(recs) + 1,
-        text="납기가 임박한 작업지시부터 우선순위를 재검토하십시오.",
-    ))
+        recs.append(RecommendationItem(priority=len(recs) + 1, text=t["rec_shortage"]))
+    recs.append(RecommendationItem(priority=len(recs) + 1, text=t["rec_priority"]))
 
     return RiskNarrative(
         root_cause=" ".join(causes),
@@ -119,21 +105,24 @@ def _to_narrative(payload: dict) -> RiskNarrative:
 
 
 async def generate_narrative(
-    facts: RiskSummaryFacts, config_name: str = "no_think"
+    facts: RiskSummaryFacts, config_name: str = "no_think", lang: str = DEFAULT_LANG
 ) -> tuple[RiskNarrative, str, list[str]]:
     """Return (narrative, generated_by, rejected_numbers).
 
+    `lang` is a GSystem language code (same as the FE's active locale) — both the
+    LLM prompt's output-language directive and the deterministic template follow it.
+
     `generated_by` is "template" whenever the LLM was skipped, failed, timed
     out, or quoted a figure the facts do not support. The caller never has to
-    handle an error path — the panel always gets renderable Korean text.
+    handle an error path — the panel always gets renderable text in `lang`.
     """
     if not facts.workcenters and not facts.shortages:
         # Nothing to explain — spending an LLM call here would only invite invention.
-        return build_template_narrative(facts), "template", []
+        return build_template_narrative(facts, lang), "template", []
 
     payload = facts.model_dump(mode="json", by_alias=True)
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": build_system_prompt(lang)},
         {
             "role": "user",
             "content": USER_PROMPT.format(
@@ -151,18 +140,18 @@ async def generate_narrative(
             )
     except (asyncio.TimeoutError, ChatServiceError, ValueError, OSError) as e:
         logger.warning("risk narrative LLM unavailable (%s) — using template", e)
-        return build_template_narrative(facts), "template", []
+        return build_template_narrative(facts, lang), "template", []
 
     invented = find_invented_numbers(narrative_text(raw), allowed_numbers(payload))
     if invented:
         logger.warning(
             "risk narrative rejected — figures absent from facts: %s", invented
         )
-        return build_template_narrative(facts), "template", invented
+        return build_template_narrative(facts, lang), "template", invented
 
     narrative = _to_narrative(raw)
     if not narrative.root_cause or not narrative.recommendations:
         logger.warning("risk narrative incomplete — using template")
-        return build_template_narrative(facts), "template", []
+        return build_template_narrative(facts, lang), "template", []
 
     return narrative, "llm", []

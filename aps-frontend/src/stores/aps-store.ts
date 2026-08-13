@@ -1,7 +1,7 @@
 // Pinia store — RUN/시뮬레이션 gọi thẳng BE (`POST /aps/run`, `POST /aps/adjust`).
 // Contract khớp `aps-backend/app/schemas/aps.py::ApsRunResult`.
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   enumerateDates,
   type LoadCellOut, type WorkPlanRow, type Kpi,
@@ -11,6 +11,7 @@ import { runAps as fetchApsRun, adjustAps as fetchApsAdjust } from '@/api/aps'
 import { fetchMaterialShortages, rebuildMaterialShortage } from '@/api/master'
 import { createPurchaseRequest, createWorkOrder } from '@/api/erp'
 import { fetchRiskSummary } from '@/api/llm'
+import { getLocale } from '@/i18n'
 import type { RiskRecommendation } from '@/types/llm'
 import { toLoadCells, toWorkPlanRows } from '@/data/aps-run-adapter'
 import type { WorkPlan, LoadCell } from '@/types/planning'
@@ -200,13 +201,20 @@ export const useApsStore = defineStore('aps', () => {
     aiLoading.value = true
     aiError.value = null
     try {
-      aiSummary.value = await fetchRiskSummary({ refresh: true })
+      aiSummary.value = await fetchRiskSummary({ refresh: true, lang: getLocale() })
     } catch (e) {
       aiError.value = e instanceof Error ? e.message : 'AI 분석을 불러오지 못했습니다'
     } finally {
       aiLoading.value = false
     }
   }
+
+  // MES đổi ngôn ngữ (GSYSTEM_I18N_CHANGE) → narrative AI제안 đang hiển thị sai ngôn
+  // ngữ cũ, phải fetch lại bằng lang mới. `getLocale()` đọc thẳng ref reactive của
+  // vue-i18n nên watch getter này bắt được cả đổi qua MES lẫn qua setLocale() riêng.
+  watch(getLocale, () => {
+    if (hasData.value) void loadAiSummary()
+  })
 
   /** Fetch material-shortage sau khi BE vừa rebuild (/aps/run|/aps/adjust) rồi remap vào runResult. */
   async function applyAssembled(result: { workPlans: WorkPlan[]; loadCells: LoadCell[]; kpi: Kpi }): Promise<void> {
