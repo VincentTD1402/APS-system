@@ -22,6 +22,7 @@
     "close": "Đóng",
     "detail": "Chi tiết",
     "all": "Tất cả",
+    "select": "Chọn",
     "search": "Tìm kiếm",
     "loading": "Đang tải...",
     "noData": "Không có dữ liệu",
@@ -34,6 +35,16 @@
     "workCenter": "Work Center",
     "item": "Item",
     "risk": "Rủi ro"
+  },
+  "filterBar": {
+    "businessUnit": "Đơn vị KD",
+    "planType": "Loại kế hoạch",
+    "requestDate": "Ngày yêu cầu",
+    "apsDocNo": "Số chứng từ APS",
+    "rev": "Rev.",
+    "status": "Trạng thái xử lý",
+    "owner": "Người phụ trách",
+    "dept": "Phòng ban"
   },
   "kpi": {
     "onTime": "Tỉ lệ giao hàng đúng hạn",
@@ -53,7 +64,13 @@
       "overload": "Quá tải",
       "both": "Thiếu VL + Quá tải",
       "empty": "Chưa phân bổ"
-    }
+    },
+    "col": {
+      "wc": "Work Center",
+      "count": "Số chỉ thị",
+      "qtySum": "Tổng SL"
+    },
+    "total": "Tổng cộng"
   },
   "matrix": {
     "aggregate": "Tổng hợp WC",
@@ -71,6 +88,7 @@
   "workPlanList": {
     "title": "Danh sách kế hoạch sản xuất",
     "subtitle": "Tổng {total} · Rủi ro {risk} · Trễ {delay}",
+    "unit": "kế hoạch",
     "col": {
       "workOrderNo": "Mã chỉ thị SX",
       "tmpPlanNo": "Mã KHSX tạm",
@@ -117,6 +135,21 @@
       "workOrder": "Chỉ thị SX",
       "mps": "MPS"
     }
+  },
+  "actionPanel": {
+    "header": "Action",
+    "titleBoth": "Điều chỉnh lịch + Yêu cầu mua hàng",
+    "selectRow": "Chọn 1 dòng",
+    "materialName": "Tên vật liệu",
+    "onHand": "Tồn hiện tại",
+    "shortageQty": "SL thiếu",
+    "requestQty": "SL yêu cầu",
+    "memoPlaceholder": "Nhập ghi chú"
+  },
+  "badge": {
+    "pending": "Đang chờ",
+    "solved": "Đã giải quyết",
+    "unresolved": "Chưa giải quyết"
   },
   "dialog": {
     "purchase": {
@@ -183,5 +216,40 @@
     "endDate": "Ngày kết thúc",
     "status": "Trạng thái",
     "statusDraft": "Đã lập"
+  },
+  "aiPanel": {
+    "header": "AI đề xuất",
+    "placeholder": "Tải dữ liệu để xem phân tích rủi ro.",
+    "errorMsg": "Không tải được phân tích AI.",
+    "retry": "Thử lại",
+    "docTitle": "Rủi ro kế hoạch và khuyến nghị",
+    "stale": "※ Không tải được phân tích mới nhất — đang hiển thị kết quả cũ.",
+    "section1": "1. Nguyên nhân gốc của tác động (Impact)",
+    "section2": "2. Đơn hàng và khu vực (WO) bị ảnh hưởng, mức độ nghiêm trọng",
+    "affectedWc": "Khu vực bị ảnh hưởng: {list}",
+    "affectedOrder": "Đơn hàng bị ảnh hưởng: tổng {count} công việc bị ảnh hưởng.",
+    "severityLine": "Mức độ: {severity} (mức khẩn cấp: {urgency})",
+    "materialShort": "Thiếu vật liệu: {name} — tồn hiện tại {onHand}, thiếu {shortage}",
+    "section3": "3. Khuyến nghị xử lý và giảm thiểu",
+    "priorityLine": "Ưu tiên {priority}: {text}"
+  },
+  "apsView": {
+    "runIdle": "▶ Tải dữ liệu",
+    "runLoading": "Đang tải…",
+    "simIdle": "Mô phỏng",
+    "simLoading": "Đang tính…",
+    "dispatchLoading": "Đang tạo…",
+    "toastConfirmSaved": "Đã lưu · chờ mô phỏng",
+    "toastCancelled": "Đã hủy",
+    "toastRunFailed": "Tải dữ liệu thất bại · vui lòng thử lại",
+    "toastSimDone": "Mô phỏng hoàn tất · đã tính lại lịch",
+    "toastSimPrFailed": "Mô phỏng hoàn tất · một số yêu cầu mua hàng gửi thất bại (cần thử lại)",
+    "toastSimFailed": "Mô phỏng thất bại · vui lòng thử lại",
+    "toastNeedRun": "Vui lòng tải dữ liệu trước",
+    "toastDispatchDone": "Đã tạo chỉ thị sản xuất",
+    "toastDispatchFailed": "Tạo chỉ thị sản xuất thất bại · gửi G-System thất bại (cần thử lại)",
+    "toastDispatchError": "Tạo chỉ thị sản xuất thất bại · vui lòng thử lại",
+    "toastNeedSelect": "Vui lòng chọn 1 kế hoạch trước",
+    "toastAlreadyDispatched": "Kế hoạch này đã được tạo chỉ thị sản xuất"
   }
 }

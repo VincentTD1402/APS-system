@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
 import { useMasterStore } from '@/stores/master-store'
 import FilterBar from '@/components/aps/filter-bar.vue'
@@ -13,6 +14,7 @@ import type { WorkPlanRow } from '@/data/mock-scheduler'
 
 const store = useApsStore()
 const masterStore = useMasterStore()
+const { t } = useI18n()
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 const toastMessage = ref('')
@@ -48,7 +50,7 @@ function onConfirm(payload: {
     mode: payload.mode,
     data: payload.data,
   })
-  showToast('저장되었습니다 · 시뮬레이션 대기')
+  showToast(t('apsView.toastConfirmSaved'))
 }
 
 function onCancel() {
@@ -57,7 +59,7 @@ function onCancel() {
   if (!selectedRow.value || !selectedKey.value) return
   const wasConfirmed = store.confirmedRows.has(selectedKey.value)
   store.cancelAdjustment(selectedRow.value.id, selectedKey.value)
-  if (wasConfirmed) showToast('취소되었습니다')
+  if (wasConfirmed) showToast(t('apsView.toastCancelled'))
 }
 
 // ── RUN APS button ─────────────────────────────────────────────────────────────
@@ -65,32 +67,28 @@ async function onRunAps() {
   try {
     await store.runAps()
   } catch {
-    showToast('데이터 조회 실패 · 다시 시도해주세요')
+    showToast(t('apsView.toastRunFailed'))
   }
 }
 
 // ── 시뮬레이션 button ──────────────────────────────────────────────────────────
 async function onSimulate() {
   if (!store.hasData) {
-    showToast('먼저 데이터를 불러오세요')
+    showToast(t('apsView.toastNeedRun'))
     return
   }
   let purchaseRequestFailed = false
   try {
     ;({ purchaseRequestFailed } = await store.runSimulation())
   } catch {
-    showToast('시뮬레이션 실패 · 다시 시도해주세요')
+    showToast(t('apsView.toastSimFailed'))
     return
   }
   // Selection sau simulation có thể trỏ tới data cũ — clear để user chọn lại
   selectedRow.value = null
   selectedKey.value = null
   store.selectRow(null)
-  showToast(
-    purchaseRequestFailed
-      ? '시뮬레이션 완료 · 구매요청 일부 전송 실패 (재시도 필요)'
-      : '시뮬레이션 완료 · 스케줄 재계산됨',
-  )
+  showToast(purchaseRequestFailed ? t('apsView.toastSimPrFailed') : t('apsView.toastSimDone'))
 }
 
 // ── 작업지시 생성 button ───────────────────────────────────────────────────────
@@ -98,18 +96,18 @@ async function onSimulate() {
 // gate theo business state nữa. Thiếu selection / đã dispatch rồi thì báo toast.
 async function onDispatch() {
   if (!selectedKey.value || !selectedRow.value) {
-    showToast('먼저 작업계획을 선택하세요')
+    showToast(t('apsView.toastNeedSelect'))
     return
   }
   if (store.dispatchedIds.has(selectedKey.value)) {
-    showToast('이미 작업지시가 생성된 계획입니다')
+    showToast(t('apsView.toastAlreadyDispatched'))
     return
   }
   try {
     const { pushed } = await store.dispatchWorkOrder(selectedRow.value.id, selectedKey.value)
-    showToast(pushed ? '작업지시가 생성되었습니다' : '작업지시 생성 실패 · G-System 전송 실패 (재시도 필요)')
+    showToast(pushed ? t('apsView.toastDispatchDone') : t('apsView.toastDispatchFailed'))
   } catch {
-    showToast('작업지시 생성 실패 · 다시 시도해주세요')
+    showToast(t('apsView.toastDispatchError'))
   }
 }
 
@@ -163,22 +161,22 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="aps-canvas" aria-label="APS 작업계획 대시보드">
+  <main class="aps-canvas" :aria-label="t('nav.aps')">
     <Toast :message="toastMessage" :visible="toastVisible" />
 
-    <h1 class="aps-title">APS 작업계획</h1>
+    <h1 class="aps-title">{{ t('nav.aps') }}</h1>
 
     <div class="filter-row">
       <FilterBar />
       <button
         class="btn-run-aps"
         type="button"
-        aria-label="데이터 불러오기"
+        :aria-label="t('apsView.runIdle')"
         :disabled="store.isRunning"
         @click="onRunAps"
       >
-        <span v-if="store.isRunning">불러오는 중…</span>
-        <template v-else>▶ 데이터 불러오기</template>
+        <span v-if="store.isRunning">{{ t('apsView.runLoading') }}</span>
+        <template v-else>{{ t('apsView.runIdle') }}</template>
       </button>
     </div>
 
@@ -204,7 +202,7 @@ onUnmounted(() => {
             :disabled="store.isSimulating"
             @click="onSimulate"
           >
-            {{ store.isSimulating ? '계산 중…' : '시뮬레이션' }}
+            {{ store.isSimulating ? t('apsView.simLoading') : t('apsView.simIdle') }}
             <span class="btn-badge">{{ store.pendingCount }}</span>
           </button>
           <button
@@ -213,7 +211,7 @@ onUnmounted(() => {
             :disabled="store.isDispatching"
             @click="onDispatch"
           >
-            {{ store.isDispatching ? '생성 중…' : '작업지시 생성' }}
+            {{ store.isDispatching ? t('apsView.dispatchLoading') : t('detail.createWorkOrder') }}
           </button>
         </div>
       </div>

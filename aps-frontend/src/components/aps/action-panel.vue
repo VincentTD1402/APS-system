@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useApsStore } from '@/stores/aps-store'
 import BadgeTag from '@/components/aps/badge-tag.vue'
 import type { WorkPlanRow, RiskKind } from '@/data/mock-scheduler'
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useApsStore()
+const { t } = useI18n()
 
 // Mode logic:
 // - riskTypes (từ scheduler) là **day-based** — chip có thể là material_short do
@@ -37,9 +39,9 @@ const mode = computed<Mode>(() => {
 })
 
 const titleLabel = computed(() => {
-  if (mode.value === 'shortage') return '구매요청'
-  if (mode.value === 'both')     return '일정조정+구매요청'
-  return '일정조정'
+  if (mode.value === 'shortage') return t('detail.purchaseRequest')
+  if (mode.value === 'both')     return t('actionPanel.titleBoth')
+  return t('detail.scheduleAdjust')
 })
 
 // Chip meta cho row hiện tại
@@ -48,10 +50,10 @@ const rowChip = computed<Chip>(() => {
   const rt = props.row?.riskTypes ?? []
   const hasOver = rt.includes('overload')
   const hasShort = rt.includes('material_short')
-  if (hasOver && hasShort) return { code: 'both', label: '자재부족+부하초과' }
-  if (hasOver) return { code: 'overload', label: '부하초과' }
-  if (hasShort) return { code: 'shortage', label: '자재부족' }
-  return { code: 'normal', label: '정상' }
+  if (hasOver && hasShort) return { code: 'both', label: t('risk.both') }
+  if (hasOver) return { code: 'overload', label: t('risk.overload') }
+  if (hasShort) return { code: 'shortage', label: t('risk.materialShort') }
+  return { code: 'normal', label: t('risk.normal') }
 })
 
 // Material info lấy từ row.shortages — dòng NVL thực sự thiếu.
@@ -125,28 +127,28 @@ const badgeState = computed(() =>
   <div class="action-panel area-action">
     <div class="action-header">
       <svg class="ic-tool" aria-hidden="true"><use href="#ic-tool"/></svg>
-      Action [{{ titleLabel }}]
+{{ t('actionPanel.header') }} [{{ titleLabel }}]
       <BadgeTag :state="badgeState" />
     </div>
 
     <div class="action-body">
-      <div v-if="!row" class="action-empty">행을 선택하세요</div>
+      <div v-if="!row" class="action-empty">{{ t('actionPanel.selectRow') }}</div>
 
       <!-- Mode: 일정조정 -->
       <div v-else-if="mode === 'adjust'" class="action-content">
-        <span class="act-label">작업지시번호 :</span>
+        <span class="act-label">{{ t('workPlanList.col.workOrderNo') }} :</span>
         <span class="act-value">{{ row.workOrderNo ?? row.tmpPlanNo ?? '-' }}</span>
         <span :class="`risk-chip r-${rowChip.code}`">{{ rowChip.label }}</span>
 
-        <span class="act-label">품목 :</span>
+        <span class="act-label">{{ t('workPlanList.col.item') }} :</span>
         <span class="act-value">{{ row.itemName }}</span>
         <span></span>
 
-        <span class="act-label">워크센터 :</span>
+        <span class="act-label">{{ t('workPlanList.col.wc') }} :</span>
         <span class="act-value">{{ row.workcenterNo }}</span>
         <span></span>
 
-        <span class="act-label">요청일 :</span>
+        <span class="act-label">{{ t('filterBar.requestDate') }} :</span>
         <span class="act-value act-range-inline">
           <input type="date" v-model="dateStart" class="act-inline-input" />
           <span class="act-sep">~</span>
@@ -154,27 +156,27 @@ const badgeState = computed(() =>
         </span>
         <span></span>
 
-        <span class="act-label act-label-top">메모 :</span>
+        <span class="act-label act-label-top">{{ t('dialog.purchase.note') }} :</span>
         <span class="act-value act-memo-value">
-          <textarea v-model="memo" placeholder="메모를 입력하세요" class="act-inline-textarea"></textarea>
+          <textarea v-model="memo" :placeholder="t('actionPanel.memoPlaceholder')" class="act-inline-textarea"></textarea>
         </span>
       </div>
 
       <!-- Mode: 일정조정 + 구매요청 (both) -->
       <div v-else-if="mode === 'both'" class="action-content">
-        <span class="act-label">작업지시번호 :</span>
+        <span class="act-label">{{ t('workPlanList.col.workOrderNo') }} :</span>
         <span class="act-value">{{ row.workOrderNo ?? row.tmpPlanNo ?? '-' }}</span>
         <span :class="`risk-chip r-${rowChip.code}`">{{ rowChip.label }}</span>
 
-        <span class="act-label">품목 :</span>
+        <span class="act-label">{{ t('workPlanList.col.item') }} :</span>
         <span class="act-value">{{ row.itemName }}</span>
         <span></span>
 
-        <span class="act-label">워크센터 :</span>
+        <span class="act-label">{{ t('workPlanList.col.wc') }} :</span>
         <span class="act-value">{{ row.workcenterNo }}</span>
         <span></span>
 
-        <span class="act-label">요청일 :</span>
+        <span class="act-label">{{ t('filterBar.requestDate') }} :</span>
         <span class="act-value act-range-inline">
           <input type="date" v-model="dateStart" class="act-inline-input" />
           <span class="act-sep">~</span>
@@ -182,49 +184,49 @@ const badgeState = computed(() =>
         </span>
         <span></span>
 
-        <span class="act-label">자재명 :</span>
+        <span class="act-label">{{ t('actionPanel.materialName') }} :</span>
         <span class="act-value">{{ materialInfo.materialName }}</span>
         <span></span>
 
-        <span class="act-label">현재고 :</span>
+        <span class="act-label">{{ t('actionPanel.onHand') }} :</span>
         <span class="act-value">{{ materialInfo.onHand.toLocaleString('en-US') }}</span>
         <span></span>
 
-        <span class="act-label">부족수량 :</span>
+        <span class="act-label">{{ t('actionPanel.shortageQty') }} :</span>
         <span class="act-value">{{ materialInfo.shortage.toLocaleString('en-US') }}</span>
         <span></span>
 
-        <span class="act-label">요청수량 :</span>
+        <span class="act-label">{{ t('actionPanel.requestQty') }} :</span>
         <span class="act-value">
           <input type="number" v-model.number="reqQty" class="act-inline-input act-inline-input-end" min="0" />
         </span>
         <span></span>
 
-        <span class="act-label act-label-top">메모 :</span>
+        <span class="act-label act-label-top">{{ t('dialog.purchase.note') }} :</span>
         <span class="act-value act-memo-value">
-          <textarea v-model="memo" placeholder="메모를 입력하세요" class="act-inline-textarea"></textarea>
+          <textarea v-model="memo" :placeholder="t('actionPanel.memoPlaceholder')" class="act-inline-textarea"></textarea>
         </span>
       </div>
 
       <!-- Mode: 구매요청 (shortage) -->
       <div v-else class="action-content">
-        <span class="act-label">품목 :</span>
+        <span class="act-label">{{ t('workPlanList.col.item') }} :</span>
         <span class="act-value">{{ row.itemName }}</span>
         <span :class="`risk-chip r-${rowChip.code}`">{{ rowChip.label }}</span>
 
-        <span class="act-label">자재명 :</span>
+        <span class="act-label">{{ t('actionPanel.materialName') }} :</span>
         <span class="act-value">{{ materialInfo.materialName }}</span>
         <span></span>
 
-        <span class="act-label">현재고 :</span>
+        <span class="act-label">{{ t('actionPanel.onHand') }} :</span>
         <span class="act-value">{{ materialInfo.onHand.toLocaleString('en-US') }}</span>
         <span></span>
 
-        <span class="act-label">부족수량 :</span>
+        <span class="act-label">{{ t('actionPanel.shortageQty') }} :</span>
         <span class="act-value">{{ materialInfo.shortage.toLocaleString('en-US') }}</span>
         <span></span>
 
-        <span class="act-label">요청수량 :</span>
+        <span class="act-label">{{ t('actionPanel.requestQty') }} :</span>
         <span class="act-value">
           <input type="number" v-model.number="reqQty" class="act-inline-input act-inline-input-end" min="0" />
         </span>
@@ -233,8 +235,8 @@ const badgeState = computed(() =>
     </div>
 
     <div class="action-footer">
-      <button class="btn-cancel" type="button" @click="onCancel">✕ 취소</button>
-      <button class="btn-confirm" type="button" :disabled="!row" @click="onConfirm">✓ 확인</button>
+      <button class="btn-cancel" type="button" @click="onCancel">✕ {{ t('common.cancel') }}</button>
+      <button class="btn-confirm" type="button" :disabled="!row" @click="onConfirm">✓ {{ t('common.confirm') }}</button>
     </div>
   </div>
 </template>

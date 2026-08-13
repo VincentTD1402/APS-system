@@ -1,0 +1,255 @@
+{
+  "app": {
+    "title": "APS System",
+    "language": "Language"
+  },
+  "nav": {
+    "aps": "APS Work Plan",
+    "masters": "Master Data",
+    "workCenters": "Work Center / Equipment",
+    "items": "Item / Routing",
+    "bom": "BOM",
+    "inventory": "Inventory",
+    "mps": "Production Plan (MPS)"
+  },
+  "common": {
+    "run": "RUN APS",
+    "apply": "Apply",
+    "showAll": "Show All",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "detail": "Detail",
+    "all": "All",
+    "select": "Select",
+    "search": "Search",
+    "loading": "Loading...",
+    "noData": "No data",
+    "invalidDateRange": "End date cannot be earlier than start date"
+  },
+  "filter": {
+    "dateRange": "Date range",
+    "completionFrom": "Completion date (from)",
+    "completionTo": "Completion date (to)",
+    "workCenter": "Work Center",
+    "item": "Item",
+    "risk": "Risk"
+  },
+  "filterBar": {
+    "businessUnit": "Business Unit",
+    "planType": "Plan Type",
+    "requestDate": "Request Date",
+    "apsDocNo": "APS Doc No.",
+    "rev": "Rev.",
+    "status": "Status",
+    "owner": "Owner",
+    "dept": "Department"
+  },
+  "kpi": {
+    "onTime": "On-time Delivery Rate",
+    "materialShort": "Material Shortage on Input",
+    "overloadWc": "Workcenter Overload",
+    "planRisk": "Expected Planning Risk",
+    "unitPct": "%",
+    "unitCase": "cases",
+    "unitWc": "%WC"
+  },
+  "loadMatrix": {
+    "title": "Load Detail",
+    "subtitle": "Work Center × Date",
+    "legend": {
+      "normal": "Normal",
+      "materialShort": "Material Shortage",
+      "overload": "Overload",
+      "both": "Shortage + Overload",
+      "empty": "Unassigned"
+    },
+    "col": {
+      "wc": "Work Center",
+      "count": "Order Count",
+      "qtySum": "Total Qty"
+    },
+    "total": "Total"
+  },
+  "matrix": {
+    "aggregate": "WC Aggregate",
+    "detail": "Plan Detail"
+  },
+  "planMatrix": {
+    "title": "Load Detail by Plan",
+    "subtitle": "Each row = 1 plan · Cell value = daily production qty",
+    "col": {
+      "wc": "WC",
+      "item": "Item",
+      "qty": "Plan Qty"
+    }
+  },
+  "workPlanList": {
+    "title": "Work Plan List",
+    "subtitle": "Total {total} · Risk {risk} · Delay {delay}",
+    "unit": "plans",
+    "col": {
+      "workOrderNo": "Work Order No.",
+      "tmpPlanNo": "Temp Plan No.",
+      "orderNo": "Order",
+      "item": "Item",
+      "wc": "Work Center",
+      "process": "Process",
+      "planQty": "Plan Qty",
+      "planStart": "Plan Start",
+      "planEnd": "Plan End",
+      "deliveryDate": "Delivery Date",
+      "sourceType": "Source Type",
+      "riskType": "Risk Type",
+      "action": "Action"
+    }
+  },
+  "risk": {
+    "normal": "Normal",
+    "materialShort": "Material Shortage",
+    "overload": "Overload",
+    "both": "Shortage + Overload"
+  },
+  "detail": {
+    "title": "Detail by Type",
+    "selectPlan": "Select a plan from the list on the left",
+    "purchaseRequest": "Purchase Request",
+    "purchaseRequestDone": "Purchase Requested",
+    "cancelPurchaseRequest": "Cancel Purchase Request",
+    "scheduleAdjust": "Schedule Adjustment",
+    "scheduleAdjustDone": "Schedule Adjusted",
+    "cancelScheduleAdjust": "Cancel Schedule Adjustment",
+    "createWorkOrder": "Create Work Order",
+    "adjustedBadge": "Adjustment Applied",
+    "info": {
+      "item": "Item",
+      "wc": "Work Center",
+      "planQty": "Plan Qty",
+      "delivery": "Delivery Date",
+      "start": "Start",
+      "end": "End",
+      "source": "Source"
+    },
+    "source": {
+      "workOrder": "Work Order",
+      "mps": "MPS"
+    }
+  },
+  "actionPanel": {
+    "header": "Action",
+    "titleBoth": "Schedule Adjustment + Purchase Request",
+    "selectRow": "Select a row",
+    "materialName": "Material Name",
+    "onHand": "On-hand Stock",
+    "shortageQty": "Shortage Qty",
+    "requestQty": "Request Qty",
+    "memoPlaceholder": "Enter memo"
+  },
+  "badge": {
+    "pending": "Pending",
+    "solved": "Resolved",
+    "unresolved": "Unresolved"
+  },
+  "dialog": {
+    "purchase": {
+      "title": "Purchase Request",
+      "shortageQty": "Shortage Qty",
+      "onHandQty": "Current Stock",
+      "requestQty": "Request Qty",
+      "note": "Memo",
+      "stagedNote": "Staged — will only be sent when the work order for this plan is created.",
+      "noShortage": "No material shortage for this product."
+    },
+    "adjust": {
+      "title": "Schedule Adjustment",
+      "newStart": "New Start Date",
+      "newEnd": "New End Date",
+      "note": "After saving, click Apply to reflect the change on the matrix."
+    },
+    "dispatch": {
+      "title": "Create Work Order",
+      "noPlans": "No plans available to create a work order.",
+      "confirmHeader": "Confirm Work Order Creation",
+      "confirmMessage": "Once sent, the work order will be created and can no longer be edited. Please confirm."
+    }
+  },
+  "master": {
+    "wc": {
+      "code": "Code",
+      "name": "Name",
+      "defaultRuntime": "Default Runtime (min)",
+      "totalRuntime": "Total Runtime (min)",
+      "equipmentCount": "Equipment Count"
+    },
+    "equipment": {
+      "code": "Equipment Code",
+      "stRate": "ST Conversion Rate",
+      "runtime": "Runtime (min)"
+    },
+    "item": {
+      "code": "Item Code",
+      "name": "Name",
+      "uom": "UoM"
+    },
+    "routing": {
+      "step": "Step",
+      "wc": "Work Center",
+      "process": "Process",
+      "standardSt": "Standard S/T (min)"
+    },
+    "bom": {
+      "parent": "Parent Item",
+      "child": "Child Item",
+      "qtyPer": "Qty per Unit"
+    },
+    "inventory": {
+      "warehouse": "Warehouse",
+      "onHand": "On-hand Qty",
+      "asOf": "As-of Date"
+    }
+  },
+  "mps": {
+    "list": "MPS List",
+    "add": "Add",
+    "orderNo": "Order No.",
+    "endDate": "End Date",
+    "status": "Status",
+    "statusDraft": "Draft"
+  },
+  "aiPanel": {
+    "header": "AI Suggestion",
+    "placeholder": "Load data to see the risk analysis.",
+    "errorMsg": "Failed to load AI analysis.",
+    "retry": "Retry",
+    "docTitle": "Plan Risk & Recommendations",
+    "stale": "※ Could not load the latest analysis — showing the previous result.",
+    "section1": "1. Root Cause of Impact",
+    "section2": "2. Affected Orders, Workcenters (WO) & Severity",
+    "affectedWc": "Affected workcenters: {list}",
+    "affectedOrder": "Affected orders: {count} operations impacted in total.",
+    "severityLine": "Severity: {severity} (Urgency: {urgency})",
+    "materialShort": "Material shortage: {name} — on-hand {onHand}, shortage {shortage}",
+    "section3": "3. Resolution & Mitigation Recommendations",
+    "priorityLine": "Priority {priority}: {text}"
+  },
+  "apsView": {
+    "runIdle": "▶ Load Data",
+    "runLoading": "Loading…",
+    "simIdle": "Simulate",
+    "simLoading": "Calculating…",
+    "dispatchLoading": "Creating…",
+    "toastConfirmSaved": "Saved · pending simulation",
+    "toastCancelled": "Cancelled",
+    "toastRunFailed": "Failed to load data · please try again",
+    "toastSimDone": "Simulation complete · schedule recalculated",
+    "toastSimPrFailed": "Simulation complete · some purchase requests failed to send (retry needed)",
+    "toastSimFailed": "Simulation failed · please try again",
+    "toastNeedRun": "Please load data first",
+    "toastDispatchDone": "Work order created",
+    "toastDispatchFailed": "Failed to create work order · G-System push failed (retry needed)",
+    "toastDispatchError": "Failed to create work order · please try again",
+    "toastNeedSelect": "Please select a plan first",
+    "toastAlreadyDispatched": "This plan already has a work order"
+  }
+}

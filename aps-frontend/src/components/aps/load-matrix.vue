@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDragScroll } from '@/composables/use-drag-scroll'
 import { useApsStore } from '@/stores/aps-store'
 import type { LoadCellStatus, WorkPlanRow } from '@/data/mock-scheduler'
 
 const store = useApsStore()
+const { t } = useI18n()
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const fixedSide  = ref<HTMLElement | null>(null)
@@ -183,14 +185,14 @@ function shortDate(d: string): string {
     <div class="lm-header">
       <div class="lm-title">
         <svg class="ic-clock" aria-hidden="true"><use href="#ic-clock"/></svg>
-        부하내역
+        {{ t('loadMatrix.title') }}
       </div>
       <div class="lm-legend">
-        <span class="lg-item"><i class="sw sw-normal"></i>정상</span>
-        <span class="lg-item"><i class="sw sw-shortage"></i>자재부족</span>
-        <span class="lg-item"><i class="sw sw-overload"></i>부하초과</span>
-        <span class="lg-item"><i class="sw sw-both"></i>자재부족+부하초과</span>
-        <span class="lg-item"><i class="sw sw-unassigned"></i>미배정</span>
+        <span class="lg-item"><i class="sw sw-normal"></i>{{ t('loadMatrix.legend.normal') }}</span>
+        <span class="lg-item"><i class="sw sw-shortage"></i>{{ t('loadMatrix.legend.materialShort') }}</span>
+        <span class="lg-item"><i class="sw sw-overload"></i>{{ t('loadMatrix.legend.overload') }}</span>
+        <span class="lg-item"><i class="sw sw-both"></i>{{ t('loadMatrix.legend.both') }}</span>
+        <span class="lg-item"><i class="sw sw-unassigned"></i>{{ t('loadMatrix.legend.empty') }}</span>
       </div>
     </div>
 
@@ -200,9 +202,9 @@ function shortDate(d: string): string {
         <table class="lm-table lm-t-fixed">
           <thead>
             <tr>
-              <th class="col-wc">워크센터</th>
-              <th class="col-count col-num">지시건수</th>
-              <th class="col-sum col-num">지시량계</th>
+              <th class="col-wc">{{ t('loadMatrix.col.wc') }}</th>
+              <th class="col-count col-num">{{ t('loadMatrix.col.count') }}</th>
+              <th class="col-sum col-num">{{ t('loadMatrix.col.qtySum') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -278,7 +280,7 @@ function shortDate(d: string): string {
     <!-- Footer row: 합계 (left) + custom horizontal scrollbar (right) -->
     <div class="lm-footer-row">
       <div class="lm-footer-fixed">
-        <span class="ff-wc">합계</span>
+        <span class="ff-wc">{{ t('loadMatrix.total') }}</span>
         <span class="ff-count">{{ store.totalCount }}</span>
         <span class="ff-sum">{{ store.totalSum }}</span>
       </div>
