@@ -20,6 +20,7 @@ from app.services.llm.llm_cache import (
     set_cached_response,
 )
 from app.services.llm.risk_narrative import generate_narrative
+from app.services.llm.risk_narrative_i18n import DEFAULT_LANG
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -54,11 +55,13 @@ def _parse_date(value: str | None, field: str) -> date_cls | None:
         "GET /work-plan/list, so the analysis always describes exactly the rows the "
         "user is looking at; selecting a row does not change it.\n\n"
         "`facts` is computed from aps_daily_plan / aps_material_shortage — every number "
-        "shown comes from there. `narrative` is Korean prose over those facts; it never "
-        "supplies a figure. The prose comes from the LLM when the model is reachable and "
-        "its figures check out, and from a deterministic template otherwise, so the "
-        "response shape never changes. Figures the LLM invented — and which were therefore "
-        "discarded — are listed in `rejectedNumbers`.\n\n"
+        "shown comes from there. `narrative` is prose over those facts in the language "
+        "named by `lang` (a GSystem language code); it never supplies a figure. The prose "
+        "comes from the LLM when the model is reachable and its figures check out, and from "
+        "a deterministic template otherwise, so the response shape never changes. Figures "
+        "the LLM invented — and which were therefore discarded — are listed in "
+        "`rejectedNumbers`. The cache is keyed per `lang` too, so switching language always "
+        "re-fetches instead of replaying a stale-language answer.\n\n"
         "Call POST /kpi-summary/daily-plan/rebuild first so the risk data is fresh."
     ),
 )
@@ -71,6 +74,7 @@ async def get_work_plan_risk_summary(
     plan_no: str | None = Query(None, description="Match tmp_plan_no / work_order_no / order_no"),
     date_from: str | None = Query(None, description="Keep rows with mps_completion_date >= (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="Keep rows with mps_completion_date <= (YYYY-MM-DD)"),
+    lang: str = Query(DEFAULT_LANG, description="GSystem language code — same as the FE's active locale"),
     refresh: bool = Query(False, description="Bypass the cache and re-run the LLM"),
     db: Session = Depends(get_db),
 ) -> RiskRecommendation:
@@ -81,6 +85,7 @@ async def get_work_plan_risk_summary(
         "plan_no": plan_no,
         "date_from": date_from,
         "date_to": date_to,
+        "lang": lang,
     }
     cache_key = _filter_cache_key(filters)
 
@@ -101,7 +106,7 @@ async def get_work_plan_risk_summary(
         date_to=_parse_date(date_to, "date_to"),
     )
 
-    narrative, generated_by, rejected = await generate_narrative(facts)
+    narrative, generated_by, rejected = await generate_narrative(facts, lang=lang)
     response = RiskRecommendation(
         facts=facts,
         narrative=narrative,

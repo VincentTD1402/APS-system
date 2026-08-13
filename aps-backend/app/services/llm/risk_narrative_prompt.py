@@ -7,6 +7,8 @@ only has to police *content*: no arithmetic, no figures outside the facts.
 """
 from __future__ import annotations
 
+from app.services.llm.risk_narrative_i18n import DEFAULT_LANG, LANGUAGE_DIRECTIVE
+
 # Mirrors RiskNarrative. `additionalProperties: false` keeps the decoder from
 # inventing extra keys that would silently carry unvalidated claims.
 NARRATIVE_JSON_SCHEMA: dict = {
@@ -33,8 +35,20 @@ NARRATIVE_JSON_SCHEMA: dict = {
     "additionalProperties": False,
 }
 
-SYSTEM_PROMPT = """\
-당신은 APS 생산계획 리스크 분석가입니다. 반드시 한국어로만 작성하세요.
+def build_system_prompt(lang: str = DEFAULT_LANG) -> str:
+    """SYSTEM_PROMPT with the output-language directive swapped for `lang`.
+
+    Everything else stays Korean — an explicit "respond only in X" directive is
+    followed reliably regardless of the surrounding instruction language, and
+    translating every rule per language would multiply this file for no
+    measurable quality gain.
+    """
+    directive = LANGUAGE_DIRECTIVE.get(lang, LANGUAGE_DIRECTIVE[DEFAULT_LANG])
+    return _SYSTEM_PROMPT_TEMPLATE.format(language_directive=directive)
+
+
+_SYSTEM_PROMPT_TEMPLATE = """\
+당신은 APS 생산계획 리스크 분석가입니다. {language_directive}
 
 [절대 규칙 — 숫자]
 - facts JSON에 있는 숫자만 그대로 인용하세요.
