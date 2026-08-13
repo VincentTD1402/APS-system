@@ -35,8 +35,8 @@ from app.services.llm.risk_narrative_guard import (
 from app.services.llm.risk_narrative_i18n import DEFAULT_LANG, severity_label, template_strings
 from app.services.llm.risk_narrative_prompt import (
     NARRATIVE_JSON_SCHEMA,
-    USER_PROMPT,
     build_system_prompt,
+    build_user_prompt,
 )
 
 logger = get_logger(__name__)
@@ -125,9 +125,7 @@ async def generate_narrative(
         {"role": "system", "content": build_system_prompt(lang)},
         {
             "role": "user",
-            "content": USER_PROMPT.format(
-                facts=json.dumps(payload, ensure_ascii=False)
-            ),
+            "content": build_user_prompt(json.dumps(payload, ensure_ascii=False), lang),
         },
     ]
 
